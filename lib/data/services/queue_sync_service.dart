@@ -1,0 +1,95 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart';
+
+import '../datasources/remote_api_datasource.dart';
+import '../local/app_database.dart';
+import 'connectivity_watcher.dart';
+
+/// Maximum times an operation is retried before being marked failed.
+const _maxRetries = 3;
+
+/// Flushes the SQLite write queue to the remote API whenever connectivity
+/// is available.  Call [start] once at app startup — it will replay any
+/// pending offline writes immediately and auto-flush on future reconnects.
+class QueueSyncService {
+  QueueSyncService({
+    required AppDatabase db,
+    required RemoteApiDataSource remote,
+    required ConnectivityWatcher connectivity,
+  })  : _db = db,
+        _remote = remote,
+        _connectivity = connectivity;
+
+  final AppDatabase _db;
+  final RemoteApiDataSource _remote;
+  final ConnectivityWatcher _connectivity;
+  StreamSubscription<List<ConnectivityResult>>? _sub;
+
+  /// Starts the listener and performs an initial flush.
+  void start() {
+    _flush();
+    _sub = _connectivity.stream.listen((results) {
+      final online = results.any((r) => r != ConnectivityResult.none);
+      if (online) _flush();
+    });
+  }
+
+  void stop() {
+    _sub?.cancel();
+    _sub = null;
+  }
+
+  /// Replays all `pending` queue entries against the remote API.
+  Future<void> _flush() async {
+    List<Map<String, dynamic>> entries;
+    try {
+      entries = await _db.pendingWrites();
+    } catch (_) {
+      return; // DB not yet ready — skip silently
+    }
+    if (entries.isEmpty) return;
+
+    for (final entry in entries) {
+      final id = entry['id'] as int;
+      final operation = entry['operation'] as String;
+      final payload =
+          jsonDecode(entry['payload'] as String) as Map<String, dynamic>;
+      final retries = entry['retry_count'] as int;
+
+      try {
+        await _dispatch(operation, payload);
+        await _db.markWriteSynced(id);
+      } catch (e) {
+        final exceeded = retries + 1 >= _maxRetries;
+        await _db.incrementWriteRetry(id, markFailed: exceeded);
+        if (exceeded) {
+          debugPrint(
+            '[QueueSync] op=$operation id=$id failed after $_maxRetries '
+            'attempts — marked failed.',
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _dispatch(
+    String operation,
+    Map<String, dynamic> payload,
+  ) async {
+    switch (operation) {
+      case 'create_listing':
+        await _remote.createProduct(payload);
+      case 'update_listing':
+        final id = payload['id'] as String;
+        await _remote.updateProduct(id, payload);
+      case 'delete_listing':
+        final id = payload['id'] as String;
+        await _remote.deleteProduct(id);
+      default:
+        throw UnsupportedError('Unknown queue operation: $operation');
+    }
+  }
+}

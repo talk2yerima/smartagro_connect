@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "569426499692",
+    "project_id": "smartagro-connect",
+    "storage_bucket": "smartagro-connect.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:569426499692:android:9dbe9f2f4912a28b2aa049",
+        "android_client_info": {
+          "package_name": "com.smartagro.connect"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "569426499692-r1o1mc7872khq9u3urg45vqbtl9oo7tk.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.smartagro.connect",
+            "certificate_hash": "39609661dcd8c5a902c4b93e0e3c623738994c4a"
+          }
+        },
+        {
+          "client_id": "569426499692-5ilf27bvnftdt2l9bn9cub4tmvtrr9dj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDhmzMNhU2nfPkHXmIP6S_xTMeJ5LupTEg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "569426499692-5ilf27bvnftdt2l9bn9cub4tmvtrr9dj.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "569426499692-ffhpq6jobqrijnqvbubggdjjqqlpodep.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.smartagro.connect"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

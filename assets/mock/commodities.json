@@ -1,0 +1,12 @@
+{
+  "updatedAt": "2026-05-12T08:00:00Z",
+  "items": [
+    {"id": "maize", "name": "Maize", "unit": "bag (100kg)", "priceNgn": 28500, "changePct": 1.2, "category": "grains"},
+    {"id": "rice", "name": "Rice (paddy)", "unit": "bag (75kg)", "priceNgn": 42000, "changePct": -0.4, "category": "grains"},
+    {"id": "beans", "name": "Beans (oloyin)", "unit": "bag (100kg)", "priceNgn": 98000, "changePct": 0.8, "category": "legumes"},
+    {"id": "millet", "name": "Millet", "unit": "bag (100kg)", "priceNgn": 52000, "changePct": 0.0, "category": "grains"},
+    {"id": "sorghum", "name": "Sorghum", "unit": "bag (100kg)", "priceNgn": 48000, "changePct": -0.6, "category": "grains"},
+    {"id": "groundnut", "name": "Groundnut", "unit": "bag (80kg)", "priceNgn": 76000, "changePct": 1.1, "category": "oilseeds"},
+    {"id": "soybeans", "name": "Soybeans", "unit": "bag (100kg)", "priceNgn": 89000, "changePct": 0.3, "category": "legumes"}
+  ]
+}

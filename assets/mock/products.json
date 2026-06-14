@@ -1,0 +1,55 @@
+{
+  "items": [
+    {
+      "id": "p1",
+      "title": "Premium Maize — Ibadan",
+      "description": "Well dried maize, moisture tested. Bulk discount available.",
+      "priceNgn": 27000,
+      "quantityKg": 2500,
+      "state": "Oyo",
+      "city": "Ibadan",
+      "sellerId": "u1",
+      "sellerName": "Adunni Farms",
+      "sellerRating": 4.8,
+      "verified": true,
+      "availability": "in_stock",
+      "imageUrl": "https://images.unsplash.com/photo-1500595046743-cd271d694d30?w=800",
+      "lat": 7.3775,
+      "lng": 3.9470
+    },
+    {
+      "id": "p2",
+      "title": "Parboiled Rice — Kebbi",
+      "description": "High quality parboiled rice from Argungu corridor.",
+      "priceNgn": 41000,
+      "quantityKg": 1500,
+      "state": "Kebbi",
+      "city": "Argungu",
+      "sellerId": "u2",
+      "sellerName": "Sokoto Grains Co.",
+      "sellerRating": 4.6,
+      "verified": true,
+      "availability": "limited",
+      "imageUrl": "https://images.unsplash.com/photo-1586201375761-83865001e31c?w=800",
+      "lat": 12.7442,
+      "lng": 4.5253
+    },
+    {
+      "id": "p3",
+      "title": "Honey Beans — Jos",
+      "description": "Stone-free beans, sorted and bagged.",
+      "priceNgn": 95000,
+      "quantityKg": 800,
+      "state": "Plateau",
+      "city": "Jos",
+      "sellerId": "u3",
+      "sellerName": "Plateau Producers",
+      "sellerRating": 4.9,
+      "verified": true,
+      "availability": "in_stock",
+      "imageUrl": "https://images.unsplash.com/photo-1599599810769-bcde5a160d32?w=800",
+      "lat": 9.8965,
+      "lng": 8.8583
+    }
+  ]
+}

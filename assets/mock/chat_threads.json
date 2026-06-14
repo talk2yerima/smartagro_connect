@@ -1,0 +1,27 @@
+{
+  "threads": [
+    {
+      "id": "t1",
+      "peerId": "b1",
+      "peerName": "Lagos Commodity Hub",
+      "peerRole": "buyer",
+      "lastMessage": "Can you supply 50 bags next week?",
+      "updatedAt": "2026-05-11T16:22:00Z",
+      "unread": 2
+    },
+    {
+      "id": "t2",
+      "peerId": "u2",
+      "peerName": "Sokoto Grains Co.",
+      "peerRole": "farmer",
+      "lastMessage": "Price is firm at ₦41,000 per bag.",
+      "updatedAt": "2026-05-10T09:10:00Z",
+      "unread": 0
+    }
+  ],
+  "messages_t1": [
+    {"id": "m1", "threadId": "t1", "fromMe": false, "text": "Hello, we need maize for our mill.", "sentAt": "2026-05-11T15:00:00Z", "kind": "text"},
+    {"id": "m2", "threadId": "t1", "fromMe": true, "text": "Good afternoon. We have 120 bags available.", "sentAt": "2026-05-11T15:05:00Z", "kind": "text"},
+    {"id": "m3", "threadId": "t1", "fromMe": false, "text": "Can you supply 50 bags next week?", "sentAt": "2026-05-11T16:22:00Z", "kind": "text"}
+  ]
+}

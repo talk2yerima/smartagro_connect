@@ -1,0 +1,7 @@
+{
+  "items": [
+    {"id": "b1", "name": "Lagos Commodity Hub", "type": "buyer", "state": "Lagos", "distanceKm": 12, "rating": 4.7, "verified": true},
+    {"id": "b2", "name": "Abuja Agro Traders", "type": "buyer", "state": "FCT", "distanceKm": 28, "rating": 4.5, "verified": true},
+    {"id": "b3", "name": "Kano Wholesale Market", "type": "buyer", "state": "Kano", "distanceKm": 45, "rating": 4.6, "verified": false}
+  ]
+}
