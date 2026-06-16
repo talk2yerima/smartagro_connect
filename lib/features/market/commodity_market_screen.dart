@@ -10,6 +10,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/di/repositories_provider.dart';
 import '../../core/utils/money_format.dart';
 import '../../domain/entities/commodity.dart';
+import '../../shared/widgets/connectivity_banner.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/skeleton_list.dart';
 import '../../shared/widgets/sparkline_chart.dart';
@@ -171,14 +172,53 @@ class _CommodityMarketScreenState
           ),
         ],
       ),
-      body: async.when(
+      body: Column(
+        children: [
+          const ConnectivityBanner(),
+          Expanded(
+            child: async.when(
         loading: () => const SkeletonList(count: 6, showAvatar: true),
         error: (e, _) => Center(
-          child: Text(
-            'Error: $e',
-            style: const TextStyle(
-              color: AppColors.errorRed,
-              fontFamily: 'Poppins',
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.cloud_off_rounded,
+                    size: 48,
+                    color: AppColors.gray.withValues(alpha: 0.5)),
+                const SizedBox(height: 12),
+                Text(
+                  'Failed to load market data',
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w600,
+                    color: isDark
+                        ? AppColors.darkTextPrimary
+                        : AppColors.charcoal,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '$e',
+                  textAlign: TextAlign.center,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      color: AppColors.gray, fontSize: 12),
+                ),
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  onPressed: () => ref.invalidate(commoditiesProvider),
+                  icon: const Icon(Icons.refresh_rounded, size: 16),
+                  label: const Text('Retry'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.deepGreen,
+                    side:
+                        const BorderSide(color: AppColors.deepGreen),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -264,6 +304,9 @@ class _CommodityMarketScreenState
             ),
           );
         },
+      ),
+          ),
+        ],
       ),
     );
   }

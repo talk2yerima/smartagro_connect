@@ -1,9 +1,17 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, compute, defaultTargetPlatform;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+
+// Top-level so compute() can spawn it in a background isolate.
+List<Map<String, dynamic>> _decodePayloads(List<Map<String, dynamic>> maps) {
+  return maps
+      .map((m) => jsonDecode(m['payload'] as String) as Map<String, dynamic>)
+      .toList();
+}
 
 /// Local SQLite cache for offline-first marketplace reads.
 class AppDatabase {
@@ -95,9 +103,8 @@ CREATE TABLE meta (
       limit: limit,
       offset: offset > 0 ? offset : null,
     );
-    return maps
-        .map((m) => jsonDecode(m['payload'] as String) as Map<String, dynamic>)
-        .toList();
+    if (maps.length > 50) return compute(_decodePayloads, maps);
+    return _decodePayloads(maps);
   }
 
   Future<void> upsertProducts(List<Map<String, dynamic>> rows) async {
@@ -129,9 +136,8 @@ CREATE TABLE meta (
       limit: limit,
       offset: offset > 0 ? offset : null,
     );
-    return maps
-        .map((m) => jsonDecode(m['payload'] as String) as Map<String, dynamic>)
-        .toList();
+    if (maps.length > 50) return compute(_decodePayloads, maps);
+    return _decodePayloads(maps);
   }
 
   // ── Write queue ─────────────────────────────────────────────────────────────

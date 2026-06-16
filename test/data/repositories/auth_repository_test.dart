@@ -3,13 +3,16 @@ import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:smartagro_connect/core/errors/failures.dart';
 import 'package:smartagro_connect/data/repositories/auth_repository.dart';
+import 'package:smartagro_connect/data/services/firestore_service.dart';
 import 'package:smartagro_connect/data/services/secure_token_store.dart';
 import 'package:smartagro_connect/domain/entities/app_user.dart';
 
 class MockSecureTokenStore extends Mock implements SecureTokenStore {}
+class MockFirestoreService extends Mock implements FirestoreService {}
 
 void main() {
   late MockSecureTokenStore tokenStore;
+  late MockFirestoreService firestore;
   late SharedPreferences prefs;
   late AuthRepository repo;
 
@@ -17,12 +20,13 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     prefs = await SharedPreferences.getInstance();
     tokenStore = MockSecureTokenStore();
+    firestore = MockFirestoreService();
 
     when(() => tokenStore.writeTokens(access: any(named: 'access')))
         .thenAnswer((_) async {});
     when(() => tokenStore.clear()).thenAnswer((_) async {});
 
-    repo = AuthRepository(secure: tokenStore, prefs: prefs);
+    repo = AuthRepository(secure: tokenStore, prefs: prefs, firestore: firestore);
   });
 
   // ── currentSessionUser ──────────────────────────────────────────────────────

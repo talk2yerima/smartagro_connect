@@ -2,8 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:flutter/foundation.dart';
-
+import '../../core/utils/app_logger.dart';
 import '../datasources/remote_api_datasource.dart';
 import '../local/app_database.dart';
 import 'connectivity_watcher.dart';
@@ -66,9 +65,10 @@ class QueueSyncService {
         final exceeded = retries + 1 >= _maxRetries;
         await _db.incrementWriteRetry(id, markFailed: exceeded);
         if (exceeded) {
-          debugPrint(
+          log.w(
             '[QueueSync] op=$operation id=$id failed after $_maxRetries '
             'attempts — marked failed.',
+            error: e,
           );
         }
       }

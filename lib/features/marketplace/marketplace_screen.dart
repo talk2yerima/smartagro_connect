@@ -14,6 +14,7 @@ import '../../core/di/repositories_provider.dart';
 import '../../core/utils/money_format.dart';
 import '../../domain/entities/app_user.dart';
 import '../../domain/entities/product_listing.dart';
+import '../../shared/widgets/connectivity_banner.dart';
 import '../../shared/widgets/empty_state.dart';
 
 // ─── Category model ──────────────────────────────────────────────────────────
@@ -224,7 +225,11 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
           const SizedBox(width: 4),
         ],
       ),
-      body: async.when(
+      body: Column(
+        children: [
+          const ConnectivityBanner(),
+          Expanded(
+            child: async.when(
         loading: () => _LoadingGrid(isDark: isDark),
         error: (e, _) => Center(
           child: Padding(
@@ -363,6 +368,9 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
             ),
           );
         },
+      ),
+          ),
+        ],
       ),
     );
   }

@@ -5,11 +5,13 @@ import 'package:smartagro_connect/data/datasources/asset_bundle_datasource.dart'
 import 'package:smartagro_connect/data/datasources/remote_api_datasource.dart';
 import 'package:smartagro_connect/data/local/app_database.dart';
 import 'package:smartagro_connect/data/repositories/product_repository.dart';
+import 'package:smartagro_connect/data/services/firestore_service.dart';
 import 'package:smartagro_connect/domain/entities/product_listing.dart';
 
 class MockRemote extends Mock implements RemoteApiDataSource {}
 class MockAssets extends Mock implements AssetBundleDataSource {}
 class MockDb extends Mock implements AppDatabase {}
+class MockFirestoreService extends Mock implements FirestoreService {}
 
 const _rows = [
   {
@@ -34,13 +36,15 @@ void main() {
   late MockRemote remote;
   late MockAssets assets;
   late MockDb db;
+  late MockFirestoreService firestore;
   late ProductRepository repo;
 
   setUp(() {
     remote = MockRemote();
     assets = MockAssets();
     db = MockDb();
-    repo = ProductRepository(remote: remote, assets: assets, db: db);
+    firestore = MockFirestoreService();
+    repo = ProductRepository(remote: remote, assets: assets, db: db, firestore: firestore);
     when(() => db.upsertProducts(any())).thenAnswer((_) async {});
   });
 
