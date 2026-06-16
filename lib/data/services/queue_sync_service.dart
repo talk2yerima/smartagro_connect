@@ -2,13 +2,15 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../../core/utils/app_logger.dart';
 import '../datasources/remote_api_datasource.dart';
 import '../local/app_database.dart';
 import 'connectivity_watcher.dart';
 
 /// Maximum times an operation is retried before being marked failed.
-const _maxRetries = 3;
+const _maxRetries = 5;
 
 /// Flushes the SQLite write queue to the remote API whenever connectivity
 /// is available.  Call [start] once at app startup — it will replay any
@@ -18,6 +20,7 @@ class QueueSyncService {
     required AppDatabase db,
     required RemoteApiDataSource remote,
     required ConnectivityWatcher connectivity,
+    this.onQueueChanged,
   })  : _db = db,
         _remote = remote,
         _connectivity = connectivity;
@@ -25,6 +28,7 @@ class QueueSyncService {
   final AppDatabase _db;
   final RemoteApiDataSource _remote;
   final ConnectivityWatcher _connectivity;
+  final VoidCallback? onQueueChanged;
   StreamSubscription<List<ConnectivityResult>>? _sub;
 
   /// Starts the listener and performs an initial flush.
@@ -61,16 +65,26 @@ class QueueSyncService {
       try {
         await _dispatch(operation, payload);
         await _db.markWriteSynced(id);
+        onQueueChanged?.call();
       } catch (e) {
-        final exceeded = retries + 1 >= _maxRetries;
-        await _db.incrementWriteRetry(id, markFailed: exceeded);
-        if (exceeded) {
-          log.w(
-            '[QueueSync] op=$operation id=$id failed after $_maxRetries '
-            'attempts — marked failed.',
-            error: e,
-          );
+        // 404 / 409 → server conflict; mark immediately without retrying.
+        final isConflict = e is DioException &&
+            (e.response?.statusCode == 404 ||
+                e.response?.statusCode == 409);
+        if (isConflict) {
+          await _db.markWriteConflict(id);
+          log.w('[QueueSync] conflict op=$operation id=$id — marked conflict.', error: e);
+        } else {
+          final exceeded = retries + 1 >= _maxRetries;
+          await _db.incrementWriteRetry(id, markFailed: exceeded);
+          if (exceeded) {
+            log.w(
+              '[QueueSync] op=$operation id=$id failed after $_maxRetries attempts — marked failed.',
+              error: e,
+            );
+          }
         }
+        onQueueChanged?.call();
       }
     }
   }

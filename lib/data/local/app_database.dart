@@ -201,6 +201,22 @@ CREATE TABLE write_queue (
     );
   }
 
+  Future<void> markWriteConflict(int id) async {
+    await _db!.update(
+      'write_queue',
+      {'status': 'conflict'},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> pendingWriteCount() async {
+    final rows = await _db!.rawQuery(
+      "SELECT COUNT(*) as cnt FROM write_queue WHERE status = 'pending'",
+    );
+    return rows;
+  }
+
   Future<void> close() async {
     await _db?.close();
     _db = null;

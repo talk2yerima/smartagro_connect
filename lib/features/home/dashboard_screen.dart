@@ -12,6 +12,7 @@ import '../../domain/entities/commodity.dart';
 import '../../domain/entities/nearby_buyer.dart';
 import '../../domain/entities/product_listing.dart';
 import '../../shared/widgets/app_avatar.dart';
+import '../../shared/widgets/connectivity_banner.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/section_header.dart';
 import '../../shared/widgets/skeleton_list.dart';
@@ -85,7 +86,7 @@ class DashboardScreen extends ConsumerWidget {
     final commodities = ref.watch(commoditiesProvider);
     final buyers = ref.watch(buyersNearbyProvider);
     final products = ref.watch(productsProvider);
-    final role = user?.role ?? UserRole.farmer;
+    final role = ref.watch(authSessionProvider.select((u) => u?.role ?? UserRole.farmer));
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -116,7 +117,11 @@ class DashboardScreen extends ConsumerWidget {
           const SizedBox(width: 4),
         ],
       ),
-      body: RefreshIndicator(
+      body: Column(
+        children: [
+          const ConnectivityBanner(),
+          Expanded(
+            child: RefreshIndicator(
         color: AppColors.deepGreen,
         onRefresh: () async {
           ref.invalidate(commoditiesProvider);
@@ -132,7 +137,7 @@ class DashboardScreen extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           children: [
             // [1] HERO BANNER
-            _HeroBanner(user: user)
+            _HeroBanner(user: user, role: role)
                 .animate()
                 .fadeIn(duration: 400.ms)
                 .slideY(begin: 0.04, end: 0, duration: 400.ms),
@@ -306,6 +311,9 @@ class DashboardScreen extends ConsumerWidget {
           ],
         ),
       ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -315,14 +323,14 @@ class DashboardScreen extends ConsumerWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _HeroBanner extends StatelessWidget {
-  const _HeroBanner({required this.user});
+  const _HeroBanner({required this.user, required this.role});
 
   final AppUser? user;
+  final UserRole role;
 
   @override
   Widget build(BuildContext context) {
     final name = user?.name ?? 'Guest';
-    final role = user?.role ?? UserRole.farmer;
     final verified = user?.verified ?? false;
 
     return Container(
@@ -393,11 +401,29 @@ class _HeroBanner extends StatelessWidget {
                     ),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
-                  onPressed: () => context.push('/marketplace/add'),
-                  icon: const Icon(Icons.add_box_outlined, size: 18),
-                  label: const Text(
-                    'New Listing',
-                    style: TextStyle(
+                  onPressed: () => switch (role) {
+                    UserRole.farmer => context.push('/marketplace/add'),
+                    UserRole.buyer => context.push('/marketplace'),
+                    UserRole.transporter => context.push('/map'),
+                    UserRole.admin => context.push('/admin'),
+                  },
+                  icon: Icon(
+                    switch (role) {
+                      UserRole.farmer => Icons.add_box_outlined,
+                      UserRole.buyer => Icons.shopping_basket_outlined,
+                      UserRole.transporter => Icons.route_outlined,
+                      UserRole.admin => Icons.admin_panel_settings_outlined,
+                    },
+                    size: 18,
+                  ),
+                  label: Text(
+                    switch (role) {
+                      UserRole.farmer => 'New Listing',
+                      UserRole.buyer => 'Browse Produce',
+                      UserRole.transporter => 'View Routes',
+                      UserRole.admin => 'Admin Console',
+                    },
+                    style: const TextStyle(
                       fontFamily: 'Poppins',
                       fontWeight: FontWeight.w700,
                       fontSize: 14,
@@ -416,11 +442,26 @@ class _HeroBanner extends StatelessWidget {
                     ),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
-                  onPressed: () => context.push('/map'),
-                  icon: const Icon(Icons.map_outlined, size: 18),
-                  label: const Text(
-                    'Buyer Map',
-                    style: TextStyle(
+                  onPressed: () => switch (role) {
+                    UserRole.farmer || UserRole.admin => context.push('/main/market'),
+                    UserRole.buyer => context.push('/map'),
+                    UserRole.transporter => context.push('/main/messages'),
+                  },
+                  icon: Icon(
+                    switch (role) {
+                      UserRole.farmer || UserRole.admin => Icons.show_chart_rounded,
+                      UserRole.buyer => Icons.map_outlined,
+                      UserRole.transporter => Icons.chat_bubble_outline,
+                    },
+                    size: 18,
+                  ),
+                  label: Text(
+                    switch (role) {
+                      UserRole.farmer || UserRole.admin => 'Market Prices',
+                      UserRole.buyer => 'Buyer Map',
+                      UserRole.transporter => 'Dispatch Chat',
+                    },
+                    style: const TextStyle(
                       fontFamily: 'Poppins',
                       fontWeight: FontWeight.w700,
                       fontSize: 14,

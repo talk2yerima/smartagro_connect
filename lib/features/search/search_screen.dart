@@ -497,71 +497,88 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
         ref.invalidate(productsProvider);
         ref.invalidate(buyersNearbyProvider);
       },
-      child: ListView(
-        padding: const EdgeInsets.only(bottom: 24),
-        children: [
+      child: CustomScrollView(
+        slivers: [
           if (commodities.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            SectionHeader(
-              title: 'Commodities',
-              actionLabel: commodities.length > 2 ? 'See all' : null,
-              onAction: () => _tabController.animateTo(1),
+            SliverToBoxAdapter(
+              child: SectionHeader(
+                title: 'Commodities',
+                actionLabel: commodities.length > 2 ? 'See all' : null,
+                onAction: () => _tabController.animateTo(1),
+              ),
             ),
-            ...commodities.take(2).toList().asMap().entries.map((e) {
-              return Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                child: _CommodityTile(
-                  commodity: e.value,
-                  isDark: isDark,
-                  index: e.key,
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (ctx, i) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _CommodityTile(
+                      commodity: commodities[i],
+                      isDark: isDark,
+                      index: i,
+                    ),
+                  ),
+                  childCount: commodities.take(2).length,
                 ),
-              );
-            }),
+              ),
+            ),
           ],
           if (products.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            SectionHeader(
-              title: 'Products',
-              actionLabel: products.length > 2 ? 'See all' : null,
-              onAction: () => _tabController.animateTo(2),
+            SliverToBoxAdapter(
+              child: SectionHeader(
+                title: 'Products',
+                actionLabel: products.length > 2 ? 'See all' : null,
+                onAction: () => _tabController.animateTo(2),
+              ),
             ),
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 2,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              childAspectRatio: 0.82,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              children: products.take(2).toList().asMap().entries.map((e) {
-                return _ProductCard(
-                  product: e.value,
-                  isDark: isDark,
-                  index: e.key,
-                );
-              }).toList(),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              sliver: SliverGrid(
+                delegate: SliverChildBuilderDelegate(
+                  (ctx, i) => _ProductCard(
+                    product: products[i],
+                    isDark: isDark,
+                    index: i,
+                  ),
+                  childCount: products.take(2).length,
+                ),
+                gridDelegate:
+                    const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 10,
+                  childAspectRatio: 0.82,
+                ),
+              ),
             ),
           ],
           if (buyers.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            SectionHeader(
-              title: 'Buyers',
-              actionLabel: buyers.length > 2 ? 'See all' : null,
-              onAction: () => _tabController.animateTo(3),
+            SliverToBoxAdapter(
+              child: SectionHeader(
+                title: 'Buyers',
+                actionLabel: buyers.length > 2 ? 'See all' : null,
+                onAction: () => _tabController.animateTo(3),
+              ),
             ),
-            ...buyers.take(2).toList().asMap().entries.map((e) {
-              return Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                child: _BuyerTile(
-                  buyer: e.value,
-                  isDark: isDark,
-                  index: e.key,
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (ctx, i) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _BuyerTile(
+                      buyer: buyers[i],
+                      isDark: isDark,
+                      index: i,
+                    ),
+                  ),
+                  childCount: buyers.take(2).length,
                 ),
-              );
-            }),
+              ),
+            ),
           ],
+          const SliverToBoxAdapter(child: SizedBox(height: 24)),
         ],
       ),
     );
