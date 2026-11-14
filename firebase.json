@@ -1,1 +1,56 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"smartagro-connect","appId":"1:569426499692:android:9dbe9f2f4912a28b2aa049","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"smartagro-connect","configurations":{"android":"1:569426499692:android:9dbe9f2f4912a28b2aa049","ios":"1:569426499692:ios:a4134723eeaef80f2aa049","web":"1:569426499692:web:4d460b962728c55d2aa049","windows":"1:569426499692:web:9912290d671cbcb72aa049"}}}}}}
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "runtime": "nodejs22",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "test",
+        "*.log"
+      ]
+    }
+  ],
+  "emulators": {
+    "auth": {
+      "port": 9099
+    },
+    "functions": {
+      "port": 5001
+    },
+    "firestore": {
+      "port": 8085
+    },
+    "ui": {
+      "enabled": true
+    },
+    "singleProjectMode": true
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "smartagro-connect",
+          "appId": "1:569426499692:android:9dbe9f2f4912a28b2aa049",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "smartagro-connect",
+          "configurations": {
+            "android": "1:569426499692:android:9dbe9f2f4912a28b2aa049",
+            "ios": "1:569426499692:ios:af7a6b9b8ebb8cc32aa049",
+            "web": "1:569426499692:web:4d460b962728c55d2aa049",
+            "windows": "1:569426499692:web:9912290d671cbcb72aa049"
+          }
+        }
+      }
+    }
+  }
+}

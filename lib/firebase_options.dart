@@ -60,16 +60,17 @@ class DefaultFirebaseOptions {
     projectId: 'smartagro-connect',
     storageBucket: 'smartagro-connect.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyDM7UuW8R9dx6Y-qM1OfTNA1Ybh-hoWLQA',
-    appId: '1:569426499692:ios:a4134723eeaef80f2aa049',
+    appId: '1:569426499692:ios:af7a6b9b8ebb8cc32aa049',
     messagingSenderId: '569426499692',
     projectId: 'smartagro-connect',
     storageBucket: 'smartagro-connect.firebasestorage.app',
-    androidClientId: '569426499692-r1o1mc7872khq9u3urg45vqbtl9oo7tk.apps.googleusercontent.com',
-    iosClientId: '569426499692-jv12q31lkshj3bs86kd6c5jsll1skb0o.apps.googleusercontent.com',
-    iosBundleId: 'c',
+    androidClientId:
+        '569426499692-r1o1mc7872khq9u3urg45vqbtl9oo7tk.apps.googleusercontent.com',
+    iosClientId:
+        '569426499692-ffhpq6jobqrijnqvbubggdjjqqlpodep.apps.googleusercontent.com',
+    iosBundleId: 'com.smartagro.connect',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(

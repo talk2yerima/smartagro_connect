@@ -197,8 +197,8 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
   Future<void> _pickImage(ImageSource source) async {
     try {
       final picker = ImagePicker();
-      final file =
-          await picker.pickImage(source: source, imageQuality: 80, maxWidth: 1200);
+      final file = await picker.pickImage(
+          source: source, imageQuality: 80, maxWidth: 1200);
       if (file != null) {
         setState(() {
           _imagePath = file.path;
@@ -231,19 +231,18 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
           },
         )
         .then((url) {
-          if (mounted) {
-            setState(() {
-              _uploadedImageUrl = url;
-              _uploadProgress = null;
-            });
-          }
-        })
-        .catchError((_) {
-          if (mounted) {
-            setState(() => _uploadProgress = null);
-            _showSnack('Image upload failed. Please try again.');
-          }
+      if (mounted) {
+        setState(() {
+          _uploadedImageUrl = url;
+          _uploadProgress = null;
         });
+      }
+    }).catchError((_) {
+      if (mounted) {
+        setState(() => _uploadProgress = null);
+        _showSnack('Image upload failed. Please try again.');
+      }
+    });
   }
 
   // ─── GPS ──────────────────────────────────────────────────────────────────
@@ -265,11 +264,13 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
         }
       }
       if (permission == LocationPermission.deniedForever) {
-        _showSnack('Location permission permanently denied. Enable in settings.');
+        _showSnack(
+            'Location permission permanently denied. Enable in settings.');
         return;
       }
       await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium),
+        locationSettings:
+            const LocationSettings(accuracy: LocationAccuracy.medium),
       );
       // In production: reverse-geocode to fill state/city fields.
       _showSnack('GPS location detected. Fill city manually for accuracy.',
@@ -476,10 +477,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                       hint: 'e.g. Fresh White Maize — Kano 2024',
                       isDark: isDark,
                       maxLength: 80,
-                      validator: (v) =>
-                          (v == null || v.trim().length < 4)
-                              ? 'Enter a descriptive title (min 4 chars)'
-                              : null,
+                      validator: (v) => (v == null || v.trim().length < 4)
+                          ? 'Enter a descriptive title (min 4 chars)'
+                          : null,
                     ),
                     const SizedBox(height: 14),
                     _buildCategoryDropdown(isDark, textPrimary, textSub),
@@ -490,17 +490,13 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                       hint: 'Describe quality, harvest date, storage…',
                       isDark: isDark,
                       maxLines: 3,
-                      validator: (v) =>
-                          (v == null || v.trim().length < 10)
-                              ? 'Add a description (min 10 chars)'
-                              : null,
+                      validator: (v) => (v == null || v.trim().length < 10)
+                          ? 'Add a description (min 10 chars)'
+                          : null,
                     ),
                   ],
                 ),
-              )
-                  .animate(delay: 80.ms)
-                  .fadeIn()
-                  .slideY(begin: 0.04),
+              ).animate(delay: 80.ms).fadeIn().slideY(begin: 0.04),
 
               const SizedBox(height: 20),
 
@@ -529,8 +525,8 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                             hint: '0.00',
                             isDark: isDark,
                             prefixText: '₦ ',
-                            keyboardType:
-                                const TextInputType.numberWithOptions(decimal: true),
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
                             inputFormatters: [
                               FilteringTextInputFormatter.allow(
                                   RegExp(r'[\d.]'))
@@ -581,10 +577,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                     ),
                   ],
                 ),
-              )
-                  .animate(delay: 140.ms)
-                  .fadeIn()
-                  .slideY(begin: 0.04),
+              ).animate(delay: 140.ms).fadeIn().slideY(begin: 0.04),
 
               const SizedBox(height: 20),
 
@@ -611,8 +604,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                       label: 'City / LGA',
                       hint: 'e.g. Ikeja, Nassarawa, Ungwa Rimi',
                       isDark: isDark,
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'Enter city or LGA' : null,
+                      validator: (v) => (v == null || v.trim().isEmpty)
+                          ? 'Enter city or LGA'
+                          : null,
                     ),
                     const SizedBox(height: 14),
                     SizedBox(
@@ -648,10 +642,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                     ),
                   ],
                 ),
-              )
-                  .animate(delay: 200.ms)
-                  .fadeIn()
-                  .slideY(begin: 0.04),
+              ).animate(delay: 200.ms).fadeIn().slideY(begin: 0.04),
 
               const SizedBox(height: 28),
 
@@ -732,8 +723,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
         labelText: label,
         hintText: hint,
         hintStyle: GoogleFonts.poppins(fontSize: 13, color: hintColor),
-        labelStyle:
-            GoogleFonts.poppins(fontSize: 13, color: hintColor),
+        labelStyle: GoogleFonts.poppins(fontSize: 13, color: hintColor),
         prefixText: prefixText,
         suffixText: suffixText,
         filled: true,
@@ -755,21 +745,18 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide:
-              const BorderSide(color: AppColors.errorRed, width: 1.4),
+          borderSide: const BorderSide(color: AppColors.errorRed, width: 1.4),
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide:
-              const BorderSide(color: AppColors.errorRed, width: 1.8),
+          borderSide: const BorderSide(color: AppColors.errorRed, width: 1.8),
         ),
       ),
       validator: validator,
     );
   }
 
-  Widget _buildCategoryDropdown(
-      bool isDark, Color textPrimary, Color textSub) {
+  Widget _buildCategoryDropdown(bool isDark, Color textPrimary, Color textSub) {
     final borderColor =
         isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0);
     final fillColor = isDark ? const Color(0xFF121212) : AppColors.surfaceLight;
@@ -785,20 +772,17 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                 value: c,
                 child: Text(
                   c,
-                  style: GoogleFonts.poppins(
-                      fontSize: 14, color: textPrimary),
+                  style: GoogleFonts.poppins(fontSize: 14, color: textPrimary),
                 ),
               ))
           .toList(),
       onChanged: (v) => setState(() => _selectedCategory = v),
-      validator: (v) =>
-          v == null ? 'Please select a category' : null,
+      validator: (v) => v == null ? 'Please select a category' : null,
       style: GoogleFonts.poppins(fontSize: 14, color: textPrimary),
       dropdownColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
       decoration: InputDecoration(
         labelText: 'Category',
-        labelStyle:
-            GoogleFonts.poppins(fontSize: 13, color: textSub),
+        labelStyle: GoogleFonts.poppins(fontSize: 13, color: textSub),
         filled: true,
         fillColor: fillColor,
         contentPadding:
@@ -813,22 +797,19 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide:
-              const BorderSide(color: AppColors.deepGreen, width: 1.8),
+          borderSide: const BorderSide(color: AppColors.deepGreen, width: 1.8),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide:
-              const BorderSide(color: AppColors.errorRed, width: 1.4),
+          borderSide: const BorderSide(color: AppColors.errorRed, width: 1.4),
         ),
       ),
-      icon: const Icon(Icons.keyboard_arrow_down_rounded,
-          color: AppColors.gray),
+      icon:
+          const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.gray),
     );
   }
 
-  Widget _buildStateDropdown(
-      bool isDark, Color textPrimary, Color textSub) {
+  Widget _buildStateDropdown(bool isDark, Color textPrimary, Color textSub) {
     final borderColor =
         isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0);
     final fillColor = isDark ? const Color(0xFF121212) : AppColors.surfaceLight;
@@ -844,8 +825,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                 value: s,
                 child: Text(
                   s,
-                  style: GoogleFonts.poppins(
-                      fontSize: 14, color: textPrimary),
+                  style: GoogleFonts.poppins(fontSize: 14, color: textPrimary),
                 ),
               ))
           .toList(),
@@ -855,8 +835,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
       dropdownColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
       decoration: InputDecoration(
         labelText: 'State',
-        labelStyle:
-            GoogleFonts.poppins(fontSize: 13, color: textSub),
+        labelStyle: GoogleFonts.poppins(fontSize: 13, color: textSub),
         filled: true,
         fillColor: fillColor,
         contentPadding:
@@ -871,17 +850,15 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide:
-              const BorderSide(color: AppColors.deepGreen, width: 1.8),
+          borderSide: const BorderSide(color: AppColors.deepGreen, width: 1.8),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide:
-              const BorderSide(color: AppColors.errorRed, width: 1.4),
+          borderSide: const BorderSide(color: AppColors.errorRed, width: 1.4),
         ),
       ),
-      icon: const Icon(Icons.keyboard_arrow_down_rounded,
-          color: AppColors.gray),
+      icon:
+          const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.gray),
     );
   }
 }
@@ -1074,12 +1051,10 @@ class _AvailabilitySegment extends StatelessWidget {
             backgroundColor:
                 isDark ? const Color(0xFF121212) : AppColors.surfaceLight,
             side: BorderSide(
-              color: isDark
-                  ? const Color(0xFF2E3C2E)
-                  : const Color(0xFFE2EAE0),
+              color: isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0),
             ),
-            textStyle: GoogleFonts.poppins(
-                fontSize: 12, fontWeight: FontWeight.w500),
+            textStyle:
+                GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w500),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
             ),

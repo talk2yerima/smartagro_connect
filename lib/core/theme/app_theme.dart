@@ -40,10 +40,13 @@ abstract final class AppTheme {
     final Color onPrimary = Colors.white;
     final Color secondary = AppColors.golden;
     final Color scaffoldBg = isDark ? AppColors.darkBg : AppColors.softWhite;
-    final Color surfaceColor = isDark ? AppColors.darkSurface : AppColors.softWhite;
+    final Color surfaceColor =
+        isDark ? AppColors.darkSurface : AppColors.softWhite;
     final Color cardColor = isDark ? AppColors.cardDark : AppColors.cardLight;
-    final Color onSurface = isDark ? AppColors.darkTextPrimary : AppColors.charcoal;
-    final Color onSurfaceVar = isDark ? AppColors.darkTextSecondary : AppColors.gray;
+    final Color onSurface =
+        isDark ? AppColors.darkTextPrimary : AppColors.charcoal;
+    final Color onSurfaceVar =
+        isDark ? AppColors.darkTextSecondary : AppColors.gray;
     final Color outline = isDark ? AppColors.darkBorder : AppColors.borderLight;
     final Color inputFill = isDark ? AppColors.cardDark : AppColors.softWhite;
     final Color error = AppColors.errorRed;
@@ -52,7 +55,9 @@ abstract final class AppTheme {
       brightness: brightness,
       primary: primary,
       onPrimary: onPrimary,
-      primaryContainer: isDark ? AppColors.emerald.withValues(alpha: 0.25) : AppColors.surfaceLight,
+      primaryContainer: isDark
+          ? AppColors.emerald.withValues(alpha: 0.25)
+          : AppColors.surfaceLight,
       onPrimaryContainer: isDark ? AppColors.freshGreen : AppColors.deepGreen,
       secondary: secondary,
       onSecondary: AppColors.charcoal,
@@ -139,7 +144,8 @@ abstract final class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: inputFill,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         hintStyle: GoogleFonts.inter(
           fontSize: 14,
           fontWeight: FontWeight.w400,
@@ -181,9 +187,8 @@ abstract final class AppTheme {
 
       // ── Chips ─────────────────────────────────────────────────────────
       chipTheme: ChipThemeData(
-        backgroundColor: isDark
-            ? AppColors.darkSurface
-            : AppColors.surfaceLight,
+        backgroundColor:
+            isDark ? AppColors.darkSurface : AppColors.surfaceLight,
         selectedColor: isDark
             ? AppColors.deepGreen.withValues(alpha: 0.85)
             : AppColors.deepGreen,
@@ -421,7 +426,7 @@ abstract final class AppTheme {
           fontWeight: FontWeight.w400,
         ),
         dividerColor: outline,
-        tabAlignment: TabAlignment.start,
+        tabAlignment: TabAlignment.fill,
       ),
 
       // ── Slider ────────────────────────────────────────────────────────

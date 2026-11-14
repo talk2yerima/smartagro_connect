@@ -76,7 +76,7 @@ class StatCard extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         // Compact mode: height too small for vertical layout
-        final compact = constraints.maxHeight < 88;
+        final compact = constraints.maxHeight < 116;
         final pad = compact ? 10.0 : 14.0;
         final iconSize = compact ? 28.0 : 36.0;
 
@@ -121,8 +121,8 @@ class StatCard extends StatelessWidget {
                             const SizedBox(width: 3),
                             Text(
                               unit!,
-                              style: textTheme.bodySmall?.copyWith(
-                                  color: grayColor, fontSize: 10),
+                              style: textTheme.bodySmall
+                                  ?.copyWith(color: grayColor, fontSize: 10),
                               maxLines: 1,
                             ),
                           ],
@@ -130,8 +130,8 @@ class StatCard extends StatelessWidget {
                       ),
                       Text(
                         label,
-                        style: textTheme.bodySmall?.copyWith(
-                            color: grayColor, fontSize: 10),
+                        style: textTheme.bodySmall
+                            ?.copyWith(color: grayColor, fontSize: 10),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -194,8 +194,8 @@ class StatCard extends StatelessWidget {
                       padding: const EdgeInsets.only(bottom: 2),
                       child: Text(
                         unit!,
-                        style: textTheme.bodySmall
-                            ?.copyWith(color: grayColor, fontWeight: FontWeight.w500),
+                        style: textTheme.bodySmall?.copyWith(
+                            color: grayColor, fontWeight: FontWeight.w500),
                         maxLines: 1,
                       ),
                     ),

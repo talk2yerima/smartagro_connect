@@ -34,29 +34,49 @@ BoxDecoration _card(bool isDark) => BoxDecoration(
     );
 
 // ---------------------------------------------------------------------------
+// Sort options
+// ---------------------------------------------------------------------------
+enum _SortOption { nameAsc, nameDesc, priceHigh, priceLow, gainers, losers }
+
+String _sortLabel(_SortOption s) => switch (s) {
+      _SortOption.nameAsc => 'Name A → Z',
+      _SortOption.nameDesc => 'Name Z → A',
+      _SortOption.priceHigh => 'Price: High to Low',
+      _SortOption.priceLow => 'Price: Low to High',
+      _SortOption.gainers => 'Biggest Gainers',
+      _SortOption.losers => 'Biggest Losers',
+    };
+
+// ---------------------------------------------------------------------------
 // Category definitions
 // ---------------------------------------------------------------------------
 const List<String> _categories = [
   'All',
   'Grains',
+  'Tubers',
   'Vegetables',
   'Fruits',
-  'Livestock',
-  'Oilseeds',
+  'Oils',
+  'Legumes',
+  'Spices',
 ];
 
 IconData _categoryIcon(String category) {
   switch (category.toLowerCase()) {
     case 'grains':
       return Icons.grain;
+    case 'tubers':
+      return Icons.grass_outlined;
     case 'vegetables':
       return Icons.eco;
     case 'fruits':
       return Icons.spa;
-    case 'livestock':
-      return Icons.pets;
-    case 'oilseeds':
+    case 'oils':
       return Icons.opacity_outlined;
+    case 'legumes':
+      return Icons.filter_vintage_outlined;
+    case 'spices':
+      return Icons.local_fire_department_outlined;
     default:
       return Icons.storefront;
   }
@@ -66,14 +86,18 @@ Color _categoryColor(String category) {
   switch (category.toLowerCase()) {
     case 'grains':
       return const Color(0xFFF9A825);
+    case 'tubers':
+      return const Color(0xFFFB8C00);
     case 'vegetables':
       return const Color(0xFF4CAF50);
     case 'fruits':
-      return const Color(0xFFFB8C00);
-    case 'livestock':
-      return const Color(0xFF6D4C41);
-    case 'oilseeds':
+      return const Color(0xFF2E7D32);
+    case 'oils':
       return const Color(0xFF0277BD);
+    case 'legumes':
+      return const Color(0xFF00C853);
+    case 'spices':
+      return const Color(0xFFC62828);
     default:
       return const Color(0xFF2E7D32);
   }
@@ -90,10 +114,11 @@ class CommodityMarketScreen extends ConsumerStatefulWidget {
       _CommodityMarketScreenState();
 }
 
-class _CommodityMarketScreenState
-    extends ConsumerState<CommodityMarketScreen> {
+class _CommodityMarketScreenState extends ConsumerState<CommodityMarketScreen> {
   String _selectedCategory = 'All';
   String _query = '';
+  _SortOption _sortBy = _SortOption.nameAsc;
+  DateTime _lastFetched = DateTime.now();
   final TextEditingController _searchController = TextEditingController();
   Timer? _debounce;
 
@@ -112,12 +137,11 @@ class _CommodityMarketScreenState
   }
 
   List<Commodity> _filtered(List<Commodity> all) {
-    var list = all;
+    var list = [...all];
     if (_selectedCategory != 'All') {
       list = list
           .where((c) =>
-              c.category.toLowerCase() ==
-              _selectedCategory.toLowerCase())
+              c.category.toLowerCase() == _selectedCategory.toLowerCase())
           .toList();
     }
     if (_query.isNotEmpty) {
@@ -125,7 +149,33 @@ class _CommodityMarketScreenState
           .where((c) => c.name.toLowerCase().contains(_query.toLowerCase()))
           .toList();
     }
+    list.sort(_sorter());
     return list;
+  }
+
+  Comparator<Commodity> _sorter() => switch (_sortBy) {
+        _SortOption.nameAsc => (a, b) => a.name.compareTo(b.name),
+        _SortOption.nameDesc => (a, b) => b.name.compareTo(a.name),
+        _SortOption.priceHigh => (a, b) => b.priceNgn.compareTo(a.priceNgn),
+        _SortOption.priceLow => (a, b) => a.priceNgn.compareTo(b.priceNgn),
+        _SortOption.gainers => (a, b) => b.changePct.compareTo(a.changePct),
+        _SortOption.losers => (a, b) => a.changePct.compareTo(b.changePct),
+      };
+
+  void _showSortSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _SortSheet(
+        current: _sortBy,
+        onSelect: (s) {
+          setState(() => _sortBy = s);
+          Navigator.pop(context);
+        },
+      ),
+    );
   }
 
   // Compute summary stats from the full unfiltered list
@@ -144,8 +194,7 @@ class _CommodityMarketScreenState
     final async = ref.watch(commoditiesProvider);
 
     return Scaffold(
-      backgroundColor:
-          isDark ? AppColors.darkBg : AppColors.softWhite,
+      backgroundColor: isDark ? AppColors.darkBg : AppColors.softWhite,
       appBar: AppBar(
         elevation: 0,
         scrolledUnderElevation: 0.5,
@@ -155,9 +204,7 @@ class _CommodityMarketScreenState
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontFamily: 'Poppins',
                 fontWeight: FontWeight.w700,
-                color: isDark
-                    ? AppColors.darkTextPrimary
-                    : AppColors.charcoal,
+                color: isDark ? AppColors.darkTextPrimary : AppColors.charcoal,
               ),
         ),
         actions: [
@@ -165,8 +212,7 @@ class _CommodityMarketScreenState
             onPressed: () => context.push('/search'),
             icon: Icon(
               Icons.search_rounded,
-              color:
-                  isDark ? AppColors.darkTextPrimary : AppColors.charcoal,
+              color: isDark ? AppColors.darkTextPrimary : AppColors.charcoal,
             ),
             tooltip: 'Search',
           ),
@@ -177,134 +223,141 @@ class _CommodityMarketScreenState
           const ConnectivityBanner(),
           Expanded(
             child: async.when(
-        loading: () => const SkeletonList(count: 6, showAvatar: true),
-        error: (e, _) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.cloud_off_rounded,
-                    size: 48,
-                    color: AppColors.gray.withValues(alpha: 0.5)),
-                const SizedBox(height: 12),
-                Text(
-                  'Failed to load market data',
-                  style: TextStyle(
-                    fontFamily: 'Poppins',
-                    fontWeight: FontWeight.w600,
-                    color: isDark
-                        ? AppColors.darkTextPrimary
-                        : AppColors.charcoal,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '$e',
-                  textAlign: TextAlign.center,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      color: AppColors.gray, fontSize: 12),
-                ),
-                const SizedBox(height: 16),
-                OutlinedButton.icon(
-                  onPressed: () => ref.invalidate(commoditiesProvider),
-                  icon: const Icon(Icons.refresh_rounded, size: 16),
-                  label: const Text('Retry'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.deepGreen,
-                    side:
-                        const BorderSide(color: AppColors.deepGreen),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        data: (items) {
-          final filtered = _filtered(items);
-          final summary = _summary(items);
-
-          return RefreshIndicator(
-            color: AppColors.deepGreen,
-            onRefresh: () => ref.refresh(commoditiesProvider.future),
-            child: CustomScrollView(
-              slivers: [
-                // ── 1. Search bar ─────────────────────────────────────────
-                SliverToBoxAdapter(
-                  child: _SearchBar(
-                    controller: _searchController,
-                    isDark: isDark,
-                    onChanged: _onSearchChanged,
-                    onFilterTap: () {
-                      // Filter action placeholder — reserved for a bottom sheet
-                    },
-                  ).animate().fadeIn(duration: 300.ms).slideY(begin: -0.04),
-                ),
-
-                // ── 2. Category chips ─────────────────────────────────────
-                SliverToBoxAdapter(
-                  child: _CategoryChips(
-                    selected: _selectedCategory,
-                    isDark: isDark,
-                    onSelect: (cat) =>
-                        setState(() => _selectedCategory = cat),
-                  )
-                      .animate()
-                      .fadeIn(duration: 300.ms, delay: 60.ms)
-                      .slideY(begin: -0.03),
-                ),
-
-                // ── 3. Market summary strip ───────────────────────────────
-                SliverToBoxAdapter(
-                  child: _MarketSummaryStrip(
-                    summary: summary,
-                    isDark: isDark,
-                  )
-                      .animate()
-                      .fadeIn(duration: 300.ms, delay: 100.ms)
-                      .slideY(begin: -0.02),
-                ),
-
-                // ── 4. Commodity list ─────────────────────────────────────
-                filtered.isEmpty
-                    ? const SliverFillRemaining(
-                        child: EmptyState(
-                          icon: Icons.bar_chart_rounded,
-                          title: 'No commodities found',
-                          subtitle:
-                              'Try adjusting your search or filters',
-                        ),
-                      )
-                    : SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                        sliver: SliverList(
-                          delegate: SliverChildBuilderDelegate(
-                            (context, i) {
-                              final c = filtered[i];
-                              return _CommodityCard(
-                                key: ValueKey(c.id),
-                                commodity: c,
-                                isDark: isDark,
-                                index: i,
-                              );
-                            },
-                            findChildIndexCallback: (key) {
-                              final id = (key as ValueKey<String>).value;
-                              final idx =
-                                  filtered.indexWhere((c) => c.id == id);
-                              return idx == -1 ? null : idx;
-                            },
-                            childCount: filtered.length,
-                          ),
+              loading: () => const SkeletonList(count: 6, showAvatar: true),
+              error: (e, _) => Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.cloud_off_rounded,
+                          size: 48,
+                          color: AppColors.gray.withValues(alpha: 0.5)),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Failed to load market data',
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontWeight: FontWeight.w600,
+                          color: isDark
+                              ? AppColors.darkTextPrimary
+                              : AppColors.charcoal,
                         ),
                       ),
-              ],
+                      const SizedBox(height: 6),
+                      Text(
+                        '$e',
+                        textAlign: TextAlign.center,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            color: AppColors.gray, fontSize: 12),
+                      ),
+                      const SizedBox(height: 16),
+                      OutlinedButton.icon(
+                        onPressed: () => ref.invalidate(commoditiesProvider),
+                        icon: const Icon(Icons.refresh_rounded, size: 16),
+                        label: const Text('Retry'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.deepGreen,
+                          side: const BorderSide(color: AppColors.deepGreen),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              data: (items) {
+                final filtered = _filtered(items);
+                final summary = _summary(items);
+
+                return RefreshIndicator(
+                  color: AppColors.deepGreen,
+                  onRefresh: () async {
+                    HapticFeedback.mediumImpact();
+                    ref.invalidate(commoditiesProvider);
+                    await ref.read(commoditiesProvider.future);
+                    if (mounted) setState(() => _lastFetched = DateTime.now());
+                  },
+                  child: CustomScrollView(
+                    slivers: [
+                      // ── 1. Search bar ─────────────────────────────────────────
+                      SliverToBoxAdapter(
+                        child: _SearchBar(
+                          controller: _searchController,
+                          isDark: isDark,
+                          onChanged: _onSearchChanged,
+                          onFilterTap: _showSortSheet,
+                        )
+                            .animate()
+                            .fadeIn(duration: 300.ms)
+                            .slideY(begin: -0.04),
+                      ),
+
+                      // ── 2. Category chips ─────────────────────────────────────
+                      SliverToBoxAdapter(
+                        child: _CategoryChips(
+                          selected: _selectedCategory,
+                          isDark: isDark,
+                          onSelect: (cat) =>
+                              setState(() => _selectedCategory = cat),
+                        )
+                            .animate()
+                            .fadeIn(duration: 300.ms, delay: 60.ms)
+                            .slideY(begin: -0.03),
+                      ),
+
+                      // ── 3. Market summary strip ───────────────────────────────
+                      SliverToBoxAdapter(
+                        child: _MarketSummaryStrip(
+                          summary: summary,
+                          isDark: isDark,
+                          lastFetched: _lastFetched,
+                        )
+                            .animate()
+                            .fadeIn(duration: 300.ms, delay: 100.ms)
+                            .slideY(begin: -0.02),
+                      ),
+
+                      // ── 4. Commodity list ─────────────────────────────────────
+                      filtered.isEmpty
+                          ? const SliverFillRemaining(
+                              child: EmptyState(
+                                type: EmptyStateType.market,
+                                icon: Icons.bar_chart_rounded,
+                                title: 'No commodities found',
+                                subtitle:
+                                    'Try adjusting your search or filters',
+                              ),
+                            )
+                          : SliverPadding(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                              sliver: SliverList(
+                                delegate: SliverChildBuilderDelegate(
+                                  (context, i) {
+                                    final c = filtered[i];
+                                    return _CommodityCard(
+                                      key: ValueKey(c.id),
+                                      commodity: c,
+                                      isDark: isDark,
+                                      index: i,
+                                    );
+                                  },
+                                  findChildIndexCallback: (key) {
+                                    final id = (key as ValueKey<String>).value;
+                                    final idx =
+                                        filtered.indexWhere((c) => c.id == id);
+                                    return idx == -1 ? null : idx;
+                                  },
+                                  childCount: filtered.length,
+                                ),
+                              ),
+                            ),
+                    ],
+                  ),
+                );
+              },
             ),
-          );
-        },
-      ),
           ),
         ],
       ),
@@ -348,8 +401,7 @@ class _SearchBar extends StatelessWidget {
             color: AppColors.gray,
           ),
           filled: true,
-          fillColor:
-              isDark ? AppColors.darkSurface : AppColors.surfaceLight,
+          fillColor: isDark ? AppColors.darkSurface : AppColors.surfaceLight,
           prefixIcon: const Icon(
             Icons.search_rounded,
             size: 20,
@@ -360,9 +412,7 @@ class _SearchBar extends StatelessWidget {
             icon: Icon(
               Icons.tune_rounded,
               size: 20,
-              color: isDark
-                  ? AppColors.darkTextSecondary
-                  : AppColors.gray,
+              color: isDark ? AppColors.darkTextSecondary : AppColors.gray,
             ),
             tooltip: 'Filter',
           ),
@@ -375,9 +425,7 @@ class _SearchBar extends StatelessWidget {
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(
-              color: isDark
-                  ? AppColors.darkBorder
-                  : AppColors.borderLight,
+              color: isDark ? AppColors.darkBorder : AppColors.borderLight,
             ),
           ),
           focusedBorder: OutlineInputBorder(
@@ -427,21 +475,16 @@ class _CategoryChips extends StatelessWidget {
             },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(
                 color: isActive
                     ? AppColors.deepGreen
-                    : (isDark
-                        ? AppColors.darkSurface
-                        : AppColors.surfaceLight),
+                    : (isDark ? AppColors.darkSurface : AppColors.surfaceLight),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: isActive
                       ? AppColors.deepGreen
-                      : (isDark
-                          ? AppColors.darkBorder
-                          : AppColors.borderLight),
+                      : (isDark ? AppColors.darkBorder : AppColors.borderLight),
                 ),
               ),
               child: Text(
@@ -449,13 +492,10 @@ class _CategoryChips extends StatelessWidget {
                 style: TextStyle(
                   fontFamily: 'Poppins',
                   fontSize: 12,
-                  fontWeight:
-                      isActive ? FontWeight.w700 : FontWeight.w500,
+                  fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
                   color: isActive
                       ? Colors.white
-                      : (isDark
-                          ? AppColors.darkTextSecondary
-                          : AppColors.gray),
+                      : (isDark ? AppColors.darkTextSecondary : AppColors.gray),
                 ),
               ),
             ),
@@ -483,10 +523,20 @@ class _MarketSummaryStrip extends StatelessWidget {
   const _MarketSummaryStrip({
     required this.summary,
     required this.isDark,
+    required this.lastFetched,
   });
 
   final _MarketSummary summary;
   final bool isDark;
+  final DateTime lastFetched;
+
+  String _relTime() {
+    final diff = DateTime.now().difference(lastFetched);
+    if (diff.inSeconds < 60) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -497,8 +547,7 @@ class _MarketSummaryStrip extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             colors: [Color(0xFF1B5E20), Color(0xFF2E7D32)],
@@ -541,11 +590,11 @@ class _MarketSummaryStrip extends StatelessWidget {
               ),
             ),
             _divider(),
-            const Text(
-              'Updated 2m ago',
+            Text(
+              'Updated ${_relTime()}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
+              style: const TextStyle(
                 fontFamily: 'Poppins',
                 fontSize: 11,
                 fontWeight: FontWeight.w500,
@@ -589,8 +638,7 @@ class _CommodityCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = commodity;
     final isUp = c.changePct >= 0;
-    final trendColor =
-        isUp ? AppColors.mintGreen : AppColors.errorRed;
+    final trendColor = isUp ? AppColors.mintGreen : AppColors.errorRed;
     final sparkData = mockSparklineFromChange(c.changePct);
     final catColor = _categoryColor(c.category);
     final catIcon = _categoryIcon(c.category);
@@ -605,20 +653,17 @@ class _CommodityCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             // ── Category icon bubble ───────────────────────────────
-            Hero(
-              tag: 'commodity-icon-${c.id}',
-              child: Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: catColor.withValues(alpha: 0.13),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  catIcon,
-                  size: 22,
-                  color: catColor,
-                ),
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: catColor.withValues(alpha: 0.13),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                catIcon,
+                size: 22,
+                color: catColor,
               ),
             ),
 
@@ -673,30 +718,39 @@ class _CommodityCard extends StatelessWidget {
                     fontFamily: 'Poppins',
                     fontWeight: FontWeight.w800,
                     fontSize: 14,
-                    color: isDark
-                        ? AppColors.darkTextPrimary
-                        : AppColors.charcoal,
+                    color:
+                        isDark ? AppColors.darkTextPrimary : AppColors.charcoal,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      isUp
-                          ? Icons.arrow_upward_rounded
-                          : Icons.arrow_downward_rounded,
-                      size: 11,
-                      color: trendColor,
+                    ExcludeSemantics(
+                      child: Icon(
+                        isUp
+                            ? Icons.arrow_upward_rounded
+                            : Icons.arrow_downward_rounded,
+                        size: 11,
+                        color: trendColor,
+                      ),
                     ),
                     const SizedBox(width: 2),
-                    Text(
-                      '${isUp ? '+' : ''}${c.changePct.toStringAsFixed(1)}%',
-                      style: TextStyle(
-                        fontFamily: 'Poppins',
-                        color: trendColor,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 12,
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 400),
+                      transitionBuilder: (child, animation) => ScaleTransition(
+                        scale: animation,
+                        child: FadeTransition(opacity: animation, child: child),
+                      ),
+                      child: Text(
+                        '${isUp ? '+' : ''}${c.changePct.toStringAsFixed(1)}%',
+                        key: ValueKey(c.changePct),
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          color: trendColor,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                        ),
                       ),
                     ),
                   ],
@@ -718,6 +772,82 @@ class _CommodityCard extends StatelessWidget {
           .animate(delay: (60 * index).ms)
           .fadeIn(duration: 280.ms)
           .slideX(begin: -0.03),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Sort bottom sheet
+// ---------------------------------------------------------------------------
+class _SortSheet extends StatelessWidget {
+  const _SortSheet({required this.current, required this.onSelect});
+
+  final _SortOption current;
+  final ValueChanged<_SortOption> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.darkBorder : AppColors.borderLight,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Text(
+              'Sort by',
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
+                color: isDark ? AppColors.darkTextPrimary : AppColors.charcoal,
+              ),
+            ),
+            const SizedBox(height: 8),
+            RadioGroup<_SortOption>(
+              groupValue: current,
+              onChanged: (v) {
+                if (v != null) onSelect(v);
+              },
+              child: Column(
+                children: _SortOption.values
+                    .map((opt) => ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          leading: Radio<_SortOption>(
+                            value: opt,
+                            activeColor: AppColors.deepGreen,
+                          ),
+                          title: Text(
+                            _sortLabel(opt),
+                            style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 14,
+                              color: isDark
+                                  ? AppColors.darkTextPrimary
+                                  : AppColors.charcoal,
+                            ),
+                          ),
+                          onTap: () => onSelect(opt),
+                        ))
+                    .toList(),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -71,16 +71,18 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 TextFormField(
                   controller: _name,
                   decoration: const InputDecoration(labelText: 'Full name'),
-                  validator: (v) =>
-                      v == null || v.trim().length < 2 ? 'Enter your name' : null,
+                  validator: (v) => v == null || v.trim().length < 2
+                      ? 'Enter your name'
+                      : null,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _email,
                   decoration: const InputDecoration(labelText: 'Email'),
                   keyboardType: TextInputType.emailAddress,
-                  validator: (v) =>
-                      v == null || !v.contains('@') ? 'Enter a valid email' : null,
+                  validator: (v) => v == null || !v.contains('@')
+                      ? 'Enter a valid email'
+                      : null,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
@@ -93,7 +95,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 const SizedBox(height: 12),
                 DropdownButtonFormField<UserRole>(
                   initialValue: _role,
+                  // Admin accounts are granted by an existing admin, never
+                  // self-selected at sign-up (Firestore rules enforce this).
                   items: UserRole.values
+                      .where((r) => r != UserRole.admin)
                       .map(
                         (r) => DropdownMenuItem(
                           value: r,
@@ -106,12 +111,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         ),
                       )
                       .toList(),
-                  onChanged: (v) => setState(() => _role = v ?? UserRole.farmer),
+                  onChanged: (v) =>
+                      setState(() => _role = v ?? UserRole.farmer),
                   decoration: const InputDecoration(labelText: 'I am a'),
                 ),
                 if (_error != null) ...[
                   const SizedBox(height: 12),
-                  Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                  Text(_error!,
+                      style: TextStyle(
+                          color: Theme.of(context).colorScheme.error)),
                 ],
                 const SizedBox(height: 16),
                 PrimaryGradientButton(

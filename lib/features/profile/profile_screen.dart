@@ -3,7 +3,9 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/constants/app_colors.dart';
 import '../../core/di/auth_providers.dart';
+import '../../core/di/repositories_provider.dart';
 import '../../domain/entities/app_user.dart';
 import '../../shared/widgets/app_avatar.dart';
 import '../../shared/widgets/section_header.dart';
@@ -27,8 +29,7 @@ class ProfileScreen extends ConsumerWidget {
       appBar: AppBar(
         elevation: 0,
         scrolledUnderElevation: 0.5,
-        backgroundColor:
-            isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         title: const Text(
           'Profile',
           style: TextStyle(
@@ -40,7 +41,7 @@ class ProfileScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.edit_outlined),
             tooltip: 'Edit profile',
-            onPressed: () {}, // decorative
+            onPressed: () => context.push('/profile/edit'),
           ),
           IconButton(
             icon: const Icon(Icons.settings_outlined),
@@ -52,8 +53,11 @@ class ProfileScreen extends ConsumerWidget {
       body: RefreshIndicator(
         color: const Color(0xFF2E7D32),
         onRefresh: () async {
-          // re-hydrate session if needed
-          await Future<void>.delayed(const Duration(milliseconds: 600));
+          await Future.wait([
+            ref.refresh(myListingsProvider.future),
+            ref.refresh(userCreatedAtProvider.future),
+            ref.refresh(notificationsProvider.future),
+          ]);
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -75,7 +79,24 @@ class ProfileScreen extends ConsumerWidget {
               const SizedBox(height: 8),
 
               // ── [4] Verification Card ─────────────────────────────────────
-              _VerificationCard(isDark: isDark),
+              _VerificationCard(user: user, isDark: isDark),
+
+              const SizedBox(height: 8),
+
+              // ── [4.5] My Listings shortcut (farmers only) ─────────────────
+              if (user?.role == UserRole.farmer) ...[
+                _MyListingsCard(isDark: isDark),
+                const SizedBox(height: 8),
+              ],
+
+              // ── [4.6] Payment History shortcut ────────────────────────────
+              _QuickLinkTile(
+                icon: Icons.receipt_long_outlined,
+                label: 'Payment History',
+                subtitle: 'View your past transactions',
+                isDark: isDark,
+                onTap: () => context.push('/orders'),
+              ),
 
               const SizedBox(height: 8),
 
@@ -153,33 +174,37 @@ class _HeroSection extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(24, 32, 24, 28),
       child: Column(
         children: [
-          // Avatar with camera overlay
-          Stack(
-            children: [
-              AppAvatar(
-                name: name,
-                color: Colors.white.withValues(alpha: 0.30),
-                radius: 48,
-              ),
-              Positioned(
-                bottom: 0,
-                right: 0,
-                child: Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF9A825),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
-                  ),
-                  child: const Icon(
-                    Icons.camera_alt_rounded,
-                    size: 14,
-                    color: Colors.white,
+          // Avatar with camera overlay — taps to edit profile
+          GestureDetector(
+            onTap: () => context.push('/profile/edit'),
+            child: Stack(
+              children: [
+                AppAvatar(
+                  name: name,
+                  color: Colors.white.withValues(alpha: 0.30),
+                  radius: 48,
+                  imageUrl: user?.avatarUrl,
+                ),
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF9A825),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                    child: const Icon(
+                      Icons.camera_alt_rounded,
+                      size: 14,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
 
           const SizedBox(height: 16),
@@ -201,19 +226,16 @@ class _HeroSection extends StatelessWidget {
 
           // Role badge — custom pill with white text on translucent bg
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.22),
               borderRadius: BorderRadius.circular(99),
-              border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.35)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(_roleIcon(role),
-                    size: 13, color: Colors.white),
+                Icon(_roleIcon(role), size: 13, color: Colors.white),
                 const SizedBox(width: 5),
                 Text(
                   _roleName(role),
@@ -285,7 +307,7 @@ class _HeroSection extends StatelessWidget {
 // [2] Stats Row
 // ---------------------------------------------------------------------------
 
-class _StatsRow extends StatelessWidget {
+class _StatsRow extends ConsumerWidget {
   const _StatsRow({required this.user, required this.isDark});
 
   final AppUser? user;
@@ -295,8 +317,7 @@ class _StatsRow extends StatelessWidget {
       ? BoxDecoration(
           color: const Color(0xFF1E1E1E),
           borderRadius: BorderRadius.circular(12),
-          border:
-              Border.all(color: const Color(0xFF2E3C2E)),
+          border: Border.all(color: const Color(0xFF2E3C2E)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.22),
@@ -319,13 +340,23 @@ class _StatsRow extends StatelessWidget {
         );
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final rating = user?.rating ?? 0.0;
+
+    final listingCount = ref.watch(myListingsProvider).maybeWhen(
+          data: (list) => '${list.length}',
+          orElse: () => '—',
+        );
+    final sinceYear = ref.watch(userCreatedAtProvider).maybeWhen(
+          data: (dt) => dt != null ? '${dt.year}' : '—',
+          orElse: () => '—',
+        );
+
     final stats = [
-      const _StatItem(value: '12', label: 'Listings'),
-      const _StatItem(value: '47', label: 'Trades'),
+      _StatItem(value: listingCount, label: 'Listings'),
       _StatItem(value: rating.toStringAsFixed(1), label: 'Rating'),
-      const _StatItem(value: '2023', label: 'Member Since'),
+      _StatItem(value: user?.verified == true ? '✓' : '—', label: 'Verified'),
+      _StatItem(value: sinceYear, label: 'Since'),
     ];
 
     return Container(
@@ -333,55 +364,51 @@ class _StatsRow extends StatelessWidget {
       decoration: _card,
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: Row(
-        children: stats
-            .asMap()
-            .entries
-            .map((entry) {
-              final idx = entry.key;
-              final s = entry.value;
-              final isLast = idx == stats.length - 1;
-              return Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    border: isLast
-                        ? null
-                        : Border(
-                            right: BorderSide(
-                              color: isDark
-                                  ? const Color(0xFF2E3C2E)
-                                  : const Color(0xFFE2EAE0),
-                            ),
-                          ),
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        s.value,
-                        style: const TextStyle(
-                          fontFamily: 'Poppins',
-                          fontWeight: FontWeight.w800,
-                          fontSize: 20,
-                          color: Color(0xFF1B5E20),
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        s.label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 11,
+        children: stats.asMap().entries.map((entry) {
+          final idx = entry.key;
+          final s = entry.value;
+          final isLast = idx == stats.length - 1;
+          return Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                border: isLast
+                    ? null
+                    : Border(
+                        right: BorderSide(
                           color: isDark
-                              ? const Color(0xFF9CA3AF)
-                              : const Color(0xFF6B7280),
+                              ? const Color(0xFF2E3C2E)
+                              : const Color(0xFFE2EAE0),
                         ),
                       ),
-                    ],
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    s.value,
+                    style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w800,
+                      fontSize: 20,
+                      color: Color(0xFF1B5E20),
+                    ),
                   ),
-                ),
-              );
-            })
-            .toList(),
+                  const SizedBox(height: 2),
+                  Text(
+                    s.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isDark
+                          ? const Color(0xFF9CA3AF)
+                          : const Color(0xFF6B7280),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
       ),
     ).animate(delay: 100.ms).fadeIn().slideY(begin: 0.04);
   }
@@ -433,8 +460,7 @@ class _ContactCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final textColor =
         isDark ? const Color(0xFFF8FAF5) : const Color(0xFF1F2937);
-    final subColor =
-        isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280);
+    final subColor = isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280);
     final iconColor = const Color(0xFF2E7D32);
 
     return Column(
@@ -454,8 +480,7 @@ class _ContactCard extends StatelessWidget {
                     color: const Color(0xFF1B5E20).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(Icons.email_outlined,
-                      size: 18, color: iconColor),
+                  child: Icon(Icons.email_outlined, size: 18, color: iconColor),
                 ),
                 title: Text(
                   'Email',
@@ -479,9 +504,8 @@ class _ContactCard extends StatelessWidget {
                 height: 1,
                 indent: 16,
                 endIndent: 16,
-                color: isDark
-                    ? const Color(0xFF2E3C2E)
-                    : const Color(0xFFE2EAE0),
+                color:
+                    isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0),
               ),
               ListTile(
                 leading: Container(
@@ -491,8 +515,7 @@ class _ContactCard extends StatelessWidget {
                     color: const Color(0xFF1B5E20).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(Icons.phone_outlined,
-                      size: 18, color: iconColor),
+                  child: Icon(Icons.phone_outlined, size: 18, color: iconColor),
                 ),
                 title: Text(
                   'Phone',
@@ -512,6 +535,42 @@ class _ContactCard extends StatelessWidget {
                   ),
                 ),
               ),
+              if (user?.location != null && (user!.location!.isNotEmpty)) ...[
+                Divider(
+                  height: 1,
+                  indent: 16,
+                  endIndent: 16,
+                  color: isDark
+                      ? const Color(0xFF2E3C2E)
+                      : const Color(0xFFE2EAE0),
+                ),
+                ListTile(
+                  leading: Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1B5E20).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.location_on_outlined,
+                        size: 18, color: iconColor),
+                  ),
+                  title: Text(
+                    'Location',
+                    style: TextStyle(fontSize: 12, color: subColor),
+                  ),
+                  subtitle: Text(
+                    user!.location!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: textColor,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -525,8 +584,9 @@ class _ContactCard extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _VerificationCard extends StatelessWidget {
-  const _VerificationCard({required this.isDark});
+  const _VerificationCard({required this.user, required this.isDark});
 
+  final AppUser? user;
   final bool isDark;
 
   BoxDecoration get _card => isDark
@@ -557,21 +617,19 @@ class _VerificationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final accountVerified = user?.verified ?? false;
+    final phoneLinked = (user?.phone ?? '').isNotEmpty;
+
     final items = [
-      const _VerifItem(
-        label: 'Identity Verification',
-        subtitle: 'Government ID confirmed',
-        verified: true,
+      _VerifItem(
+        label: 'Account Verified',
+        subtitle: accountVerified ? 'Identity confirmed' : 'Pending review',
+        verified: accountVerified,
       ),
-      const _VerifItem(
-        label: 'Business Registration',
-        subtitle: 'CAC certificate on file',
-        verified: true,
-      ),
-      const _VerifItem(
-        label: 'Bank Account',
-        subtitle: 'Pending review',
-        verified: false,
+      _VerifItem(
+        label: 'Phone Number',
+        subtitle: phoneLinked ? user!.phone! : 'Not provided',
+        verified: phoneLinked,
       ),
     ];
 
@@ -670,10 +728,182 @@ class _VerifItem {
 }
 
 // ---------------------------------------------------------------------------
+// [4.5] My Listings shortcut
+// ---------------------------------------------------------------------------
+
+class _MyListingsCard extends StatelessWidget {
+  const _MyListingsCard({required this.isDark});
+
+  final bool isDark;
+
+  BoxDecoration get _card => isDark
+      ? BoxDecoration(
+          color: const Color(0xFF1E1E1E),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFF2E3C2E)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.22),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        )
+      : BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE2EAE0)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        );
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader(title: 'My Listings'),
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: _card,
+          child: ListTile(
+            leading: Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: const Color(0xFF1B5E20).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.inventory_2_outlined,
+                size: 18,
+                color: Color(0xFF2E7D32),
+              ),
+            ),
+            title: Text(
+              'Manage your product listings',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+                color:
+                    isDark ? const Color(0xFFF8FAF5) : const Color(0xFF1F2937),
+              ),
+            ),
+            subtitle: Text(
+              'Edit, delete or add new listings',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                color:
+                    isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+              ),
+            ),
+            trailing: const Icon(
+              Icons.chevron_right_rounded,
+              color: Color(0xFF2E7D32),
+            ),
+            onTap: () => context.push('/my-listings'),
+          ),
+        ),
+      ],
+    ).animate(delay: 225.ms).fadeIn().slideY(begin: 0.04);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Quick-link tile (generic shortcut card used in the profile body)
+// ---------------------------------------------------------------------------
+
+class _QuickLinkTile extends StatelessWidget {
+  const _QuickLinkTile({
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final String subtitle;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  BoxDecoration get _card => isDark
+      ? BoxDecoration(
+          color: const Color(0xFF1E1E1E),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFF2E3C2E)),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withValues(alpha: 0.22),
+                blurRadius: 12,
+                offset: const Offset(0, 4))
+          ],
+        )
+      : BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE2EAE0)),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 12,
+                offset: const Offset(0, 4))
+          ],
+        );
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: _card,
+      child: ListTile(
+        leading: Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: AppColors.deepGreen.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, size: 18, color: AppColors.deepGreen),
+        ),
+        title: Text(
+          label,
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 14,
+            color: isDark ? const Color(0xFFF8FAF5) : const Color(0xFF1F2937),
+          ),
+        ),
+        subtitle: Text(
+          subtitle,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 12,
+            color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+          ),
+        ),
+        trailing:
+            const Icon(Icons.chevron_right_rounded, color: AppColors.deepGreen),
+        onTap: onTap,
+      ),
+    ).animate(delay: 240.ms).fadeIn().slideY(begin: 0.04);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // [5] Recent Activity
 // ---------------------------------------------------------------------------
 
-class _RecentActivity extends StatelessWidget {
+class _RecentActivity extends ConsumerWidget {
   const _RecentActivity({required this.isDark});
 
   final bool isDark;
@@ -704,41 +934,86 @@ class _RecentActivity extends StatelessWidget {
           ],
         );
 
-  static const _activities = [
-    _ActivityItem(
-      icon: Icons.add_box_rounded,
-      title: 'Listed 50 bags of White Maize',
-      date: 'Jun 10, 2026',
-      color: Color(0xFF2E7D32),
-    ),
-    _ActivityItem(
-      icon: Icons.handshake_rounded,
-      title: 'Completed trade with Emeka Buyers Ltd',
-      date: 'Jun 7, 2026',
-      color: Color(0xFF0277BD),
-    ),
-    _ActivityItem(
-      icon: Icons.star_rounded,
-      title: 'Received 5-star rating from Fatima A.',
-      date: 'Jun 5, 2026',
-      color: Color(0xFFF9A825),
-    ),
-  ];
+  IconData _iconFor(String type) {
+    switch (type) {
+      case 'price_alert':
+        return Icons.show_chart_rounded;
+      case 'new_buyer':
+        return Icons.person_add_outlined;
+      case 'order':
+        return Icons.inventory_2_outlined;
+      default:
+        return Icons.notifications_outlined;
+    }
+  }
+
+  Color _colorFor(String type) {
+    switch (type) {
+      case 'price_alert':
+        return const Color(0xFFF9A825);
+      case 'new_buyer':
+        return const Color(0xFF0277BD);
+      case 'order':
+        return const Color(0xFF2E7D32);
+      default:
+        return const Color(0xFF6B7280);
+    }
+  }
+
+  String _timeAgo(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
+    if (diff.inHours < 24) return '${diff.inHours} hr ago';
+    if (diff.inDays == 1) return 'Yesterday';
+    return '${diff.inDays} days ago';
+  }
 
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SectionHeader(title: 'Recent Activity'),
-        Container(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final notificationsAsync = ref.watch(notificationsProvider);
+
+    Widget body = const SizedBox.shrink();
+    notificationsAsync.when(
+      loading: () => body = Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: _card,
+        height: 80,
+        child: const Center(
+          child: CircularProgressIndicator(
+              strokeWidth: 2, color: Color(0xFF2E7D32)),
+        ),
+      ),
+      error: (_, __) => body = const SizedBox.shrink(),
+      data: (notifications) {
+        if (notifications.isEmpty) {
+          body = Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: _card,
+            padding: const EdgeInsets.all(20),
+            child: Center(
+              child: Text(
+                'No recent activity yet',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: isDark
+                      ? const Color(0xFF9CA3AF)
+                      : const Color(0xFF6B7280),
+                ),
+              ),
+            ),
+          );
+          return;
+        }
+        final items = notifications.take(5).toList();
+        body = Container(
           margin: const EdgeInsets.symmetric(horizontal: 16),
           decoration: _card,
           child: Column(
-            children: _activities.asMap().entries.map((entry) {
+            children: items.asMap().entries.map((entry) {
               final idx = entry.key;
-              final item = entry.value;
-              final isLast = idx == _activities.length - 1;
+              final n = entry.value;
+              final isLast = idx == items.length - 1;
+              final color = _colorFor(n.type);
               return Column(
                 children: [
                   ListTile(
@@ -746,15 +1021,14 @@ class _RecentActivity extends StatelessWidget {
                       width: 38,
                       height: 38,
                       decoration: BoxDecoration(
-                        color: item.color.withValues(alpha: 0.12),
+                        color: color.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Icon(item.icon,
-                          size: 18, color: item.color),
+                      child: Icon(_iconFor(n.type), size: 18, color: color),
                     ),
                     title: Text(
-                      item.title,
-                      maxLines: 2,
+                      n.title,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontWeight: FontWeight.w500,
@@ -765,11 +1039,20 @@ class _RecentActivity extends StatelessWidget {
                       ),
                     ),
                     subtitle: Text(
-                      item.date,
+                      n.body,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 11,
+                        color: isDark
+                            ? const Color(0xFF9CA3AF)
+                            : const Color(0xFF6B7280),
+                      ),
+                    ),
+                    trailing: Text(
+                      _timeAgo(n.createdAt),
+                      style: TextStyle(
+                        fontSize: 10,
                         color: isDark
                             ? const Color(0xFF9CA3AF)
                             : const Color(0xFF6B7280),
@@ -792,24 +1075,18 @@ class _RecentActivity extends StatelessWidget {
                   .slideY(begin: 0.04);
             }).toList(),
           ),
-        ),
+        );
+      },
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader(title: 'Recent Activity'),
+        body,
       ],
     );
   }
-}
-
-@immutable
-class _ActivityItem {
-  const _ActivityItem({
-    required this.icon,
-    required this.title,
-    required this.date,
-    required this.color,
-  });
-  final IconData icon;
-  final String title;
-  final String date;
-  final Color color;
 }
 
 // ---------------------------------------------------------------------------
@@ -866,8 +1143,7 @@ class _DangerZone extends StatelessWidget {
             fontWeight: FontWeight.w700,
           ),
         ),
-        content:
-            const Text('Are you sure you want to sign out of SmartAgro?'),
+        content: const Text('Are you sure you want to sign out of SmartAgro?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -927,9 +1203,8 @@ class _DangerZone extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 12,
-                color: isDark
-                    ? const Color(0xFF9CA3AF)
-                    : const Color(0xFF6B7280),
+                color:
+                    isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
               ),
             ),
             trailing: const Icon(

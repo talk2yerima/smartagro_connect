@@ -21,9 +21,13 @@ import '../../features/market/commodity_market_screen.dart';
 import '../../features/market/market_trends_screen.dart';
 import '../../features/marketplace/add_product_screen.dart';
 import '../../features/marketplace/marketplace_screen.dart';
+import '../../features/marketplace/my_listings_screen.dart';
 import '../../features/marketplace/product_detail_screen.dart';
+import '../../features/marketplace/seller_profile_screen.dart';
 import '../../features/notifications/notifications_screen.dart';
 import '../../features/onboarding/onboarding_screen.dart';
+import '../../features/orders/orders_screen.dart';
+import '../../features/profile/profile_edit_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/search/search_screen.dart';
 import '../../features/settings/settings_screen.dart';
@@ -32,6 +36,10 @@ import '../../features/splash/splash_screen.dart';
 import '../di/analytics_providers.dart';
 import '../di/auth_providers.dart';
 import '../di/initialization_provider.dart';
+
+/// Holds a deep-link path that arrived while the user was unauthenticated.
+/// Cleared and consumed on the first redirect after successful login.
+final pendingDeepLinkProvider = StateProvider<String?>((ref) => null);
 
 /// Global navigation graph with auth + onboarding redirects.
 final goRouterProvider = Provider<GoRouter>((ref) {
@@ -43,6 +51,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     initialLocation: '/splash',
     refreshListenable: refresh,
     observers: [ref.read(analyticsServiceProvider).observer],
+    // GoRouter reads the launch URI from the platform automatically when the
+    // app is opened via an HTTPS App Link or smartagro:// URI scheme intent.
     redirect: (context, state) {
       final prefs = ref.read(loadedSharedPreferencesProvider);
       final onboarded = prefs.getBool('onboarding_completed') ?? false;
@@ -64,18 +74,32 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 
       final protected = loc.startsWith('/main') ||
           loc.startsWith('/marketplace') ||
+          loc.startsWith('/my-listings') ||
+          loc.startsWith('/profile') ||
           loc.startsWith('/search') ||
           loc.startsWith('/notifications') ||
           loc.startsWith('/map') ||
           loc.startsWith('/settings') ||
+          loc.startsWith('/seller') ||
           loc.startsWith('/admin');
 
       if (!authed) {
-        if (protected) return '/login';
+        if (protected) {
+          // Remember the intended destination so we can redirect back after login.
+          ref.read(pendingDeepLinkProvider.notifier).state = state.uri.path;
+          return '/login';
+        }
         return null;
       }
 
-      if (authed && authPublic) return '/main/home';
+      if (authed && authPublic) {
+        final pending = ref.read(pendingDeepLinkProvider);
+        if (pending != null) {
+          ref.read(pendingDeepLinkProvider.notifier).state = null;
+          return pending;
+        }
+        return '/main/home';
+      }
 
       if (loc.startsWith('/admin') && user.role != UserRole.admin) {
         return '/main/home';
@@ -161,7 +185,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
                     path: 'thread/:id',
                     builder: (context, state) {
                       final id = state.pathParameters['id']!;
-                      return ChatRoomScreen(threadId: id);
+                      final name = state.uri.queryParameters['name'];
+                      final peerId = state.uri.queryParameters['peerId'];
+                      return ChatRoomScreen(
+                          threadId: id, peerName: name, peerId: peerId);
                     },
                   ),
                 ],
@@ -210,6 +237,38 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/settings',
         builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: '/profile/edit',
+        builder: (context, state) => const ProfileEditScreen(),
+      ),
+      GoRoute(
+        path: '/orders',
+        builder: (context, state) => const OrdersScreen(),
+      ),
+      GoRoute(
+        path: '/my-listings',
+        builder: (context, state) => const MyListingsScreen(),
+      ),
+      // Standalone chat thread route — used when navigating from outside the
+      // shell (e.g. marketplace product detail, seller profile).  Avoids the
+      // StatefulShellBranch key-reservation conflict that occurs when pushing
+      // a shell-nested route from a top-level navigator context.
+      GoRoute(
+        path: '/chat/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          final name = state.uri.queryParameters['name'];
+          final peerId = state.uri.queryParameters['peerId'];
+          return ChatRoomScreen(threadId: id, peerName: name, peerId: peerId);
+        },
+      ),
+      GoRoute(
+        path: '/seller/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return SellerProfileScreen(sellerId: id);
+        },
       ),
       GoRoute(
         path: '/admin',

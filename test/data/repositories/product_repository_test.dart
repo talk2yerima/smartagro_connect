@@ -9,24 +9,47 @@ import 'package:smartagro_connect/data/services/firestore_service.dart';
 import 'package:smartagro_connect/domain/entities/product_listing.dart';
 
 class MockRemote extends Mock implements RemoteApiDataSource {}
+
 class MockAssets extends Mock implements AssetBundleDataSource {}
+
 class MockDb extends Mock implements AppDatabase {}
+
 class MockFirestoreService extends Mock implements FirestoreService {}
 
 const _rows = [
   {
-    'id': 'p1', 'title': 'Tomatoes', 'description': 'Fresh',
-    'priceNgn': 1200, 'quantityKg': 500, 'state': 'Lagos', 'city': 'Ikeja',
-    'sellerId': 's1', 'sellerName': 'Emeka', 'sellerRating': 4.5,
-    'verified': true, 'availability': 'in_stock',
-    'imageUrl': 'https://img.test/t.jpg', 'lat': 6.52, 'lng': 3.38,
+    'id': 'p1',
+    'title': 'Tomatoes',
+    'description': 'Fresh',
+    'priceNgn': 1200,
+    'quantityKg': 500,
+    'state': 'Lagos',
+    'city': 'Ikeja',
+    'sellerId': 's1',
+    'sellerName': 'Emeka',
+    'sellerRating': 4.5,
+    'verified': true,
+    'availability': 'in_stock',
+    'imageUrl': 'https://img.test/t.jpg',
+    'lat': 6.52,
+    'lng': 3.38,
   },
   {
-    'id': 'p2', 'title': 'Yam', 'description': 'Grade B',
-    'priceNgn': 800, 'quantityKg': 200, 'state': 'Oyo', 'city': 'Ibadan',
-    'sellerId': 's2', 'sellerName': 'Bola', 'sellerRating': 4.1,
-    'verified': false, 'availability': 'limited',
-    'imageUrl': 'https://img.test/y.jpg', 'lat': 7.38, 'lng': 3.90,
+    'id': 'p2',
+    'title': 'Yam',
+    'description': 'Grade B',
+    'priceNgn': 800,
+    'quantityKg': 200,
+    'state': 'Oyo',
+    'city': 'Ibadan',
+    'sellerId': 's2',
+    'sellerName': 'Bola',
+    'sellerRating': 4.1,
+    'verified': false,
+    'availability': 'limited',
+    'imageUrl': 'https://img.test/y.jpg',
+    'lat': 7.38,
+    'lng': 3.90,
   },
 ];
 
@@ -44,13 +67,17 @@ void main() {
     assets = MockAssets();
     db = MockDb();
     firestore = MockFirestoreService();
-    repo = ProductRepository(remote: remote, assets: assets, db: db, firestore: firestore);
+    repo = ProductRepository(
+        remote: remote, assets: assets, db: db, firestore: firestore);
     when(() => db.upsertProducts(any())).thenAnswer((_) async {});
+    // These tests cover the REST → cache → fixture path (no Firebase).
+    when(() => firestore.isAvailable).thenReturn(false);
   });
 
   group('fetchProducts — remote success', () {
     setUp(() {
-      when(() => remote.fetchProducts()).thenAnswer((_) async => List.from(_rows));
+      when(() => remote.fetchProducts())
+          .thenAnswer((_) async => List.from(_rows));
     });
 
     test('returns mapped products', () async {
@@ -69,8 +96,7 @@ void main() {
 
   group('fetchProducts — remote fails, cache hit', () {
     setUp(() {
-      when(() => remote.fetchProducts())
-          .thenThrow(const ServerFailure('500'));
+      when(() => remote.fetchProducts()).thenThrow(const ServerFailure('500'));
       when(() => db.readProducts()).thenAnswer((_) async => List.from(_rows));
     });
 

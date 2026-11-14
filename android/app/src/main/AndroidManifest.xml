@@ -9,7 +9,7 @@
         android:name="${applicationName}"
         android:icon="@drawable/ic_launcher_legacy"
         android:label="SmartAgro Connect"
-        android:usesCleartextTraffic="true">
+        android:usesCleartextTraffic="false">
         <!-- Replace with your Maps SDK key for production. -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
@@ -29,6 +29,31 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!--
+              Android App Links — HTTPS deep links.
+              Requires hosting /.well-known/assetlinks.json on smartagro.ng
+              and staging-api.smartagro.ng with the app's SHA-256 fingerprint.
+              Verify with: adb shell pm verify-app-links - -package com.smartagro.connect
+            -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="smartagro.ng" />
+            </intent-filter>
+
+            <!-- Custom URI scheme fallback: smartagro://app/marketplace/product/... -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="smartagro"
+                    android:host="app" />
             </intent-filter>
         </activity>
         <meta-data

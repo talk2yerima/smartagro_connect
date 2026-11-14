@@ -99,10 +99,9 @@ class CommodityDetailScreen extends ConsumerWidget {
             .toList();
 
         return Scaffold(
-          backgroundColor:
-              Theme.of(context).brightness == Brightness.dark
-                  ? AppColors.darkBg
-                  : AppColors.softWhite,
+          backgroundColor: Theme.of(context).brightness == Brightness.dark
+              ? AppColors.darkBg
+              : AppColors.softWhite,
           appBar: _buildAppBar(context, c.name, c),
           body: RefreshIndicator(
             color: AppColors.deepGreen,
@@ -189,8 +188,7 @@ class _HeroPriceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isUp = commodity.changePct >= 0;
-    final trendColor =
-        isUp ? AppColors.mintGreen : AppColors.errorRed;
+    final trendColor = isUp ? AppColors.mintGreen : AppColors.errorRed;
     final signLabel =
         '${isUp ? '+' : ''}${commodity.changePct.toStringAsFixed(2)}%';
 
@@ -278,13 +276,11 @@ class _HeroPriceCard extends StatelessWidget {
             children: [
               // Trend badge
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: trendColor.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                      color: trendColor.withValues(alpha: 0.5)),
+                  border: Border.all(color: trendColor.withValues(alpha: 0.5)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -418,8 +414,7 @@ class _SparklineCard extends StatelessWidget {
               ),
               const Spacer(),
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: trendColor.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(6),
@@ -465,9 +460,8 @@ class _SparklineCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w500,
-                      color: isDark
-                          ? AppColors.darkTextSecondary
-                          : AppColors.gray,
+                      color:
+                          isDark ? AppColors.darkTextSecondary : AppColors.gray,
                     ),
                   ),
                 )
@@ -503,8 +497,7 @@ class _MarketStatsGrid extends StatelessWidget {
       ),
       _StatEntry(
         label: '7-Day Change',
-        value:
-            '${isUp ? '+' : ''}${commodity.changePct.toStringAsFixed(2)}%',
+        value: '${isUp ? '+' : ''}${commodity.changePct.toStringAsFixed(2)}%',
         icon: Icons.trending_up_rounded,
         color: isUp ? AppColors.mintGreen : AppColors.errorRed,
         trend: commodity.changePct,
@@ -520,9 +513,7 @@ class _MarketStatsGrid extends StatelessWidget {
       _StatEntry(
         label: 'Market Trend',
         value: isUp ? 'Bullish' : 'Bearish',
-        icon: isUp
-            ? Icons.arrow_upward_rounded
-            : Icons.arrow_downward_rounded,
+        icon: isUp ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
         color: isUp ? AppColors.mintGreen : AppColors.errorRed,
         trend: null,
       ),
@@ -538,10 +529,9 @@ class _MarketStatsGrid extends StatelessWidget {
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   fontFamily: 'Poppins',
                   fontWeight: FontWeight.w700,
-                  color:
-                      Theme.of(context).brightness == Brightness.dark
-                          ? AppColors.darkTextPrimary
-                          : AppColors.charcoal,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? AppColors.darkTextPrimary
+                      : AppColors.charcoal,
                 ),
           ),
         ),
@@ -695,9 +685,7 @@ class _DetailsCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
-                  color: isDark
-                      ? AppColors.darkTextSecondary
-                      : AppColors.gray,
+                  color: isDark ? AppColors.darkTextSecondary : AppColors.gray,
                 ),
               ),
               const Spacer(),
@@ -706,9 +694,8 @@ class _DetailsCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: isDark
-                      ? AppColors.darkTextPrimary
-                      : AppColors.charcoal,
+                  color:
+                      isDark ? AppColors.darkTextPrimary : AppColors.charcoal,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -720,9 +707,7 @@ class _DetailsCard extends StatelessWidget {
           Divider(
             height: 1,
             thickness: 1,
-            color: isDark
-                ? const Color(0xFF2E3C2E)
-                : AppColors.borderLight,
+            color: isDark ? const Color(0xFF2E3C2E) : AppColors.borderLight,
           ),
       ],
     );
@@ -771,8 +756,7 @@ class _PriceAlertCard extends StatelessWidget {
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
-          backgroundColor:
-              isDark ? AppColors.cardDark : Colors.white,
+          backgroundColor: isDark ? AppColors.cardDark : Colors.white,
           builder: (_) => _PriceAlertSheet(commodity: commodity),
         );
       },
@@ -817,9 +801,8 @@ class _PriceAlertCard extends StatelessWidget {
                     'Get notified when ${commodity.name} hits your target price',
                     style: TextStyle(
                       fontSize: 12,
-                      color: isDark
-                          ? AppColors.darkTextSecondary
-                          : AppColors.gray,
+                      color:
+                          isDark ? AppColors.darkTextSecondary : AppColors.gray,
                       height: 1.4,
                     ),
                     maxLines: 2,
@@ -912,15 +895,14 @@ class _PriceAlertSheetState extends State<_PriceAlertSheet> {
             keyboardType: TextInputType.number,
             decoration: InputDecoration(
               labelText: 'Target price (₦)',
-              prefixIcon:
-                  const Icon(Icons.monetization_on_outlined, size: 20),
+              prefixIcon: const Icon(Icons.monetization_on_outlined, size: 20),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(
-                    color: AppColors.deepGreen, width: 1.8),
+                borderSide:
+                    const BorderSide(color: AppColors.deepGreen, width: 1.8),
               ),
             ),
           ),
@@ -1023,8 +1005,7 @@ class _RelatedCard extends StatelessWidget {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute<void>(
-            builder: (_) =>
-                CommodityDetailScreen(id: commodity.id),
+            builder: (_) => CommodityDetailScreen(id: commodity.id),
           ),
         );
       },
@@ -1045,9 +1026,7 @@ class _RelatedCard extends StatelessWidget {
                 fontFamily: 'Poppins',
                 fontWeight: FontWeight.w700,
                 fontSize: 13,
-                color: isDark
-                    ? AppColors.darkTextPrimary
-                    : AppColors.charcoal,
+                color: isDark ? AppColors.darkTextPrimary : AppColors.charcoal,
               ),
             ),
 

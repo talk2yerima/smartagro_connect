@@ -1,14 +1,21 @@
+import 'dart:async';
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:safe_device/safe_device.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../data/local/app_database.dart';
 import '../../data/services/connectivity_watcher.dart';
 import '../services/push_messaging_service.dart';
+import 'payment_providers.dart';
 import 'queue_provider.dart';
 
 /// Boot-time dependencies and global toggles (theme, onboarding, session).
-final sharedPreferencesProvider = FutureProvider<SharedPreferences>((ref) async {
+final sharedPreferencesProvider =
+    FutureProvider<SharedPreferences>((ref) async {
   return SharedPreferences.getInstance();
 });
 
@@ -55,7 +62,8 @@ final onboardingCompletedProvider = FutureProvider<bool>((ref) async {
   return prefs.getBool('onboarding_completed') ?? false;
 });
 
-Future<void> setOnboardingCompleted(WidgetRef ref, {required bool value}) async {
+Future<void> setOnboardingCompleted(WidgetRef ref,
+    {required bool value}) async {
   final prefs = await ref.read(sharedPreferencesProvider.future);
   await prefs.setBool('onboarding_completed', value);
   ref.invalidate(onboardingCompletedProvider);
@@ -81,6 +89,20 @@ final initializationProvider = FutureProvider<void>((ref) async {
   await ref.read(appDatabaseProvider).open();
   // Start offline write-queue flusher after DB is open.
   ref.read(queueSyncServiceProvider).start();
+  // Verify any Paystack transactions that completed while the app was closed.
+  unawaited(ref.read(transactionRefQueueProvider).drainPendingRefs());
   // Register for push notifications (no-op when Firebase is not configured).
   await PushMessagingService.instance.register();
+});
+
+/// `true` when the device is rooted (Android) or jailbroken (iOS).
+/// Always `false` on unsupported platforms (Windows, Linux, web).
+final jailbreakDetectedProvider = FutureProvider<bool>((ref) async {
+  if (kIsWeb) return false;
+  if (!Platform.isAndroid && !Platform.isIOS) return false;
+  try {
+    return await SafeDevice.isJailBroken;
+  } catch (_) {
+    return false;
+  }
 });

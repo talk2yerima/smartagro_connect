@@ -7,6 +7,8 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/di/auth_providers.dart';
+import '../../core/di/firestore_providers.dart';
 import '../../core/di/repositories_provider.dart';
 import '../../core/utils/money_format.dart';
 import '../../domain/entities/product_listing.dart';
@@ -15,6 +17,7 @@ import '../../shared/widgets/gradient_button.dart';
 import '../../shared/widgets/section_header.dart';
 import '../../shared/widgets/skeleton_list.dart';
 import '../../shared/widgets/status_badge.dart';
+import '../payment/payment_sheet.dart';
 
 // ---------------------------------------------------------------------------
 // Local helpers
@@ -110,7 +113,7 @@ class ProductDetailScreen extends ConsumerWidget {
 // _ProductDetailView
 // ---------------------------------------------------------------------------
 
-class _ProductDetailView extends StatefulWidget {
+class _ProductDetailView extends ConsumerStatefulWidget {
   const _ProductDetailView({
     required this.product,
     required this.similar,
@@ -120,11 +123,150 @@ class _ProductDetailView extends StatefulWidget {
   final List<ProductListing> similar;
 
   @override
-  State<_ProductDetailView> createState() => _ProductDetailViewState();
+  ConsumerState<_ProductDetailView> createState() => _ProductDetailViewState();
 }
 
-class _ProductDetailViewState extends State<_ProductDetailView> {
+class _ProductDetailViewState extends ConsumerState<_ProductDetailView> {
   bool _bookmarked = false;
+
+  Future<void> _showReportSheet(BuildContext context, ProductListing p) async {
+    final user = ref.read(authSessionProvider);
+    if (user == null) return;
+
+    String? selected;
+    const reasons = [
+      'Spam or misleading',
+      'Wrong price / quantity',
+      'Fake listing',
+      'Inappropriate content',
+    ];
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return StatefulBuilder(
+          builder: (ctx, setLocal) => Container(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              20,
+              20,
+              20 + MediaQuery.of(ctx).viewInsets.bottom,
+            ),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade400,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Report Listing',
+                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Select a reason for reporting this listing.',
+                  style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                        color: AppColors.gray,
+                      ),
+                ),
+                const SizedBox(height: 12),
+                RadioGroup<String>(
+                  groupValue: selected,
+                  onChanged: (v) => setLocal(() => selected = v),
+                  child: Column(
+                    children: reasons
+                        .map((r) => RadioListTile<String>(
+                              value: r,
+                              title: Text(
+                                r,
+                                style: Theme.of(ctx).textTheme.bodyMedium,
+                              ),
+                              activeColor: AppColors.deepGreen,
+                              dense: true,
+                            ))
+                        .toList(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.deepGreen,
+                        ),
+                        onPressed: selected == null
+                            ? null
+                            : () async {
+                                Navigator.pop(ctx);
+                                try {
+                                  await ref
+                                      .read(firestoreServiceProvider)
+                                      .submitReport(
+                                        productId: p.id,
+                                        productTitle: p.title,
+                                        reportedBy: user.id,
+                                        reason: selected!,
+                                      );
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                            'Report submitted. Thank you.'),
+                                        duration: Duration(seconds: 3),
+                                      ),
+                                    );
+                                  }
+                                } catch (_) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                            'Failed to submit report. Try again.'),
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                        child: const Text('Submit'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -132,8 +274,7 @@ class _ProductDetailViewState extends State<_ProductDetailView> {
     final p = widget.product;
 
     return Scaffold(
-      backgroundColor:
-          isDark ? AppColors.darkBg : AppColors.softWhite,
+      backgroundColor: isDark ? AppColors.darkBg : AppColors.softWhite,
       extendBodyBehindAppBar: true,
       body: Stack(
         children: [
@@ -160,7 +301,10 @@ class _ProductDetailViewState extends State<_ProductDetailView> {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: _SellerCard(product: p, isDark: isDark),
-                    ).animate(delay: 50.ms).fadeIn(duration: 300.ms).slideY(begin: 0.04),
+                    )
+                        .animate(delay: 50.ms)
+                        .fadeIn(duration: 300.ms)
+                        .slideY(begin: 0.04),
 
                     const SizedBox(height: 12),
 
@@ -168,7 +312,10 @@ class _ProductDetailViewState extends State<_ProductDetailView> {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: _DetailsCard(product: p, isDark: isDark),
-                    ).animate(delay: 100.ms).fadeIn(duration: 300.ms).slideY(begin: 0.04),
+                    )
+                        .animate(delay: 100.ms)
+                        .fadeIn(duration: 300.ms)
+                        .slideY(begin: 0.04),
 
                     const SizedBox(height: 12),
 
@@ -178,7 +325,10 @@ class _ProductDetailViewState extends State<_ProductDetailView> {
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: _DescriptionCard(
                             description: p.description, isDark: isDark),
-                      ).animate(delay: 150.ms).fadeIn(duration: 300.ms).slideY(begin: 0.04),
+                      )
+                          .animate(delay: 150.ms)
+                          .fadeIn(duration: 300.ms)
+                          .slideY(begin: 0.04),
                       const SizedBox(height: 12),
                     ],
 
@@ -225,8 +375,7 @@ class _ProductDetailViewState extends State<_ProductDetailView> {
       pinned: true,
       elevation: 0,
       scrolledUnderElevation: 0.5,
-      backgroundColor:
-          isDark ? const Color(0xFF121212) : Colors.white,
+      backgroundColor: isDark ? const Color(0xFF121212) : Colors.white,
       leading: Padding(
         padding: const EdgeInsets.all(8),
         child: _CircleIconButton(
@@ -253,7 +402,7 @@ class _ProductDetailViewState extends State<_ProductDetailView> {
           ),
         ),
         Padding(
-          padding: const EdgeInsets.only(right: 8),
+          padding: const EdgeInsets.only(right: 4),
           child: _CircleIconButton(
             icon: _bookmarked
                 ? Icons.bookmark_rounded
@@ -275,6 +424,17 @@ class _ProductDetailViewState extends State<_ProductDetailView> {
             },
           ),
         ),
+        Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: _CircleIconButton(
+            icon: Icons.flag_outlined,
+            isDark: isDark,
+            onTap: () {
+              HapticFeedback.lightImpact();
+              _showReportSheet(context, p);
+            },
+          ),
+        ),
       ],
       flexibleSpace: FlexibleSpaceBar(
         collapseMode: CollapseMode.parallax,
@@ -287,9 +447,7 @@ class _ProductDetailViewState extends State<_ProductDetailView> {
                 imageUrl: p.imageUrl,
                 fit: BoxFit.cover,
                 placeholder: (_, __) => Container(
-                  color: isDark
-                      ? AppColors.cardDark
-                      : AppColors.surfaceLight,
+                  color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
                   child: const Center(
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
@@ -298,9 +456,7 @@ class _ProductDetailViewState extends State<_ProductDetailView> {
                   ),
                 ),
                 errorWidget: (_, __, ___) => Container(
-                  color: isDark
-                      ? AppColors.cardDark
-                      : AppColors.surfaceLight,
+                  color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
                   child: const Icon(
                     Icons.image_not_supported_outlined,
                     size: 48,
@@ -579,14 +735,14 @@ class _InfoChip extends StatelessWidget {
 // [2] _SellerCard
 // ---------------------------------------------------------------------------
 
-class _SellerCard extends StatelessWidget {
+class _SellerCard extends ConsumerWidget {
   const _SellerCard({required this.product, required this.isDark});
 
   final ProductListing product;
   final bool isDark;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final textColor = AppColors.text(isDark);
     final subTextColor = AppColors.subText(isDark);
 
@@ -663,11 +819,13 @@ class _SellerCard extends StatelessWidget {
               Expanded(
                 child: FilledButton.icon(
                   onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Opening chat with seller...'),
-                        duration: Duration(seconds: 2),
-                      ),
+                    final myUid = ref.read(authSessionProvider)?.id ?? '';
+                    final ids = [myUid, product.sellerId]..sort();
+                    final threadId = ids.join('_');
+                    context.push(
+                      '/chat/$threadId'
+                      '?name=${Uri.encodeComponent(product.sellerName)}'
+                      '&peerId=${product.sellerId}',
                     );
                   },
                   icon: const Icon(Icons.chat_bubble_rounded, size: 16),
@@ -689,14 +847,7 @@ class _SellerCard extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Viewing seller profile...'),
-                        duration: Duration(seconds: 2),
-                      ),
-                    );
-                  },
+                  onPressed: () => context.push('/seller/${product.sellerId}'),
                   icon: const Icon(Icons.person_outline_rounded, size: 16),
                   label: const Text('View Profile'),
                   style: OutlinedButton.styleFrom(
@@ -853,21 +1004,25 @@ class _DetailsCard extends StatelessWidget {
                             d.label,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style:
-                                Theme.of(context).textTheme.labelSmall?.copyWith(
-                                      color: subTextColor,
-                                      fontSize: 10,
-                                    ),
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelSmall
+                                ?.copyWith(
+                                  color: subTextColor,
+                                  fontSize: 10,
+                                ),
                           ),
                           Text(
                             d.value,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style:
-                                Theme.of(context).textTheme.labelMedium?.copyWith(
-                                      color: textColor,
-                                      fontWeight: FontWeight.w700,
-                                    ),
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelMedium
+                                ?.copyWith(
+                                  color: textColor,
+                                  fontWeight: FontWeight.w700,
+                                ),
                           ),
                         ],
                       ),
@@ -1007,8 +1162,7 @@ class _SimilarCard extends StatelessWidget {
     final subTextColor = AppColors.subText(isDark);
 
     return GestureDetector(
-      onTap: () =>
-          context.push('/marketplace/product/${product.id}'),
+      onTap: () => context.push('/marketplace/product/${product.id}'),
       child: Container(
         width: 148,
         margin: const EdgeInsets.only(right: 12),
@@ -1028,16 +1182,12 @@ class _SimilarCard extends StatelessWidget {
                 placeholder: (_, __) => Container(
                   width: 148,
                   height: 90,
-                  color: isDark
-                      ? AppColors.cardDark
-                      : AppColors.surfaceLight,
+                  color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
                 ),
                 errorWidget: (_, __, ___) => Container(
                   width: 148,
                   height: 90,
-                  color: isDark
-                      ? AppColors.cardDark
-                      : AppColors.surfaceLight,
+                  color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
                   child: const Icon(
                     Icons.image_not_supported_outlined,
                     color: AppColors.gray,
@@ -1096,16 +1246,18 @@ class _SimilarCard extends StatelessWidget {
 // Bottom sticky bar
 // ---------------------------------------------------------------------------
 
-class _BottomBar extends StatelessWidget {
+class _BottomBar extends ConsumerWidget {
   const _BottomBar({required this.product, required this.isDark});
 
   final ProductListing product;
   final bool isDark;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(authSessionProvider);
     final subTextColor = AppColors.subText(isDark);
     final isSoldOut = product.availability == ProductAvailability.soldOut;
+    final isOwnListing = user?.id == product.sellerId;
 
     return Container(
       padding: EdgeInsets.fromLTRB(
@@ -1156,25 +1308,64 @@ class _BottomBar extends StatelessWidget {
 
           const SizedBox(width: 16),
 
-          // Make Offer button
+          // Action button — varies by ownership / availability
           Expanded(
-            child: PrimaryGradientButton(
-              label: isSoldOut ? 'Sold Out' : 'Make Offer',
-              onPressed: isSoldOut
-                  ? null
-                  : () {
-                      HapticFeedback.mediumImpact();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Sending offer for ${product.title}...',
-                          ),
-                          duration: const Duration(seconds: 2),
-                        ),
-                      );
-                    },
-              icon: isSoldOut ? null : Icons.handshake_rounded,
-            ),
+            child: isOwnListing
+                ? OutlinedButton.icon(
+                    onPressed: null,
+                    icon: const Icon(Icons.storefront_rounded, size: 18),
+                    label: const Text('Your Listing'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.gray,
+                      side: BorderSide(
+                          color: AppColors.gray.withValues(alpha: 0.40)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      textStyle: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                    ),
+                  )
+                : PrimaryGradientButton(
+                    label: isSoldOut ? 'Sold Out' : 'Buy Now',
+                    onPressed: isSoldOut
+                        ? null
+                        : () async {
+                            HapticFeedback.mediumImpact();
+                            final result = await PaymentSheet.show(
+                              context,
+                              productId: product.id,
+                              amountNgn: (product.priceNgn * product.quantityKg)
+                                  .toDouble(),
+                              description:
+                                  '${product.quantityKg} kg of ${product.title}',
+                            );
+                            if (!context.mounted) return;
+                            if (result == PaymentResult.success) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content:
+                                      Text('Payment successful! Order placed.'),
+                                  backgroundColor: AppColors.deepGreen,
+                                  duration: Duration(seconds: 4),
+                                ),
+                              );
+                            } else if (result == PaymentResult.failed) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                      'Payment was not completed. Try again.'),
+                                  backgroundColor: AppColors.errorRed,
+                                ),
+                              );
+                            }
+                          },
+                    icon:
+                        isSoldOut ? null : Icons.shopping_cart_checkout_rounded,
+                  ),
           ),
         ],
       ),

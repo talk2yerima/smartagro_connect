@@ -28,7 +28,6 @@ final loadedSharedPreferencesProvider = Provider<SharedPreferences>((ref) {
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return AuthRepository(
     secure: ref.watch(secureTokenStoreProvider),
-    prefs: ref.watch(loadedSharedPreferencesProvider),
     firestore: ref.watch(firestoreServiceProvider),
   );
 });
@@ -47,9 +46,10 @@ class AuthSessionNotifier extends StateNotifier<AppUser?> {
   final Ref _ref;
   StreamSubscription<fb.User?>? _firebaseSub;
 
-  void _init() {
-    // Restore any previously persisted session first (instant on cold start).
+  Future<void> _init() async {
+    // Warm the in-memory cache from secure storage, then expose the user.
     final repo = _ref.read(authRepositoryProvider);
+    await repo.initSession();
     state = repo.currentSessionUser;
 
     // If Firebase is ready, let its auth stream drive session state.
@@ -88,6 +88,24 @@ class AuthSessionNotifier extends StateNotifier<AppUser?> {
   }
 
   void setUser(AppUser user) => state = user;
+
+  Future<void> updateProfile({
+    required String name,
+    String? phone,
+    String? location,
+    String? avatarUrl,
+  }) async {
+    final user = state;
+    if (user == null) return;
+    final updated = await _ref.read(authRepositoryProvider).updateProfile(
+          userId: user.id,
+          name: name,
+          phone: phone,
+          location: location,
+          avatarUrl: avatarUrl,
+        );
+    state = updated;
+  }
 
   Future<void> logout() async {
     await _ref.read(authRepositoryProvider).logout();

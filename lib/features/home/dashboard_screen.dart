@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -50,7 +51,8 @@ String _greeting() {
   return 'Good evening';
 }
 
-String _signed(double v) => v >= 0 ? '+${v.toStringAsFixed(1)}' : v.toStringAsFixed(1);
+String _signed(double v) =>
+    v >= 0 ? '+${v.toStringAsFixed(1)}' : v.toStringAsFixed(1);
 
 String _availabilityLabel(ProductAvailability a) => switch (a) {
       ProductAvailability.inStock => 'In stock',
@@ -86,12 +88,12 @@ class DashboardScreen extends ConsumerWidget {
     final commodities = ref.watch(commoditiesProvider);
     final buyers = ref.watch(buyersNearbyProvider);
     final products = ref.watch(productsProvider);
-    final role = ref.watch(authSessionProvider.select((u) => u?.role ?? UserRole.farmer));
+    final role = ref
+        .watch(authSessionProvider.select((u) => u?.role ?? UserRole.farmer));
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor:
-          isDark ? AppColors.darkBg : AppColors.softWhite,
+      backgroundColor: isDark ? AppColors.darkBg : AppColors.softWhite,
       appBar: AppBar(
         elevation: 0,
         scrolledUnderElevation: 0.5,
@@ -122,195 +124,204 @@ class DashboardScreen extends ConsumerWidget {
           const ConnectivityBanner(),
           Expanded(
             child: RefreshIndicator(
-        color: AppColors.deepGreen,
-        onRefresh: () async {
-          ref.invalidate(commoditiesProvider);
-          ref.invalidate(buyersNearbyProvider);
-          ref.invalidate(productsProvider);
-          await Future.wait([
-            ref.read(commoditiesProvider.future),
-            ref.read(buyersNearbyProvider.future),
-            ref.read(productsProvider.future),
-          ]);
-        },
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-          children: [
-            // [1] HERO BANNER
-            _HeroBanner(user: user, role: role)
-                .animate()
-                .fadeIn(duration: 400.ms)
-                .slideY(begin: 0.04, end: 0, duration: 400.ms),
+              color: AppColors.deepGreen,
+              onRefresh: () async {
+                HapticFeedback.mediumImpact();
+                ref.invalidate(commoditiesProvider);
+                ref.invalidate(buyersNearbyProvider);
+                ref.invalidate(productsProvider);
+                await Future.wait([
+                  ref.read(commoditiesProvider.future),
+                  ref.read(buyersNearbyProvider.future),
+                  ref.read(productsProvider.future),
+                ]);
+              },
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                children: [
+                  // [1] HERO BANNER
+                  _HeroBanner(user: user, role: role)
+                      .animate()
+                      .fadeIn(duration: 400.ms)
+                      .slideY(begin: 0.04, end: 0, duration: 400.ms),
 
-            const SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
-            // [2] MARKET TICKER STRIP
-            commodities.when(
-              data: (list) => list.isNotEmpty
-                  ? _MarketTickerStrip(commodities: list)
-                  : const SizedBox.shrink(),
-              loading: () => const SizedBox(
-                height: 36,
-                child: Center(
-                  child: LinearProgressIndicator(
-                    color: AppColors.emerald,
-                    backgroundColor: Colors.transparent,
+                  // [2] MARKET TICKER STRIP
+                  commodities.when(
+                    data: (list) => list.isNotEmpty
+                        ? _MarketTickerStrip(commodities: list)
+                        : const SizedBox.shrink(),
+                    loading: () => const SizedBox(
+                      height: 36,
+                      child: Center(
+                        child: LinearProgressIndicator(
+                          color: AppColors.emerald,
+                          backgroundColor: Colors.transparent,
+                        ),
+                      ),
+                    ),
+                    error: (_, __) => const SizedBox.shrink(),
                   ),
-                ),
-              ),
-              error: (_, __) => const SizedBox.shrink(),
-            ),
 
-            const SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
-            // [3] KPI GRID
-            _KpiGrid(
-              commodities: commodities,
-              buyers: buyers,
-              products: products,
-            ),
+                  // [3] KPI GRID
+                  _KpiGrid(
+                    commodities: commodities,
+                    buyers: buyers,
+                    products: products,
+                  ),
 
-            const SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
-            // Role-specific sections
-            if (role == UserRole.transporter) ...[
-              // [7] TRANSPORTER WORKSPACE
-              SectionHeader(
-                title: 'Dispatch Center',
-                actionLabel: 'Routes',
-                onAction: () => context.push('/map'),
-                icon: Icons.local_shipping_outlined,
-              ),
-              _TransporterWorkspace(
-                onMap: () => context.push('/map'),
-                onMessages: () => context.push('/main/messages'),
-              )
-                  .animate()
-                  .fadeIn(duration: 350.ms)
-                  .slideY(begin: 0.03, end: 0, duration: 350.ms),
-              const SizedBox(height: 16),
+                  // Role-specific sections
+                  if (role == UserRole.transporter) ...[
+                    // [7] TRANSPORTER WORKSPACE
+                    SectionHeader(
+                      title: 'Dispatch Center',
+                      actionLabel: 'Routes',
+                      onAction: () => context.push('/map'),
+                      icon: Icons.local_shipping_outlined,
+                    ),
+                    _TransporterWorkspace(
+                      onMap: () => context.push('/map'),
+                      onMessages: () => context.push('/main/messages'),
+                    )
+                        .animate()
+                        .fadeIn(duration: 350.ms)
+                        .slideY(begin: 0.03, end: 0, duration: 350.ms),
+                    const SizedBox(height: 16),
 
-              SectionHeader(
-                title: 'Nearby Hubs',
-                actionLabel: 'Map',
-                onAction: () => context.push('/map'),
-                icon: Icons.store_mall_directory_outlined,
-              ),
-              buyers.when(
-                data: (list) => list.isEmpty
-                    ? EmptyState(
-                        icon: Icons.store_mall_directory_outlined,
-                        title: 'No hubs found',
-                        subtitle: 'Expand your delivery radius to see more hubs.',
-                        actionLabel: 'Open Map',
-                        onAction: () => context.push('/map'),
-                      )
-                    : _BuyerPipeline(buyers: list),
-                loading: () => const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 8),
-                  child: SkeletonList(count: 3),
-                ),
-                error: (e, _) => const _InlineError(message: 'Hubs unavailable'),
-              ),
-
-              const SizedBox(height: 16),
-
-              // [8] QUICK ACTIONS
-              _QuickActions(user: user),
-            ] else ...[
-              // [4] MARKET WATCH
-              SectionHeader(
-                title: 'Market Watch',
-                actionLabel: 'See all',
-                onAction: () => context.push('/main/market'),
-                icon: Icons.show_chart_rounded,
-              ),
-              commodities.when(
-                data: (list) => list.isEmpty
-                    ? const EmptyState(
-                        icon: Icons.show_chart_rounded,
-                        title: 'No price data',
-                        subtitle: 'Market prices will appear here once available.',
-                      )
-                    : _MarketWatch(
-                        commodities: list,
-                        onOpen: (id) =>
-                            context.push('/main/market/commodity/$id'),
+                    SectionHeader(
+                      title: 'Nearby Hubs',
+                      actionLabel: 'Map',
+                      onAction: () => context.push('/map'),
+                      icon: Icons.store_mall_directory_outlined,
+                    ),
+                    buyers.when(
+                      data: (list) => list.isEmpty
+                          ? EmptyState(
+                              icon: Icons.store_mall_directory_outlined,
+                              title: 'No hubs found',
+                              subtitle:
+                                  'Expand your delivery radius to see more hubs.',
+                              actionLabel: 'Open Map',
+                              onAction: () => context.push('/map'),
+                            )
+                          : _BuyerPipeline(buyers: list),
+                      loading: () => const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: SkeletonList(count: 3),
                       ),
-                loading: () => const SizedBox(
-                  height: 160,
-                  child: SkeletonList(count: 2),
-                ),
-                error: (e, _) =>
-                    const _InlineError(message: 'Prices unavailable'),
-              ),
+                      error: (e, _) =>
+                          const _InlineError(message: 'Hubs unavailable'),
+                    ),
 
-              const SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
-              // [5] BUYER PIPELINE
-              SectionHeader(
-                title: 'Active Buyers',
-                actionLabel: 'Map',
-                onAction: () => context.push('/map'),
-                icon: Icons.handshake_outlined,
-              ),
-              buyers.when(
-                data: (list) => list.isEmpty
-                    ? EmptyState(
-                        icon: Icons.handshake_outlined,
-                        title: 'No buyers nearby',
-                        subtitle: 'Verified buyers will appear once data is loaded.',
-                        actionLabel: 'Open Map',
-                        onAction: () => context.push('/map'),
-                      )
-                    : _BuyerPipeline(buyers: list),
-                loading: () => const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 8),
-                  child: SkeletonList(count: 3),
-                ),
-                error: (e, _) =>
-                    const _InlineError(message: 'Buyers unavailable'),
-              ),
-
-              const SizedBox(height: 16),
-
-              // [6] PRIORITY LISTINGS
-              SectionHeader(
-                title: 'Listings',
-                actionLabel: 'View all',
-                onAction: () => context.push('/marketplace'),
-                icon: Icons.inventory_2_outlined,
-              ),
-              products.when(
-                data: (list) => list.isEmpty
-                    ? EmptyState(
-                        icon: Icons.inventory_2_outlined,
-                        title: 'No listings yet',
-                        subtitle: 'Add your first product to start selling.',
-                        actionLabel: 'Add Listing',
-                        onAction: () => context.push('/marketplace/add'),
-                      )
-                    : _PriorityListings(
-                        products: list,
-                        onOpen: (id) =>
-                            context.push('/marketplace/product/$id'),
+                    // [8] QUICK ACTIONS
+                    _QuickActions(user: user),
+                  ] else ...[
+                    // [4] MARKET WATCH
+                    SectionHeader(
+                      title: 'Market Watch',
+                      actionLabel: 'See all',
+                      onAction: () => context.push('/main/market'),
+                      icon: Icons.show_chart_rounded,
+                    ),
+                    commodities.when(
+                      data: (list) => list.isEmpty
+                          ? const EmptyState(
+                              icon: Icons.show_chart_rounded,
+                              title: 'No price data',
+                              subtitle:
+                                  'Market prices will appear here once available.',
+                            )
+                          : _MarketWatch(
+                              commodities: list,
+                              onOpen: (id) =>
+                                  context.push('/main/market/commodity/$id'),
+                            ),
+                      loading: () => const SizedBox(
+                        height: 160,
+                        child: SkeletonList(count: 2),
                       ),
-                loading: () => const SizedBox(
-                  height: 140,
-                  child: SkeletonList(count: 2),
-                ),
-                error: (e, _) =>
-                    const _InlineError(message: 'Listings unavailable'),
+                      error: (e, _) =>
+                          const _InlineError(message: 'Prices unavailable'),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // [5] BUYER PIPELINE
+                    SectionHeader(
+                      title: 'Active Buyers',
+                      actionLabel: 'Map',
+                      onAction: () => context.push('/map'),
+                      icon: Icons.handshake_outlined,
+                    ),
+                    buyers.when(
+                      data: (list) => list.isEmpty
+                          ? EmptyState(
+                              icon: Icons.handshake_outlined,
+                              title: 'No buyers nearby',
+                              subtitle:
+                                  'Verified buyers will appear once data is loaded.',
+                              actionLabel: 'Open Map',
+                              onAction: () => context.push('/map'),
+                            )
+                          : _BuyerPipeline(buyers: list),
+                      loading: () => const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: SkeletonList(count: 3),
+                      ),
+                      error: (e, _) =>
+                          const _InlineError(message: 'Buyers unavailable'),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // [6] PRIORITY LISTINGS
+                    SectionHeader(
+                      title: 'Listings',
+                      actionLabel:
+                          role == UserRole.farmer ? 'My Listings' : 'View all',
+                      onAction: () => context.push(role == UserRole.farmer
+                          ? '/my-listings'
+                          : '/marketplace'),
+                      icon: Icons.inventory_2_outlined,
+                    ),
+                    products.when(
+                      data: (list) => list.isEmpty
+                          ? EmptyState(
+                              icon: Icons.inventory_2_outlined,
+                              title: 'No listings yet',
+                              subtitle:
+                                  'Add your first product to start selling.',
+                              actionLabel: 'Add Listing',
+                              onAction: () => context.push('/marketplace/add'),
+                            )
+                          : _PriorityListings(
+                              products: list,
+                              onOpen: (id) =>
+                                  context.push('/marketplace/product/$id'),
+                            ),
+                      loading: () => const SizedBox(
+                        height: 140,
+                        child: SkeletonList(count: 2),
+                      ),
+                      error: (e, _) =>
+                          const _InlineError(message: 'Listings unavailable'),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // [8] QUICK ACTIONS
+                    _QuickActions(user: user),
+                  ],
+                ],
               ),
-
-              const SizedBox(height: 16),
-
-              // [8] QUICK ACTIONS
-              _QuickActions(user: user),
-            ],
-          ],
-        ),
-      ),
+            ),
           ),
         ],
       ),
@@ -443,13 +454,17 @@ class _HeroBanner extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                   onPressed: () => switch (role) {
-                    UserRole.farmer || UserRole.admin => context.push('/main/market'),
+                    UserRole.farmer ||
+                    UserRole.admin =>
+                      context.push('/main/market'),
                     UserRole.buyer => context.push('/map'),
                     UserRole.transporter => context.push('/main/messages'),
                   },
                   icon: Icon(
                     switch (role) {
-                      UserRole.farmer || UserRole.admin => Icons.show_chart_rounded,
+                      UserRole.farmer ||
+                      UserRole.admin =>
+                        Icons.show_chart_rounded,
                       UserRole.buyer => Icons.map_outlined,
                       UserRole.transporter => Icons.chat_bubble_outline,
                     },
@@ -522,8 +537,7 @@ class _MarketTickerStrip extends StatelessWidget {
             itemBuilder: (context, i) {
               final c = commodities[i];
               final up = c.changePct >= 0;
-              final pctColor =
-                  up ? AppColors.mintGreen : AppColors.errorRed;
+              final pctColor = up ? AppColors.mintGreen : AppColors.errorRed;
               return Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -572,12 +586,14 @@ class _MarketTickerStrip extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
-                            up
-                                ? Icons.arrow_upward_rounded
-                                : Icons.arrow_downward_rounded,
-                            size: 9,
-                            color: pctColor,
+                          ExcludeSemantics(
+                            child: Icon(
+                              up
+                                  ? Icons.arrow_upward_rounded
+                                  : Icons.arrow_downward_rounded,
+                              size: 9,
+                              color: pctColor,
+                            ),
                           ),
                           const SizedBox(width: 2),
                           Text(
@@ -623,8 +639,9 @@ class _KpiGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final activeListings = products.maybeWhen(
-      data: (list) =>
-          list.where((p) => p.availability != ProductAvailability.soldOut).length,
+      data: (list) => list
+          .where((p) => p.availability != ProductAvailability.soldOut)
+          .length,
       orElse: () => null,
     );
     final verifiedBuyers = buyers.maybeWhen(
@@ -640,45 +657,51 @@ class _KpiGrid extends StatelessWidget {
       orElse: () => null,
     );
 
-    final marketMoveColor = (avgChange ?? 0) >= 0
-        ? AppColors.mintGreen
-        : AppColors.errorRed;
+    final marketMoveColor =
+        (avgChange ?? 0) >= 0 ? AppColors.mintGreen : AppColors.errorRed;
 
-    return GridView.count(
-      crossAxisCount: 2,
-      childAspectRatio: 1.6,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 10,
-      crossAxisSpacing: 10,
-      children: [
-        StatCard(
-          label: 'Active Listings',
-          value: activeListings?.toString() ?? '—',
-          icon: Icons.inventory_2_outlined,
-          color: AppColors.deepGreen,
-        ),
-        StatCard(
-          label: 'Verified Buyers',
-          value: verifiedBuyers?.toString() ?? '—',
-          icon: Icons.handshake_outlined,
-          color: AppColors.infoBlue,
-        ),
-        StatCard(
-          label: 'Market Move',
-          value: avgChange == null ? '—' : '${_signed(avgChange)}%',
-          icon: Icons.show_chart_rounded,
-          color: marketMoveColor,
-          trend: avgChange,
-        ),
-        StatCard(
-          label: 'Stock',
-          value: stockKg == null ? '—' : _compactKg(stockKg),
-          icon: Icons.scale_outlined,
-          color: AppColors.warmOrange,
-          unit: stockKg != null && stockKg < 1000 ? 'kg' : null,
-        ),
-      ],
+    final cards = [
+      StatCard(
+        label: 'Active Listings',
+        value: activeListings?.toString() ?? '—',
+        icon: Icons.inventory_2_outlined,
+        color: AppColors.deepGreen,
+      ),
+      StatCard(
+        label: 'Verified Buyers',
+        value: verifiedBuyers?.toString() ?? '—',
+        icon: Icons.handshake_outlined,
+        color: AppColors.infoBlue,
+      ),
+      StatCard(
+        label: 'Market Move',
+        value: avgChange == null ? '—' : '${_signed(avgChange)}%',
+        icon: Icons.show_chart_rounded,
+        color: marketMoveColor,
+        trend: avgChange,
+      ),
+      StatCard(
+        label: 'Stock',
+        value: stockKg == null ? '—' : _compactKg(stockKg),
+        icon: Icons.scale_outlined,
+        color: AppColors.warmOrange,
+        unit: stockKg != null && stockKg < 1000 ? 'kg' : null,
+      ),
+    ];
+
+    return LayoutBuilder(
+      builder: (_, constraints) {
+        final isWide = constraints.maxWidth >= 560;
+        return GridView.count(
+          crossAxisCount: isWide ? 4 : 2,
+          childAspectRatio: isWide ? 1.4 : 1.3,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+          children: cards,
+        );
+      },
     );
   }
 
@@ -751,12 +774,14 @@ class _MarketWatch extends StatelessWidget {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(
-                              up
-                                  ? Icons.arrow_upward_rounded
-                                  : Icons.arrow_downward_rounded,
-                              size: 11,
-                              color: pctColor,
+                            ExcludeSemantics(
+                              child: Icon(
+                                up
+                                    ? Icons.arrow_upward_rounded
+                                    : Icons.arrow_downward_rounded,
+                                size: 11,
+                                color: pctColor,
+                              ),
                             ),
                             const SizedBox(width: 2),
                             Text(
@@ -893,8 +918,7 @@ class _BuyerPipeline extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 12,
-                color:
-                    isDark ? AppColors.darkTextSecondary : AppColors.gray,
+                color: isDark ? AppColors.darkTextSecondary : AppColors.gray,
               ),
             ),
             trailing: Column(
@@ -913,8 +937,10 @@ class _BuyerPipeline extends StatelessWidget {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.star_rounded,
-                        size: 13, color: AppColors.golden),
+                    const ExcludeSemantics(
+                      child: Icon(Icons.star_rounded,
+                          size: 13, color: AppColors.golden),
+                    ),
                     const SizedBox(width: 3),
                     Text(
                       b.rating.toStringAsFixed(1),
@@ -1069,7 +1095,7 @@ class _PriorityListings extends StatelessWidget {
 // [7] Transporter Workspace
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _TransporterWorkspace extends StatelessWidget {
+class _TransporterWorkspace extends ConsumerWidget {
   const _TransporterWorkspace({
     required this.onMap,
     required this.onMessages,
@@ -1079,8 +1105,24 @@ class _TransporterWorkspace extends StatelessWidget {
   final VoidCallback onMessages;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final productsAsync = ref.watch(productsProvider);
+    final buyersAsync = ref.watch(buyersNearbyProvider);
+
+    final openRequests = productsAsync.maybeWhen(
+      data: (list) => list.length,
+      orElse: () => null,
+    );
+    final routeInfo = buyersAsync.maybeWhen(
+      data: (buyers) {
+        final states = buyers.map((b) => b.state).toSet();
+        final preview = states.take(3).join(' · ');
+        return (count: states.length, preview: preview);
+      },
+      orElse: () => null,
+    );
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1098,10 +1140,10 @@ class _TransporterWorkspace extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
-          const _DispatchRow(
+          _DispatchRow(
             icon: Icons.local_shipping_outlined,
             title: 'Open haulage requests',
-            value: '12',
+            value: openRequests != null ? '$openRequests' : '—',
             status: 'Ready for assignment',
             color: AppColors.deepGreen,
           ),
@@ -1109,22 +1151,23 @@ class _TransporterWorkspace extends StatelessWidget {
             padding: EdgeInsets.symmetric(vertical: 8),
             child: Divider(height: 1),
           ),
-          const _DispatchRow(
+          _DispatchRow(
             icon: Icons.route_outlined,
-            title: 'Optimised route lanes',
-            value: '4',
-            status: 'Lagos · Ibadan · Abeokuta',
+            title: 'Buyer coverage zones',
+            value: routeInfo != null ? '${routeInfo.count}' : '—',
+            status: routeInfo?.preview ?? 'Loading…',
             color: AppColors.infoBlue,
           ),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 8),
             child: Divider(height: 1),
           ),
-          const _DispatchRow(
-            icon: Icons.schedule_outlined,
-            title: 'Today dispatch SLA',
-            value: '96%',
-            status: 'On-time delivery health',
+          _DispatchRow(
+            icon: Icons.people_outline_rounded,
+            title: 'Active buyers on platform',
+            value: buyersAsync.maybeWhen(
+                data: (b) => '${b.length}', orElse: () => '—'),
+            status: 'Potential haulage clients',
             color: AppColors.golden,
           ),
           const SizedBox(height: 16),
@@ -1221,9 +1264,8 @@ class _DispatchRow extends StatelessWidget {
                   fontFamily: 'Poppins',
                   fontWeight: FontWeight.w600,
                   fontSize: 13,
-                  color: isDark
-                      ? AppColors.darkTextPrimary
-                      : AppColors.charcoal,
+                  color:
+                      isDark ? AppColors.darkTextPrimary : AppColors.charcoal,
                 ),
               ),
               const SizedBox(height: 2),
@@ -1246,8 +1288,7 @@ class _DispatchRow extends StatelessWidget {
             fontFamily: 'Poppins',
             fontWeight: FontWeight.w800,
             fontSize: 16,
-            color:
-                isDark ? AppColors.darkTextPrimary : AppColors.charcoal,
+            color: isDark ? AppColors.darkTextPrimary : AppColors.charcoal,
           ),
         ),
       ],

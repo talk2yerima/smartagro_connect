@@ -117,7 +117,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               busy: _busy,
               error: _error,
               obscurePassword: _obscurePassword,
-              isLiveMode: _isLiveMode,
               onRoleSelected: _selectRole,
               onSubmit: _submit,
               onGoogle: _google,
@@ -273,7 +272,6 @@ class _LoginPanel extends StatelessWidget {
     required this.busy,
     required this.error,
     required this.obscurePassword,
-    required this.isLiveMode,
     required this.onRoleSelected,
     required this.onSubmit,
     required this.onGoogle,
@@ -287,7 +285,6 @@ class _LoginPanel extends StatelessWidget {
   final bool busy;
   final String? error;
   final bool obscurePassword;
-  final bool isLiveMode;
   final ValueChanged<UserRole> onRoleSelected;
   final VoidCallback onSubmit;
   final VoidCallback onGoogle;
@@ -333,10 +330,7 @@ class _LoginPanel extends StatelessWidget {
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 18),
-            if (!isLiveMode)
-              _RoleSelector(selected: role, onSelected: onRoleSelected)
-            else
-              _RoleInfoBanner(role: role),
+            _RoleSelector(selected: role, onSelected: onRoleSelected),
             const SizedBox(height: 18),
             TextFormField(
               controller: email,
@@ -399,15 +393,18 @@ class _LoginPanel extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text('New to SmartAgro?'),
-                TextButton(
-                  onPressed: () => context.push('/register'),
-                  child: const Text('Create account'),
-                ),
-              ],
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text('New to SmartAgro?'),
+                  TextButton(
+                    onPressed: () => context.push('/register'),
+                    child: const Text('Create account'),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -514,39 +511,6 @@ class _ErrorBanner extends StatelessWidget {
       child: Text(
         message,
         style: TextStyle(color: Theme.of(context).colorScheme.error),
-      ),
-    );
-  }
-}
-
-class _RoleInfoBanner extends StatelessWidget {
-  const _RoleInfoBanner({required this.role});
-  final UserRole role;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColors.deepGreen.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.deepGreen.withValues(alpha: 0.25)),
-      ),
-      child: Row(
-        children: [
-          Icon(_roleIcon(role), size: 18, color: AppColors.deepGreen),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'Signing in as ${_roleLabel(role)} — your workspace is set by your registration.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.deepGreen,
-                    fontWeight: FontWeight.w500,
-                  ),
-            ),
-          ),
-        ],
       ),
     );
   }

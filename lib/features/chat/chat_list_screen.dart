@@ -129,8 +129,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
     final async = ref.watch(chatThreadsProvider);
 
     return Scaffold(
-      backgroundColor:
-          isDark ? AppColors.darkBg : AppColors.softWhite,
+      backgroundColor: isDark ? AppColors.darkBg : AppColors.softWhite,
       appBar: AppBar(
         backgroundColor: isDark ? AppColors.darkBg : Colors.white,
         elevation: 0,
@@ -147,21 +146,20 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
           IconButton(
             icon: const Icon(Icons.edit_outlined),
             tooltip: 'New conversation',
-            onPressed: () {
-              // Navigate to new conversation / contact picker
-            },
+            onPressed: () => context.push('/search'),
           ),
           const SizedBox(width: 4),
         ],
       ),
       body: async.when(
-        loading: () => const SkeletonList(count: 5, showAvatar: true, height: 72),
+        loading: () =>
+            const SkeletonList(count: 5, showAvatar: true, height: 72),
         error: (error, _) => _ErrorBody(error: error.toString()),
         data: (threads) {
           final filtered = _applyFilters(threads);
           return RefreshIndicator(
             color: AppColors.deepGreen,
-            onRefresh: () => ref.refresh(chatThreadsProvider.future),
+            onRefresh: () async => ref.invalidate(chatThreadsProvider),
             child: CustomScrollView(
               slivers: [
                 SliverToBoxAdapter(
@@ -178,10 +176,10 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                   const SliverFillRemaining(
                     hasScrollBody: false,
                     child: EmptyState(
+                      type: EmptyStateType.chat,
                       icon: Icons.chat_bubble_outline,
                       title: 'No messages yet',
-                      subtitle:
-                          'Start a conversation with buyers or sellers',
+                      subtitle: 'Start a conversation with buyers or sellers',
                     ),
                   )
                 else
@@ -240,9 +238,7 @@ class _SearchAndFilterBar extends StatelessWidget {
               color: isDark ? AppColors.cardDark : Colors.white,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: isDark
-                    ? AppColors.darkBorder
-                    : AppColors.borderLight,
+                color: isDark ? AppColors.darkBorder : AppColors.borderLight,
               ),
             ),
             child: TextField(
@@ -274,8 +270,7 @@ class _SearchAndFilterBar extends StatelessWidget {
                       )
                     : null,
                 border: InputBorder.none,
-                contentPadding:
-                    const EdgeInsets.symmetric(vertical: 12),
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
               ),
             ),
           ),
@@ -429,9 +424,8 @@ class _ThreadTile extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontFamily: 'Poppins',
-                            fontWeight: hasUnread
-                                ? FontWeight.w700
-                                : FontWeight.w600,
+                            fontWeight:
+                                hasUnread ? FontWeight.w700 : FontWeight.w600,
                             fontSize: 14,
                             color: isDark
                                 ? AppColors.darkTextPrimary
@@ -444,12 +438,10 @@ class _ThreadTile extends StatelessWidget {
                         _formatTime(thread.updatedAt),
                         style: TextStyle(
                           fontSize: 11,
-                          color: hasUnread
-                              ? AppColors.deepGreen
-                              : AppColors.gray,
-                          fontWeight: hasUnread
-                              ? FontWeight.w600
-                              : FontWeight.w400,
+                          color:
+                              hasUnread ? AppColors.deepGreen : AppColors.gray,
+                          fontWeight:
+                              hasUnread ? FontWeight.w600 : FontWeight.w400,
                         ),
                       ),
                     ],
@@ -472,9 +464,8 @@ class _ThreadTile extends StatelessWidget {
                                     ? AppColors.darkTextSecondary
                                     : AppColors.charcoal)
                                 : AppColors.gray,
-                            fontWeight: hasUnread
-                                ? FontWeight.w500
-                                : FontWeight.w400,
+                            fontWeight:
+                                hasUnread ? FontWeight.w500 : FontWeight.w400,
                           ),
                         ),
                       ),

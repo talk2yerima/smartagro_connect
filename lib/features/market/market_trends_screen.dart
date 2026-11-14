@@ -104,7 +104,8 @@ class _TrendsBody extends StatelessWidget {
         : commodities.fold<double>(0, (s, c) => s + c.changePct) /
             commodities.length;
 
-    final sorted = [...commodities]..sort((a, b) => b.changePct.compareTo(a.changePct));
+    final sorted = [...commodities]
+      ..sort((a, b) => b.changePct.compareTo(a.changePct));
     final topGainers = sorted.take(3).toList();
     final topLosers = sorted.reversed.take(3).toList();
 
@@ -150,10 +151,7 @@ class _TrendsBody extends StatelessWidget {
               commodity: c,
               isGainer: true,
               isDark: isDark,
-            )
-                .animate(delay: (80 + 50 * i).ms)
-                .fadeIn()
-                .slideY(begin: 0.04);
+            ).animate(delay: (80 + 50 * i).ms).fadeIn().slideY(begin: 0.04);
           }),
 
           const SizedBox(height: 20),
@@ -168,10 +166,7 @@ class _TrendsBody extends StatelessWidget {
               commodity: c,
               isGainer: false,
               isDark: isDark,
-            )
-                .animate(delay: (80 + 50 * i).ms)
-                .fadeIn()
-                .slideY(begin: 0.04);
+            ).animate(delay: (80 + 50 * i).ms).fadeIn().slideY(begin: 0.04);
           }),
 
           const SizedBox(height: 20),
@@ -184,10 +179,7 @@ class _TrendsBody extends StatelessWidget {
                 .map((e) => (category: e.category, avg: e.avg))
                 .toList(),
             isDark: isDark,
-          )
-              .animate(delay: 300.ms)
-              .fadeIn()
-              .slideY(begin: 0.04),
+          ).animate(delay: 300.ms).fadeIn().slideY(begin: 0.04),
 
           const SizedBox(height: 20),
 
@@ -242,7 +234,8 @@ class _SummaryCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.bar_chart_rounded, color: Colors.white, size: 20),
+              const Icon(Icons.bar_chart_rounded,
+                  color: Colors.white, size: 20),
               const SizedBox(width: 8),
               const Text(
                 'Market Summary',
@@ -255,7 +248,8 @@ class _SummaryCard extends StatelessWidget {
               ),
               const Spacer(),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(20),
@@ -268,7 +262,9 @@ class _SummaryCard extends StatelessWidget {
                           ? Icons.arrow_upward_rounded
                           : Icons.arrow_downward_rounded,
                       size: 12,
-                      color: avgUp ? const Color(0xFF00C853) : const Color(0xFFEF9A9A),
+                      color: avgUp
+                          ? const Color(0xFF00C853)
+                          : const Color(0xFFEF9A9A),
                     ),
                     const SizedBox(width: 3),
                     Text(
@@ -276,8 +272,9 @@ class _SummaryCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color:
-                            avgUp ? const Color(0xFF00C853) : const Color(0xFFEF9A9A),
+                        color: avgUp
+                            ? const Color(0xFF00C853)
+                            : const Color(0xFFEF9A9A),
                       ),
                     ),
                   ],
@@ -423,8 +420,7 @@ class _CommodityTrendCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = commodity;
     final up = c.changePct >= 0;
-    final pctColor =
-        up ? const Color(0xFF00C853) : const Color(0xFFC62828);
+    final pctColor = up ? const Color(0xFF00C853) : const Color(0xFFC62828);
     final sparkColor = up ? const Color(0xFF00C853) : const Color(0xFFC62828);
     final sparkData = mockSparklineFromChange(c.changePct);
 
@@ -439,19 +435,17 @@ class _CommodityTrendCard extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: (isGainer
-                      ? const Color(0xFF00C853)
-                      : const Color(0xFFC62828))
-                  .withValues(alpha: 0.10),
+              color:
+                  (isGainer ? const Color(0xFF00C853) : const Color(0xFFC62828))
+                      .withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
               isGainer
                   ? Icons.trending_up_rounded
                   : Icons.trending_down_rounded,
-              color: isGainer
-                  ? const Color(0xFF00C853)
-                  : const Color(0xFFC62828),
+              color:
+                  isGainer ? const Color(0xFF00C853) : const Color(0xFFC62828),
               size: 22,
             ),
           ),
@@ -605,7 +599,8 @@ class _CategoryPerformanceCard extends StatelessWidget {
           final barFraction = cat.avg.abs() / effectiveMax;
 
           return Padding(
-            padding: EdgeInsets.only(bottom: i < categories.length - 1 ? 14 : 0),
+            padding:
+                EdgeInsets.only(bottom: i < categories.length - 1 ? 14 : 0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -694,17 +689,20 @@ class _MarketInsightsCard extends StatelessWidget {
     (
       icon: Icons.grain_rounded,
       color: Color(0xFF2E7D32),
-      text: 'Maize prices rising due to seasonal demand ahead of planting season',
+      text:
+          'Maize prices rising due to seasonal demand ahead of planting season',
     ),
     (
       icon: Icons.water_drop_rounded,
       color: Color(0xFF0277BD),
-      text: 'Dry-season water scarcity in the north is tightening tomato supply',
+      text:
+          'Dry-season water scarcity in the north is tightening tomato supply',
     ),
     (
       icon: Icons.local_shipping_rounded,
       color: Color(0xFFFB8C00),
-      text: 'Improved Abuja-Kano corridor logistics reducing sorghum transport costs',
+      text:
+          'Improved Abuja-Kano corridor logistics reducing sorghum transport costs',
     ),
   ];
 

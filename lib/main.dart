@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
+import 'core/utils/app_logger.dart';
 import 'firebase_options.dart';
 
 void main() {
@@ -36,7 +37,7 @@ void _onZoneError(Object error, StackTrace stack) {
   if (_firebaseConfigured() && _crashlyticsSupported()) {
     FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
   } else {
-    debugPrint('[SmartAgro] Unhandled zone error: $error\n$stack');
+    log.e('[SmartAgro] Unhandled zone error', error: error, stackTrace: stack);
   }
 }
 
@@ -83,9 +84,7 @@ Future<void> _tryInitFirebase() async {
   } catch (_) {
     // Firebase not configured or platform unsupported (e.g. Windows dev).
     // The app continues in demo mode — auth stubs remain active.
-    debugPrint(
-      '[SmartAgro] Firebase not initialised — running in demo mode. '
-      'Run `flutterfire configure` to activate real auth.',
-    );
+    log.w('[SmartAgro] Firebase not initialised — running in demo mode. '
+        'Run `flutterfire configure` to activate real auth.');
   }
 }

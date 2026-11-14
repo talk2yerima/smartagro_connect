@@ -32,7 +32,9 @@ class ProductRepository {
     if (_firestore.isAvailable) {
       final id = await _firestore.addProduct(data);
       if (id != null) {
-        await _db.upsertProducts([{...data, 'id': id}]);
+        await _db.upsertProducts([
+          {...data, 'id': id}
+        ]);
         return;
       }
     }
@@ -79,12 +81,15 @@ class ProductRepository {
     // Firestore is the live source of truth when Firebase is configured.
     if (_firestore.isAvailable) {
       final firestoreRows = await _firestore.fetchProducts();
-      // Always append mock data so the UI is never empty for new accounts.
+      if (firestoreRows.isNotEmpty) {
+        await _db.upsertProducts(firestoreRows);
+        return firestoreRows.map(productFromMap).toList();
+      }
+      // No real listings yet — show mock data so the UI is never blank.
       final fixture = await _assets.loadJson(_asset);
       final mockItems = (fixture['items'] as List).cast<Map<String, dynamic>>();
-      final all = [...firestoreRows, ...mockItems];
-      await _db.upsertProducts(all);
-      return all.map(productFromMap).toList();
+      await _db.upsertProducts(mockItems);
+      return mockItems.map(productFromMap).toList();
     }
 
     // No Firebase — REST → SQLite cache → bundled fixture.

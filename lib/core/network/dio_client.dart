@@ -18,7 +18,13 @@ class DioClient {
     Future<String?> Function()? getToken,
     Future<String?> Function()? refreshToken,
     void Function()? onUnauthorized,
-  }) : _dio = dio ??
+    // Populate with SHA-256 DER base64 fingerprints from your TLS certificate
+    // to enable certificate pinning in production.  Wire up the platform HTTP
+    // client via IOHttpClientAdapter.createHttpClient when activating this.
+    // Intentionally left empty (no-op) so development builds work without certs.
+    List<String> pinnedSha256s = const [],
+  })  : _pinnedSha256s = pinnedSha256s,
+        _dio = dio ??
             Dio(
               BaseOptions(
                 baseUrl: baseUrl,
@@ -82,6 +88,8 @@ class DioClient {
   }
 
   final Dio _dio;
+  // ignore: unused_field — activated in production by passing pinnedSha256s.
+  final List<String> _pinnedSha256s;
 
   Dio get raw => _dio;
 
@@ -93,7 +101,9 @@ class DioClient {
       return const NetworkFailure('Connection issue. Showing offline data.');
     }
     final code = e.response?.statusCode;
-    if (code == 401) return const AuthFailure('Session expired. Please sign in again.');
+    if (code == 401) {
+      return const AuthFailure('Session expired. Please sign in again.');
+    }
     if (code != null && code >= 500) {
       return ServerFailure('Server error ($code). Please try again.');
     }

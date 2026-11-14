@@ -30,7 +30,7 @@ class AppDatabase {
     final path = p.join(dir.path, 'smartagro.db');
     _db = await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: (db, version) async {
         await db.execute('''
 CREATE TABLE commodity_cache (
@@ -55,6 +55,7 @@ CREATE TABLE meta (
 );''');
         await _createWriteQueueTable(db);
         await _createWriteQueueIndexes(db);
+        await _createTransactionRefsTable(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -69,6 +70,9 @@ CREATE TABLE meta (
             await db.execute(
                 'CREATE INDEX IF NOT EXISTS idx_product_updated ON product_cache(updated_at DESC);');
           } catch (_) {}
+        }
+        if (oldVersion < 4) {
+          await _createTransactionRefsTable(db);
         }
       },
     );
@@ -186,8 +190,8 @@ CREATE TABLE write_queue (
   }
 
   Future<void> incrementWriteRetry(int id, {required bool markFailed}) async {
-    final entry = await _db!
-        .query('write_queue', where: 'id = ?', whereArgs: [id]);
+    final entry =
+        await _db!.query('write_queue', where: 'id = ?', whereArgs: [id]);
     if (entry.isEmpty) return;
     final retries = (entry.first['retry_count'] as int) + 1;
     await _db!.update(
@@ -220,5 +224,88 @@ CREATE TABLE write_queue (
   Future<void> close() async {
     await _db?.close();
     _db = null;
+  }
+
+  // ── Transaction reference queue (Paystack) ─────────────────────────────────
+
+  static Future<void> _createTransactionRefsTable(Database db) async {
+    await db.execute('''
+CREATE TABLE transaction_refs (
+  reference   TEXT PRIMARY KEY,
+  amount_kobo INTEGER NOT NULL,
+  email       TEXT NOT NULL,
+  description TEXT NOT NULL,
+  status      TEXT NOT NULL DEFAULT 'pending',
+  created_at  INTEGER NOT NULL,
+  verified_at INTEGER
+);''');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_txref_status ON transaction_refs(status, created_at ASC);');
+  }
+
+  Future<void> enqueueTransactionRef({
+    required String reference,
+    required int amountKobo,
+    required String email,
+    required String description,
+  }) async {
+    await _db!.insert(
+      'transaction_refs',
+      {
+        'reference': reference,
+        'amount_kobo': amountKobo,
+        'email': email,
+        'description': description,
+        'status': 'pending',
+        'created_at': DateTime.now().millisecondsSinceEpoch,
+        'verified_at': null,
+      },
+      conflictAlgorithm: ConflictAlgorithm.ignore,
+    );
+  }
+
+  /// References that may still change on the server (not yet final), from the
+  /// last 7 days. Older unfinished checkouts are left alone.
+  Future<List<Map<String, dynamic>>> pendingTransactionRefs() async {
+    final cutoff =
+        DateTime.now().subtract(const Duration(days: 7)).millisecondsSinceEpoch;
+    return _db!.query(
+      'transaction_refs',
+      where: "status IN ('pending', 'abandoned') AND created_at >= ?",
+      whereArgs: [cutoff],
+      orderBy: 'created_at ASC',
+    );
+  }
+
+  Future<void> updateTransactionRefStatus(
+    String reference,
+    String status,
+  ) async {
+    await _db!.update(
+      'transaction_refs',
+      {
+        'status': status,
+        'verified_at': DateTime.now().millisecondsSinceEpoch,
+      },
+      where: 'reference = ?',
+      whereArgs: [reference],
+    );
+  }
+
+  Future<Map<String, dynamic>?> getTransactionRef(String reference) async {
+    final rows = await _db!.query(
+      'transaction_refs',
+      where: 'reference = ?',
+      whereArgs: [reference],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : rows.first;
+  }
+
+  Future<List<Map<String, dynamic>>> allTransactionRefs() async {
+    return _db!.query(
+      'transaction_refs',
+      orderBy: 'created_at DESC',
+    );
   }
 }

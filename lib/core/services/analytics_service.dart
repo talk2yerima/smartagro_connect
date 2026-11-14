@@ -33,9 +33,8 @@ class AnalyticsService {
 
   /// Returns a [NavigatorObserver] that logs screen views automatically.
   /// Falls back to a no-op observer in demo mode.
-  NavigatorObserver get observer => _ready
-      ? FirebaseAnalyticsObserver(analytics: _fa)
-      : _NoOpObserver();
+  NavigatorObserver get observer =>
+      _ready ? FirebaseAnalyticsObserver(analytics: _fa) : _NoOpObserver();
 
   // ── Event helpers ──────────────────────────────────────────────────────────
 

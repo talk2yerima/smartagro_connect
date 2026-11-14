@@ -46,19 +46,25 @@ dependencies:
   google_sign_in: ^6.2.1
 
   # ── Security ──────────────────────────────────────────────────────────────
-  # flutter_secure_storage: ^9.2.2
-  # Disabled on Windows dev — requires VS ATL component (atlstr.h).
-  # Re-enable when building for Android/iOS production:
-  #   Visual Studio → Modify → Individual Components → "C++ ATL for v143 build tools"
+  flutter_secure_storage: ^9.2.2
+  # Windows builds fall back to SharedPreferences in SecureTokenStore —
+  # see lib/data/services/secure_token_store.dart for the platform guard.
 
-# ── Networking ───────────────────────────────────────────────────────────
+  # ── Networking ───────────────────────────────────────────────────────────
   dio_smart_retry: ^6.0.0
 
-  # ── Image caching ─────────────────────────────────────────────────────────
+  # ── Image caching / compression ───────────────────────────────────────────
   flutter_cache_manager: ^3.4.1
+  flutter_image_compress: ^2.3.0
 
   # ── Observability ────────────────────────────────────────────────────────
   logger: ^2.4.0
+
+  # ── Payments ─────────────────────────────────────────────────────────────────
+  url_launcher: ^6.3.1
+
+  # ── Security ─────────────────────────────────────────────────────────────────
+  safe_device: ^1.2.1
 
 dev_dependencies:
   flutter_test:

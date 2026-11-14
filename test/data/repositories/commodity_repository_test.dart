@@ -7,18 +7,28 @@ import 'package:smartagro_connect/data/local/app_database.dart';
 import 'package:smartagro_connect/data/repositories/commodity_repository.dart';
 
 class MockRemote extends Mock implements RemoteApiDataSource {}
+
 class MockAssets extends Mock implements AssetBundleDataSource {}
+
 class MockDb extends Mock implements AppDatabase {}
 
 // Minimal fixture rows used across tests.
 const _rows = [
   {
-    'id': 'c1', 'name': 'Maize', 'unit': 'kg',
-    'priceNgn': 350, 'changePct': 2.5, 'category': 'Grains',
+    'id': 'c1',
+    'name': 'Maize',
+    'unit': 'kg',
+    'priceNgn': 350,
+    'changePct': 2.5,
+    'category': 'Grains',
   },
   {
-    'id': 'c2', 'name': 'Soybean', 'unit': 'kg',
-    'priceNgn': 620, 'changePct': -1.2, 'category': 'Legumes',
+    'id': 'c2',
+    'name': 'Soybean',
+    'unit': 'kg',
+    'priceNgn': 620,
+    'changePct': -1.2,
+    'category': 'Legumes',
   },
 ];
 
@@ -41,7 +51,8 @@ void main() {
 
   group('fetchCommodities — remote success', () {
     setUp(() {
-      when(() => remote.fetchCommodities()).thenAnswer((_) async => List.from(_rows));
+      when(() => remote.fetchCommodities())
+          .thenAnswer((_) async => List.from(_rows));
     });
 
     test('returns mapped commodities from remote', () async {

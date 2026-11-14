@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/di/repositories_provider.dart';
@@ -90,13 +91,32 @@ const List<_TrendingCategory> _trendingCategories = [
   ),
 ];
 
-const List<String> _mockRecentSearches = [
-  'Maize Plateau',
-  'Tomatoes Lagos',
-  'Rice Kebbi',
-  'Cassava Oyo',
-  'Palm Oil Rivers',
-];
+class _RecentSearchesNotifier extends StateNotifier<List<String>> {
+  _RecentSearchesNotifier() : super([]) {
+    _load();
+  }
+
+  static const _kKey = 'smartagro_recent_searches';
+  static const _kMax = 5;
+
+  Future<void> _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    state = prefs.getStringList(_kKey) ?? [];
+  }
+
+  Future<void> add(String query) async {
+    final q = query.trim();
+    if (q.isEmpty) return;
+    final next = [q, ...state.where((s) => s != q)].take(_kMax).toList();
+    state = next;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_kKey, next);
+  }
+}
+
+final _recentSearchesProvider =
+    StateNotifierProvider<_RecentSearchesNotifier, List<String>>(
+        (_) => _RecentSearchesNotifier());
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -131,7 +151,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 350), () {
       final q = _searchController.text.trim();
-      if (mounted && q != _query) setState(() => _query = q);
+      if (mounted && q != _query) {
+        setState(() => _query = q);
+        if (q.isNotEmpty) ref.read(_recentSearchesProvider.notifier).add(q);
+      }
     });
   }
 
@@ -147,6 +170,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
   // ── helpers ─────────────────────────────────────────────────────────────
 
   void _applyRecentSearch(String term) {
+    ref.read(_recentSearchesProvider.notifier).add(term);
     _searchController.text = term;
     _searchController.selection = TextSelection.fromPosition(
       TextPosition(offset: term.length),
@@ -221,7 +245,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
                     icon: Icon(
                       Icons.close_rounded,
                       size: 18,
-                      color: isDark ? AppColors.darkTextSecondary : AppColors.gray,
+                      color:
+                          isDark ? AppColors.darkTextSecondary : AppColors.gray,
                     ),
                     onPressed: () => _searchController.clear(),
                   )
@@ -273,12 +298,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
   }
 
   Widget _buildRecentSearches(bool isDark) {
+    final searches = ref.watch(_recentSearchesProvider);
+    if (searches.isEmpty) return const SizedBox.shrink();
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
-        children: List.generate(_mockRecentSearches.length, (i) {
-          final term = _mockRecentSearches[i];
+        children: List.generate(searches.length, (i) {
+          final term = searches[i];
           return Padding(
             padding: const EdgeInsets.only(right: 8),
             child: ActionChip(
@@ -292,7 +319,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
                 style: GoogleFonts.poppins(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
-                  color: isDark ? AppColors.darkTextPrimary : AppColors.charcoal,
+                  color:
+                      isDark ? AppColors.darkTextPrimary : AppColors.charcoal,
                 ),
               ),
               backgroundColor:
@@ -352,29 +380,25 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
             .toList() ??
         [];
 
-    final products = productsAsync.valueOrNull
-            ?.where((p) {
-              final matchQ = p.title.toLowerCase().contains(q) ||
-                  p.state.toLowerCase().contains(q) ||
-                  p.city.toLowerCase().contains(q) ||
-                  p.sellerName.toLowerCase().contains(q);
-              final matchVerified = !_verifiedOnly || p.verified;
-              final matchNearby = !_nearbyOnly;
-              return matchQ && matchVerified && matchNearby;
-            })
-            .toList() ??
+    final products = productsAsync.valueOrNull?.where((p) {
+          final matchQ = p.title.toLowerCase().contains(q) ||
+              p.state.toLowerCase().contains(q) ||
+              p.city.toLowerCase().contains(q) ||
+              p.sellerName.toLowerCase().contains(q);
+          final matchVerified = !_verifiedOnly || p.verified;
+          final matchNearby = !_nearbyOnly;
+          return matchQ && matchVerified && matchNearby;
+        }).toList() ??
         [];
 
-    final buyers = buyersAsync.valueOrNull
-            ?.where((b) {
-              final matchQ = b.name.toLowerCase().contains(q) ||
-                  b.type.toLowerCase().contains(q) ||
-                  b.state.toLowerCase().contains(q);
-              final matchVerified = !_verifiedOnly || b.verified;
-              final matchNearby = !_nearbyOnly || b.distanceKm <= 50;
-              return matchQ && matchVerified && matchNearby;
-            })
-            .toList() ??
+    final buyers = buyersAsync.valueOrNull?.where((b) {
+          final matchQ = b.name.toLowerCase().contains(q) ||
+              b.type.toLowerCase().contains(q) ||
+              b.state.toLowerCase().contains(q);
+          final matchVerified = !_verifiedOnly || b.verified;
+          final matchNearby = !_nearbyOnly || b.distanceKm <= 50;
+          return matchQ && matchVerified && matchNearby;
+        }).toList() ??
         [];
 
     final isLoading = commoditiesAsync.isLoading ||
@@ -421,8 +445,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
               : TabBarView(
                   controller: _tabController,
                   children: [
-                    _buildAllTab(
-                        isDark, commodities, products, buyers),
+                    _buildAllTab(isDark, commodities, products, buyers),
                     _buildCommoditiesTab(isDark, commodities),
                     _buildProductsTab(isDark, products),
                     _buildBuyersTab(isDark, buyers),
@@ -543,8 +566,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
                   ),
                   childCount: products.take(2).length,
                 ),
-                gridDelegate:
-                    const SliverGridDelegateWithFixedCrossAxisCount(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
                   mainAxisSpacing: 10,
                   crossAxisSpacing: 10,
@@ -811,11 +833,9 @@ class _CommodityTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isUp = commodity.changePct >= 0;
-    final changeColor =
-        isUp ? AppColors.mintGreen : AppColors.errorRed;
-    final changeIcon = isUp
-        ? Icons.arrow_upward_rounded
-        : Icons.arrow_downward_rounded;
+    final changeColor = isUp ? AppColors.mintGreen : AppColors.errorRed;
+    final changeIcon =
+        isUp ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded;
     final changeLabel =
         '${isUp ? '+' : ''}${commodity.changePct.toStringAsFixed(1)}%';
 
@@ -851,9 +871,8 @@ class _CommodityTile extends StatelessWidget {
                   style: GoogleFonts.poppins(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: isDark
-                        ? AppColors.darkTextPrimary
-                        : AppColors.charcoal,
+                    color:
+                        isDark ? AppColors.darkTextPrimary : AppColors.charcoal,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -863,9 +882,8 @@ class _CommodityTile extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.poppins(
                     fontSize: 11,
-                    color: isDark
-                        ? AppColors.darkTextSecondary
-                        : AppColors.gray,
+                    color:
+                        isDark ? AppColors.darkTextSecondary : AppColors.gray,
                   ),
                 ),
               ],
@@ -882,9 +900,8 @@ class _CommodityTile extends StatelessWidget {
                 style: GoogleFonts.poppins(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: isDark
-                      ? AppColors.darkTextPrimary
-                      : AppColors.charcoal,
+                  color:
+                      isDark ? AppColors.darkTextPrimary : AppColors.charcoal,
                 ),
               ),
               const SizedBox(height: 4),
@@ -978,9 +995,8 @@ class _ProductCard extends StatelessWidget {
                   style: GoogleFonts.poppins(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: isDark
-                        ? AppColors.darkTextPrimary
-                        : AppColors.charcoal,
+                    color:
+                        isDark ? AppColors.darkTextPrimary : AppColors.charcoal,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -990,9 +1006,8 @@ class _ProductCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.poppins(
                     fontSize: 10,
-                    color: isDark
-                        ? AppColors.darkTextSecondary
-                        : AppColors.gray,
+                    color:
+                        isDark ? AppColors.darkTextSecondary : AppColors.gray,
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -1115,9 +1130,8 @@ class _BuyerTile extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.poppins(
                     fontSize: 11,
-                    color: isDark
-                        ? AppColors.darkTextSecondary
-                        : AppColors.gray,
+                    color:
+                        isDark ? AppColors.darkTextSecondary : AppColors.gray,
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -1126,9 +1140,8 @@ class _BuyerTile extends StatelessWidget {
                     Icon(
                       Icons.location_on_rounded,
                       size: 12,
-                      color: isDark
-                          ? AppColors.darkTextSecondary
-                          : AppColors.gray,
+                      color:
+                          isDark ? AppColors.darkTextSecondary : AppColors.gray,
                     ),
                     const SizedBox(width: 3),
                     Text(
@@ -1187,9 +1200,7 @@ class _BuyerTile extends StatelessWidget {
               const SizedBox(height: 6),
               StatusBadge(
                 label: buyer.verified ? 'Verified' : 'Unverified',
-                color: buyer.verified
-                    ? AppColors.mintGreen
-                    : AppColors.gray,
+                color: buyer.verified ? AppColors.mintGreen : AppColors.gray,
                 icon: buyer.verified
                     ? Icons.verified_rounded
                     : Icons.help_outline_rounded,

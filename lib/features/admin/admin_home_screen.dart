@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/di/repositories_provider.dart';
+import '../../core/services/push_messaging_service.dart';
 import '../../shared/widgets/section_header.dart';
 import '../../shared/widgets/stat_card.dart';
 import '../../shared/widgets/status_badge.dart';
@@ -26,7 +28,7 @@ BoxDecoration _card(bool isDark) => BoxDecoration(
       ],
     );
 
-// ─── Mock data ───────────────────────────────────────────────────────────────
+// ─── Activity item model ──────────────────────────────────────────────────────
 
 class _ActivityItem {
   const _ActivityItem({
@@ -43,44 +45,6 @@ class _ActivityItem {
   final String time;
   final Color color;
 }
-
-const _activities = <_ActivityItem>[
-  _ActivityItem(
-    icon: Icons.person_add_alt_1_outlined,
-    title: 'New user registered',
-    subtitle: 'Amara Okonkwo joined as Farmer',
-    time: '2 min ago',
-    color: AppColors.infoBlue,
-  ),
-  _ActivityItem(
-    icon: Icons.flag_outlined,
-    title: 'Listing flagged',
-    subtitle: 'Maize lot #1042 reported for pricing',
-    time: '14 min ago',
-    color: AppColors.warmOrange,
-  ),
-  _ActivityItem(
-    icon: Icons.handshake_outlined,
-    title: 'Trade completed',
-    subtitle: '12 bags of cassava — ₦84,000 settled',
-    time: '1 hr ago',
-    color: AppColors.freshGreen,
-  ),
-  _ActivityItem(
-    icon: Icons.person_add_alt_1_outlined,
-    title: 'New user registered',
-    subtitle: 'Emeka Adeyemi joined as Buyer',
-    time: '2 hr ago',
-    color: AppColors.infoBlue,
-  ),
-  _ActivityItem(
-    icon: Icons.edit_note_outlined,
-    title: 'Listing approved',
-    subtitle: 'Yam lot #1038 cleared by moderator',
-    time: '3 hr ago',
-    color: AppColors.emerald,
-  ),
-];
 
 class _QuickAction {
   const _QuickAction({
@@ -142,10 +106,11 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
   DateTime _lastRefreshed = DateTime.now();
 
   Future<void> _onRefresh() async {
-    await Future.delayed(const Duration(milliseconds: 800));
-    if (mounted) {
-      setState(() => _lastRefreshed = DateTime.now());
-    }
+    await Future.wait([
+      ref.refresh(adminStatsProvider.future),
+      ref.refresh(adminActivityProvider.future),
+    ]);
+    if (mounted) setState(() => _lastRefreshed = DateTime.now());
   }
 
   @override
@@ -178,7 +143,7 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
               ),
             ),
             tooltip: 'Notifications',
-            onPressed: () {},
+            onPressed: () => context.push('/admin/moderation'),
           ),
           const SizedBox(width: 4),
         ],
@@ -249,14 +214,20 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
 
 // ─── [1] Welcome Banner ───────────────────────────────────────────────────────
 
-class _WelcomeBanner extends StatelessWidget {
+class _WelcomeBanner extends ConsumerWidget {
   const _WelcomeBanner({required this.lastRefreshed});
 
   final DateTime lastRefreshed;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final timeStr = DateFormat('MMM d, h:mm a').format(lastRefreshed);
+    final stats = ref.watch(adminStatsProvider).valueOrNull;
+
+    final users = stats?['totalUsers'] as int? ?? 0;
+    final listings = stats?['totalListings'] as int? ?? 0;
+    final flagged = stats?['pendingReports'] as int? ?? 0;
+    final loading = stats == null;
 
     return Container(
       decoration: BoxDecoration(
@@ -311,13 +282,22 @@ class _WelcomeBanner extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 14),
-          const Row(
+          Row(
             children: [
-              _BannerStat(label: 'Uptime', value: '99.8%'),
-              SizedBox(width: 24),
-              _BannerStat(label: 'Active Users', value: '312'),
-              SizedBox(width: 24),
-              _BannerStat(label: 'Open Tickets', value: '7'),
+              _BannerStat(
+                label: 'Users',
+                value: loading ? '—' : '$users',
+              ),
+              const SizedBox(width: 24),
+              _BannerStat(
+                label: 'Listings',
+                value: loading ? '—' : '$listings',
+              ),
+              const SizedBox(width: 24),
+              _BannerStat(
+                label: 'Flagged',
+                value: loading ? '—' : '$flagged',
+              ),
             ],
           ),
         ],
@@ -364,64 +344,97 @@ class _BannerStat extends StatelessWidget {
 
 // ─── [2] KPI Grid ─────────────────────────────────────────────────────────────
 
-class _KpiGrid extends StatelessWidget {
+class _KpiGrid extends ConsumerWidget {
   const _KpiGrid({required this.isDark});
 
   final bool isDark;
 
-  @override
-  Widget build(BuildContext context) {
-    const kpis = [
-      (
-        label: 'Total Users',
-        value: '1,247',
-        icon: Icons.people_outline,
-        color: AppColors.infoBlue,
-        trend: 4.2,
-      ),
-      (
-        label: 'Active Listings',
-        value: '342',
-        icon: Icons.storefront_outlined,
-        color: AppColors.freshGreen,
-        trend: 1.8,
-      ),
-      (
-        label: 'Trades This Week',
-        value: '89',
-        icon: Icons.swap_horiz_rounded,
-        color: AppColors.golden,
-        trend: -2.1,
-      ),
-      (
-        label: 'Revenue',
-        value: '₦2.4M',
-        icon: Icons.account_balance_wallet_outlined,
-        color: AppColors.warmOrange,
-        trend: 7.5,
-      ),
-    ];
+  String _fmtGmv(double ngn) {
+    if (ngn >= 1e9) return '₦${(ngn / 1e9).toStringAsFixed(1)}B';
+    if (ngn >= 1e6) return '₦${(ngn / 1e6).toStringAsFixed(1)}M';
+    if (ngn >= 1e3) return '₦${(ngn / 1e3).toStringAsFixed(0)}K';
+    return '₦${ngn.toStringAsFixed(0)}';
+  }
 
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      childAspectRatio: 1.35,
-      children: List.generate(kpis.length, (i) {
-        final kpi = kpis[i];
-        return StatCard(
-          label: kpi.label,
-          value: kpi.value,
-          icon: kpi.icon,
-          color: kpi.color,
-          trend: kpi.trend,
-        )
-            .animate(delay: (50 * i).ms)
-            .fadeIn()
-            .slideY(begin: 0.04);
-      }),
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final statsAsync = ref.watch(adminStatsProvider);
+
+    return statsAsync.when(
+      loading: () => GridView.count(
+        crossAxisCount: 2,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 1.35,
+        children: List.generate(
+            4,
+            (_) => Container(
+                  decoration: _card(isDark),
+                  child: const Center(
+                    child: CircularProgressIndicator(
+                        color: AppColors.deepGreen, strokeWidth: 2),
+                  ),
+                )),
+      ),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (stats) {
+        final totalUsers = stats['totalUsers'] as int? ?? 0;
+        final listings = stats['totalListings'] as int? ?? 0;
+        final verified = stats['verified'] as int? ?? 0;
+        final gmv = (stats['gmvNgn'] as num?)?.toDouble() ?? 0.0;
+
+        final kpis = [
+          (
+            label: 'Total Users',
+            value: '$totalUsers',
+            icon: Icons.people_outline,
+            color: AppColors.infoBlue,
+            trend: 0.0
+          ),
+          (
+            label: 'Active Listings',
+            value: '$listings',
+            icon: Icons.storefront_outlined,
+            color: AppColors.freshGreen,
+            trend: 0.0
+          ),
+          (
+            label: 'Verified Users',
+            value: '$verified',
+            icon: Icons.verified_user_outlined,
+            color: AppColors.golden,
+            trend: 0.0
+          ),
+          (
+            label: 'Est. GMV',
+            value: _fmtGmv(gmv),
+            icon: Icons.account_balance_wallet_outlined,
+            color: AppColors.warmOrange,
+            trend: 0.0
+          ),
+        ];
+
+        return GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 1.35,
+          children: List.generate(kpis.length, (i) {
+            final kpi = kpis[i];
+            return StatCard(
+              label: kpi.label,
+              value: kpi.value,
+              icon: kpi.icon,
+              color: kpi.color,
+              trend: kpi.trend,
+            ).animate(delay: (50 * i).ms).fadeIn().slideY(begin: 0.04);
+          }),
+        );
+      },
     );
   }
 }
@@ -514,29 +527,94 @@ class _QuickActionCard extends StatelessWidget {
 
 // ─── [4] Activity Feed ────────────────────────────────────────────────────────
 
-class _ActivityFeed extends StatelessWidget {
+class _ActivityFeed extends ConsumerWidget {
   const _ActivityFeed({required this.isDark});
 
   final bool isDark;
 
+  String _relTime(DateTime? dt) {
+    if (dt == null) return '';
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
+    if (diff.inHours < 24) return '${diff.inHours} hr ago';
+    if (diff.inDays == 1) return 'Yesterday';
+    return '${diff.inDays} days ago';
+  }
+
+  String _cap(String s) =>
+      s.isEmpty ? s : '${s[0].toUpperCase()}${s.substring(1)}';
+
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: _card(isDark),
-      child: Column(
-        children: List.generate(_activities.length, (i) {
-          final item = _activities[i];
-          final isLast = i == _activities.length - 1;
-          return _ActivityRow(
-            item: item,
-            isDark: isDark,
-            showDivider: !isLast,
-          )
-              .animate(delay: (50 * i).ms)
-              .fadeIn()
-              .slideY(begin: 0.04);
-        }),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final activityAsync = ref.watch(adminActivityProvider);
+
+    return activityAsync.when(
+      loading: () => Container(
+        decoration: _card(isDark),
+        height: 80,
+        child: const Center(
+          child: CircularProgressIndicator(
+              color: AppColors.deepGreen, strokeWidth: 2),
+        ),
       ),
+      error: (_, __) => Container(
+        decoration: _card(isDark),
+        padding: const EdgeInsets.all(20),
+        child: const Center(
+          child: Text('Could not load activity',
+              style: TextStyle(color: AppColors.gray)),
+        ),
+      ),
+      data: (raw) {
+        if (raw.isEmpty) {
+          return Container(
+            decoration: _card(isDark),
+            padding: const EdgeInsets.all(20),
+            child: const Center(
+              child: Text('No recent activity',
+                  style: TextStyle(color: AppColors.gray)),
+            ),
+          );
+        }
+        final items = raw.map((item) {
+          final type = item['type'] as String? ?? '';
+          final ts = item['timestamp'] as DateTime?;
+          if (type == 'new_user') {
+            final name = item['name'] as String? ?? 'Unknown';
+            final role = item['role'] as String? ?? 'user';
+            return _ActivityItem(
+              icon: Icons.person_add_alt_1_outlined,
+              title: 'New user registered',
+              subtitle: '$name joined as ${_cap(role)}',
+              time: _relTime(ts),
+              color: AppColors.infoBlue,
+            );
+          } else {
+            final title = item['title'] as String? ?? 'Product';
+            final sellerName = item['sellerName'] as String? ?? '';
+            return _ActivityItem(
+              icon: Icons.add_box_outlined,
+              title: 'New listing added',
+              subtitle: sellerName.isNotEmpty ? '$title by $sellerName' : title,
+              time: _relTime(ts),
+              color: AppColors.freshGreen,
+            );
+          }
+        }).toList();
+
+        return Container(
+          decoration: _card(isDark),
+          child: Column(
+            children: List.generate(items.length, (i) {
+              return _ActivityRow(
+                item: items[i],
+                isDark: isDark,
+                showDivider: i < items.length - 1,
+              ).animate(delay: (50 * i).ms).fadeIn().slideY(begin: 0.04);
+            }),
+          ),
+        );
+      },
     );
   }
 }
@@ -615,9 +693,7 @@ class _ActivityRow extends StatelessWidget {
             height: 1,
             indent: 64,
             endIndent: 16,
-            color: isDark
-                ? const Color(0xFF2E3C2E)
-                : const Color(0xFFE2EAE0),
+            color: isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0),
           ),
       ],
     );
@@ -626,13 +702,31 @@ class _ActivityRow extends StatelessWidget {
 
 // ─── [5] System Status Card ───────────────────────────────────────────────────
 
-class _SystemStatusCard extends StatelessWidget {
+class _SystemStatusCard extends ConsumerWidget {
   const _SystemStatusCard({required this.isDark});
 
   final bool isDark;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final statsAsync = ref.watch(adminStatsProvider);
+    final String firestoreStatus;
+    final Color firestoreColor;
+    if (statsAsync.isLoading) {
+      firestoreStatus = 'Checking…';
+      firestoreColor = AppColors.gray;
+    } else if (statsAsync.hasError) {
+      firestoreStatus = 'Degraded';
+      firestoreColor = AppColors.warmOrange;
+    } else {
+      firestoreStatus = 'Operational';
+      firestoreColor = AppColors.mintGreen;
+    }
+
+    final isFcmOk = PushMessagingService.instance.fcmToken != null;
+    final fcmStatus = isFcmOk ? 'Operational' : 'Not Configured';
+    final fcmColor = isFcmOk ? AppColors.mintGreen : AppColors.warmOrange;
+
     return Container(
       decoration: _card(isDark),
       padding: const EdgeInsets.all(16),
@@ -641,24 +735,24 @@ class _SystemStatusCard extends StatelessWidget {
         children: [
           _StatusRow(
             label: 'API',
-            status: 'Operational',
-            statusColor: AppColors.mintGreen,
+            status: firestoreStatus,
+            statusColor: firestoreColor,
             icon: Icons.cloud_done_outlined,
             isDark: isDark,
             showDivider: true,
           ),
           _StatusRow(
             label: 'Database',
-            status: 'Operational',
-            statusColor: AppColors.mintGreen,
+            status: firestoreStatus,
+            statusColor: firestoreColor,
             icon: Icons.storage_outlined,
             isDark: isDark,
             showDivider: true,
           ),
           _StatusRow(
             label: 'Push Notifications',
-            status: 'Degraded',
-            statusColor: AppColors.warmOrange,
+            status: fcmStatus,
+            statusColor: fcmColor,
             icon: Icons.notifications_active_outlined,
             isDark: isDark,
             showDivider: false,
@@ -725,9 +819,7 @@ class _StatusRow extends StatelessWidget {
         if (showDivider)
           Divider(
             height: 1,
-            color: isDark
-                ? const Color(0xFF2E3C2E)
-                : const Color(0xFFE2EAE0),
+            color: isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0),
           ),
       ],
     );

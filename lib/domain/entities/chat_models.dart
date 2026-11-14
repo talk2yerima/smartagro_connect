@@ -11,6 +11,7 @@ class ChatThread extends Equatable {
     required this.lastMessage,
     required this.updatedAt,
     required this.unread,
+    this.peerLastReadAt,
   });
 
   final String id;
@@ -20,6 +21,10 @@ class ChatThread extends Equatable {
   final String lastMessage;
   final DateTime updatedAt;
   final int unread;
+
+  /// When the peer last marked this thread as read.
+  /// Used to show ✓✓ (blue) on sent messages the peer has seen.
+  final DateTime? peerLastReadAt;
 
   @override
   List<Object?> get props => [id];
@@ -33,6 +38,7 @@ class ChatMessage extends Equatable {
     required this.text,
     required this.sentAt,
     required this.kind,
+    this.imageUrl,
   });
 
   final String id;
@@ -41,6 +47,9 @@ class ChatMessage extends Equatable {
   final String text;
   final DateTime sentAt;
   final ChatMessageKind kind;
+
+  /// Download URL for image messages (kind == ChatMessageKind.image).
+  final String? imageUrl;
 
   @override
   List<Object?> get props => [id];

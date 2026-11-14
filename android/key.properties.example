@@ -1,0 +1,4 @@
+storeFile=../app/release.jks
+storePassword=your_keystore_password
+keyAlias=upload
+keyPassword=your_key_password

@@ -2,11 +2,12 @@ import 'dart:convert';
 
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:firebase_core/firebase_core.dart' show Firebase;
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/config/app_env.dart';
 import '../../core/errors/failures.dart';
+import '../../core/utils/app_logger.dart';
 import '../../domain/entities/app_user.dart';
 import '../services/firestore_service.dart';
 import '../services/secure_token_store.dart';
@@ -21,21 +22,23 @@ import '../services/secure_token_store.dart';
 ///
 /// Replace `firebase_options.dart` with real values from `flutterfire configure`
 /// to activate the Firebase path.
+///
+/// Session user JSON is stored via [SecureTokenStore], which will use
+/// flutter_secure_storage (Android Keystore / iOS Keychain) in production.
 class AuthRepository {
   AuthRepository({
     required SecureTokenStore secure,
-    required SharedPreferences prefs,
     required FirestoreService firestore,
   })  : _secure = secure,
-        _prefs = prefs,
         _firestore = firestore;
 
   final SecureTokenStore _secure;
-  final SharedPreferences _prefs;
   final FirestoreService _firestore;
 
+  // In-memory cache for synchronous access via [currentSessionUser].
+  AppUser? _cachedUser;
+
   static const _kUserJson = 'session_user_json';
-  static const _kUserRole = 'session_user_role';
 
   // ── Firebase availability check ──────────────────────────────────────────
 
@@ -57,13 +60,19 @@ class AuthRepository {
 
   // ── Public API ───────────────────────────────────────────────────────────
 
-  AppUser? get currentSessionUser {
-    final raw = _prefs.getString(_kUserJson);
-    if (raw == null) return null;
+  /// Synchronous in-memory snapshot. Call [initSession] once at startup
+  /// to populate this from secure storage before reading it.
+  AppUser? get currentSessionUser => _cachedUser;
+
+  /// Reads the persisted user from secure storage and warms the in-memory
+  /// cache. Call this before accessing [currentSessionUser] on cold start.
+  Future<void> initSession() async {
+    final raw = await _secure.readValue(_kUserJson);
+    if (raw == null) return;
     try {
-      return AppUser.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+      _cachedUser = AppUser.fromJson(jsonDecode(raw) as Map<String, dynamic>);
     } catch (_) {
-      return null;
+      _cachedUser = null;
     }
   }
 
@@ -73,8 +82,9 @@ class AuthRepository {
     UserRole demoRole = UserRole.farmer,
   }) async {
     if (_firebaseReady) {
-      return _loginFirebase(email, password, role: demoRole);
+      return _loginFirebase(email, password, role: _selfServiceRole(demoRole));
     }
+    _ensureDemoAllowed();
     if (password.length < 6) throw const AuthFailure('Minimum 6 characters');
     return _loginDemo(email, role: demoRole);
   }
@@ -86,8 +96,14 @@ class AuthRepository {
     required UserRole role,
   }) async {
     if (_firebaseReady) {
-      return _registerFirebase(name: name, email: email, password: password, role: role);
+      return _registerFirebase(
+        name: name,
+        email: email,
+        password: password,
+        role: _selfServiceRole(role),
+      );
     }
+    _ensureDemoAllowed();
     return _registerDemo(name: name, email: email, role: role);
   }
 
@@ -99,7 +115,7 @@ class AuthRepository {
         throw AuthFailure(_mapFirebaseError(e));
       }
     } else {
-      if (kDebugMode) debugPrint('[Auth] Password reset (demo): $email');
+      log.d('[Auth] Password reset (demo): $email');
     }
   }
 
@@ -112,7 +128,39 @@ class AuthRepository {
     if (_firebaseReady) {
       return _googleSignInFirebase();
     }
+    _ensureDemoAllowed();
     return _googleSignInDemo();
+  }
+
+  Future<AppUser> updateProfile({
+    required String userId,
+    required String name,
+    String? phone,
+    String? location,
+    String? avatarUrl,
+  }) async {
+    final current = _cachedUser;
+    if (current == null) throw const AuthFailure('Not signed in');
+    await _firestore.updateUserProfile(
+      userId,
+      name: name,
+      phone: phone?.isEmpty ?? true ? null : phone,
+      location: location?.isEmpty ?? true ? null : location,
+      avatarUrl: avatarUrl,
+    );
+    if (_firebaseReady) {
+      try {
+        await _auth.currentUser?.updateDisplayName(name);
+      } catch (_) {}
+    }
+    final updated = current.copyWith(
+      name: name,
+      phone: phone?.isEmpty ?? true ? null : phone,
+      location: location?.isEmpty ?? true ? null : location,
+      avatarUrl: avatarUrl ?? current.avatarUrl,
+    );
+    await _persistLocal(updated);
+    return updated;
   }
 
   Future<void> logout() async {
@@ -122,9 +170,9 @@ class AuthRepository {
         await _auth.signOut();
       } catch (_) {}
     }
+    _cachedUser = null;
     await _secure.clear();
-    await _prefs.remove(_kUserJson);
-    await _prefs.remove(_kUserRole);
+    await _secure.removeValue(_kUserJson);
   }
 
   /// Returns a fresh Firebase ID token for use in API request headers.
@@ -150,19 +198,33 @@ class AuthRepository {
         email: email,
         password: password,
       );
-      // Role comes from Firestore; fall back to the UI chip for accounts that
-      // pre-date the Firestore profile and save it so subsequent logins lock in.
-      final savedRole = await _firestore.getUserRole(cred.user!.uid);
-      final effectiveRole = savedRole ?? role;
-      if (savedRole == null) {
-        await _firestore.saveUserProfile(
-          cred.user!.uid,
-          name: cred.user!.displayName ?? email.split('@').first,
-          email: email,
-          role: effectiveRole,
-        );
+
+      Map<String, dynamic>? profile;
+      try {
+        profile = await _firestore.fetchUserProfile(cred.user!.uid);
+        if (profile == null) {
+          // No Firestore profile yet — create one and refetch.
+          await _firestore.saveUserProfile(
+            cred.user!.uid,
+            name: cred.user!.displayName ?? email.split('@').first,
+            email: email,
+            role: role,
+          );
+          profile = await _firestore.fetchUserProfile(cred.user!.uid);
+        }
+      } catch (e) {
+        log.w('[Auth] fetchUserProfile failed, using Firebase-only fallback',
+            error: e);
       }
-      final user = await _buildUserFromFirebase(cred.user!, role: effectiveRole);
+
+      if (profile?['banned'] == true) {
+        await _auth.signOut();
+        throw const AuthFailure(
+            'This account has been suspended. Contact support.');
+      }
+
+      final user = _buildUserFromFirebase(cred.user!,
+          fallbackRole: role, profile: profile);
       await _persistLocal(user);
       return user;
     } on fb.FirebaseAuthException catch (e) {
@@ -190,7 +252,8 @@ class AuthRepository {
         email: email,
         role: role,
       );
-      final user = await _buildUserFromFirebase(cred.user!, role: role, nameOverride: name);
+      final user = _buildUserFromFirebase(cred.user!,
+          fallbackRole: role, nameOverride: name);
       await _persistLocal(user);
       return user;
     } on fb.FirebaseAuthException catch (e) {
@@ -208,7 +271,24 @@ class AuthRepository {
         idToken: gAuth.idToken,
       );
       final cred = await _auth.signInWithCredential(credential);
-      final user = await _buildUserFromFirebase(cred.user!, role: UserRole.buyer);
+      Map<String, dynamic>? profile;
+      try {
+        profile = await _firestore.fetchUserProfile(cred.user!.uid);
+      } catch (e) {
+        log.w('[Auth] fetchUserProfile failed for Google sign-in', error: e);
+      }
+
+      if (profile?['banned'] == true) {
+        await _auth.signOut();
+        throw const AuthFailure(
+            'This account has been suspended. Contact support.');
+      }
+
+      final user = _buildUserFromFirebase(
+        cred.user!,
+        fallbackRole: UserRole.buyer,
+        profile: profile,
+      );
       await _persistLocal(user);
       return user;
     } on fb.FirebaseAuthException catch (e) {
@@ -216,20 +296,35 @@ class AuthRepository {
     }
   }
 
-  Future<AppUser> _buildUserFromFirebase(
+  AppUser _buildUserFromFirebase(
     fb.User fbUser, {
-    required UserRole role,
+    required UserRole fallbackRole,
+    Map<String, dynamic>? profile,
     String? nameOverride,
-  }) async {
-    // Persist the chosen role so it survives session restores.
-    await _prefs.setString(_kUserRole, role.name);
+  }) {
+    final roleName = profile?['role'] as String?;
+    final role = roleName != null
+        ? UserRole.values.firstWhere(
+            (r) => r.name == roleName,
+            orElse: () => fallbackRole,
+          )
+        : fallbackRole;
+
     return AppUser(
       id: fbUser.uid,
-      name: nameOverride ?? fbUser.displayName ?? fbUser.email!.split('@').first,
+      name: nameOverride ??
+          (profile?['name'] as String?) ??
+          fbUser.displayName ??
+          fbUser.email!.split('@').first,
       email: fbUser.email ?? '',
       role: role,
-      rating: 5.0,
-      verified: fbUser.emailVerified,
+      phone: profile?['phone'] as String?,
+      location: profile?['location'] as String?,
+      avatarUrl: profile?['avatarUrl'] as String?,
+      rating: (profile?['rating'] as num?)?.toDouble() ?? 5.0,
+      // "Verified seller" is a trust badge granted by an admin (see
+      // FirestoreService.setUserVerified) — not the same as a confirmed email.
+      verified: (profile?['verified'] as bool?) ?? false,
     );
   }
 
@@ -281,8 +376,24 @@ class AuthRepository {
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
+  /// Users may pick farmer / buyer / transporter for themselves. Admin is
+  /// only ever granted server-side, so a self-chosen admin role is downgraded.
+  static UserRole _selfServiceRole(UserRole role) =>
+      role == UserRole.admin ? UserRole.farmer : role;
+
+  /// Production builds never fall back to the offline demo login, where any
+  /// password is accepted.
+  void _ensureDemoAllowed() {
+    if (!AppEnv.allowDemoMode) {
+      throw const AuthFailure(
+        'Sign-in is temporarily unavailable. Check your connection and try again.',
+      );
+    }
+  }
+
   Future<void> _persistLocal(AppUser user) async {
-    await _prefs.setString(_kUserJson, jsonEncode(user.toJson()));
+    _cachedUser = user;
+    await _secure.writeValue(_kUserJson, jsonEncode(user.toJson()));
   }
 
   String _demoName(UserRole role) => switch (role) {
@@ -297,7 +408,8 @@ class AuthRepository {
 
   String _mapFirebaseError(fb.FirebaseAuthException e) {
     if (kDebugMode) {
-      debugPrint('[Auth] FirebaseAuthException — code: "${e.code}", message: "${e.message}"');
+      log.w(
+          '[Auth] FirebaseAuthException — code: "${e.code}", message: "${e.message}"');
     }
     return switch (e.code) {
       'user-not-found' => 'No account found for this email.',
@@ -323,7 +435,9 @@ class AuthRepository {
         msg.contains('EMAIL_NOT_FOUND')) {
       return 'Incorrect email or password.';
     }
-    if (msg.contains('USER_NOT_FOUND')) return 'No account found for this email.';
+    if (msg.contains('USER_NOT_FOUND')) {
+      return 'No account found for this email.';
+    }
     if (msg.contains('TOO_MANY_ATTEMPTS_TRY_LATER') ||
         msg.contains('TOO_MANY_REQUESTS')) {
       return 'Too many attempts. Try again later.';

@@ -1,9 +1,18 @@
+import 'dart:io' show Platform;
+
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/di/auth_providers.dart';
+import '../../core/di/firestore_providers.dart';
+import '../../core/di/payment_providers.dart';
+import '../../core/di/repositories_provider.dart';
+import '../../core/services/push_messaging_service.dart';
 import '../../domain/entities/app_user.dart';
 
 // ---------------------------------------------------------------------------
@@ -26,13 +35,79 @@ class MainShell extends ConsumerStatefulWidget {
 }
 
 class _MainShellState extends ConsumerState<MainShell>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late int _currentIndex;
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.navigationShell.currentIndex;
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _setupFcm());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Silently verify any payment references the user completed in the browser.
+      ref.read(transactionRefQueueProvider).drainPendingRefs();
+    }
+  }
+
+  void _setupFcm() {
+    if (!kIsWeb && (Platform.isWindows || Platform.isLinux)) return;
+
+    final push = PushMessagingService.instance;
+
+    push.onForegroundMessage = (RemoteMessage message) {
+      if (!mounted) return;
+      final title = message.notification?.title ?? 'New notification';
+      final body = message.notification?.body;
+      final route = message.data['route'] as String?;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+              if (body != null) Text(body, maxLines: 2),
+            ],
+          ),
+          duration: const Duration(seconds: 5),
+          behavior: SnackBarBehavior.floating,
+          action: route != null
+              ? SnackBarAction(
+                  label: 'View',
+                  onPressed: () => context.push(route),
+                )
+              : null,
+        ),
+      );
+    };
+
+    push.onNotificationTap = (RemoteMessage message) {
+      if (!mounted) return;
+      final route = message.data['route'] as String?;
+      if (route != null) context.push(route);
+    };
+
+    push.onTokenRefresh = _persistFcmToken;
+
+    final initialToken = push.fcmToken;
+    if (initialToken != null) _persistFcmToken(initialToken);
+  }
+
+  void _persistFcmToken(String token) {
+    final uid = ref.read(authSessionProvider)?.id;
+    if (uid == null) return;
+    ref.read(firestoreServiceProvider).saveFcmToken(uid, token);
   }
 
   @override
@@ -46,6 +121,7 @@ class _MainShellState extends ConsumerState<MainShell>
   }
 
   void _onTap(int index) {
+    HapticFeedback.selectionClick();
     if (index == _currentIndex) {
       // Already on this branch — pop back to root of branch.
       widget.navigationShell.goBranch(index, initialLocation: true);
@@ -63,7 +139,43 @@ class _MainShellState extends ConsumerState<MainShell>
     final role = ref.watch(authSessionProvider)?.role ?? UserRole.farmer;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final destinations = _buildDestinations(role, isDark);
-    final showFab = role == UserRole.farmer;
+
+    // Total unread count for the Messages badge
+    final totalUnread = ref
+            .watch(chatThreadsProvider)
+            .whenData(
+              (threads) => threads.fold<int>(0, (sum, t) => sum + t.unread),
+            )
+            .valueOrNull ??
+        0;
+    if (totalUnread > 0) {
+      destinations[2] = _NavDestination(
+        label: 'Messages',
+        icon: Icons.chat_bubble_outline_rounded,
+        activeIcon: Icons.chat_bubble_rounded,
+        badgeCount: totalUnread,
+      );
+    }
+
+    final showFab = role == UserRole.farmer && _currentIndex != 2;
+    final useRail = MediaQuery.sizeOf(context).width >= 600;
+
+    if (useRail) {
+      return Scaffold(
+        body: Row(
+          children: [
+            _NavRail(
+              currentIndex: _currentIndex,
+              destinations: destinations,
+              onTap: _onTap,
+              isDark: isDark,
+              showFab: showFab,
+            ),
+            Expanded(child: widget.navigationShell),
+          ],
+        ),
+      );
+    }
 
     return Scaffold(
       body: widget.navigationShell,
@@ -146,7 +258,8 @@ class _BottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bgColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final borderColor = isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0);
+    final borderColor =
+        isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0);
 
     return Container(
       decoration: BoxDecoration(
@@ -165,7 +278,7 @@ class _BottomNav extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: SizedBox(
-          height: 64,
+          height: 72,
           child: Row(
             children: List.generate(destinations.length, (i) {
               return Expanded(
@@ -174,7 +287,8 @@ class _BottomNav extends StatelessWidget {
                   isSelected: i == currentIndex,
                   selectedColor: _selectedColor,
                   unselectedColor: _unselectedColor,
-                  indicatorColor: isDark ? _indicatorColorDark : _indicatorColor,
+                  indicatorColor:
+                      isDark ? _indicatorColorDark : _indicatorColor,
                   onTap: () => onTap(i),
                 ),
               );
@@ -227,16 +341,32 @@ class _NavItem extends StatelessWidget {
               color: isSelected ? indicatorColor : Colors.transparent,
               borderRadius: BorderRadius.circular(20),
             ),
-            child: Icon(
-              isSelected ? destination.activeIcon : destination.icon,
-              size: 22,
-              color: color,
+            child: Badge(
+              isLabelVisible: destination.badgeCount > 0,
+              label: Text(
+                destination.badgeCount > 99
+                    ? '99+'
+                    : '${destination.badgeCount}',
+                style: const TextStyle(fontSize: 9),
+              ),
+              backgroundColor: Colors.red.shade600,
+              child: Icon(
+                isSelected ? destination.activeIcon : destination.icon,
+                size: 22,
+                color: color,
+              ),
             )
                 .animate(target: isSelected ? 1 : 0)
                 .scale(
                   begin: const Offset(0.88, 0.88),
                   end: const Offset(1.0, 1.0),
-                  duration: 220.ms,
+                  duration: 200.ms,
+                  curve: Curves.easeOutBack,
+                )
+                .slideY(
+                  begin: 0.18,
+                  end: 0.0,
+                  duration: 200.ms,
                   curve: Curves.easeOutBack,
                 ),
           ),
@@ -294,6 +424,130 @@ class _FarmerFab extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
+// Navigation rail (tablets ≥ 600 dp)
+// ---------------------------------------------------------------------------
+
+class _NavRail extends StatelessWidget {
+  const _NavRail({
+    required this.currentIndex,
+    required this.destinations,
+    required this.onTap,
+    required this.isDark,
+    required this.showFab,
+  });
+
+  final int currentIndex;
+  final List<_NavDestination> destinations;
+  final ValueChanged<int> onTap;
+  final bool isDark;
+  final bool showFab;
+
+  static const _selectedColor = Color(0xFF1B5E20);
+  static const _unselectedColor = Color(0xFF6B7280);
+
+  @override
+  Widget build(BuildContext context) {
+    final bgColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final borderColor =
+        isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0);
+    final indicatorColor =
+        isDark ? const Color(0xFF1E3A1E) : const Color(0xFFE8F5E9);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: bgColor,
+        border: Border(
+          right: BorderSide(color: borderColor, width: 1),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.30 : 0.06),
+            blurRadius: 16,
+            offset: const Offset(4, 0),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        right: false,
+        child: NavigationRail(
+          selectedIndex: currentIndex,
+          onDestinationSelected: onTap,
+          backgroundColor: Colors.transparent,
+          indicatorColor: indicatorColor,
+          selectedIconTheme:
+              const IconThemeData(color: _selectedColor, size: 22),
+          unselectedIconTheme:
+              const IconThemeData(color: _unselectedColor, size: 22),
+          selectedLabelTextStyle: const TextStyle(
+            color: _selectedColor,
+            fontFamily: 'Poppins',
+            fontWeight: FontWeight.w700,
+            fontSize: 11,
+          ),
+          unselectedLabelTextStyle: const TextStyle(
+            color: _unselectedColor,
+            fontFamily: 'Poppins',
+            fontWeight: FontWeight.w400,
+            fontSize: 11,
+          ),
+          labelType: NavigationRailLabelType.all,
+          leading: showFab
+              ? Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _RailFab(),
+                )
+              : const SizedBox(height: 8),
+          destinations: destinations
+              .map(
+                (d) => NavigationRailDestination(
+                  icon: Badge(
+                    isLabelVisible: d.badgeCount > 0,
+                    label: Text(
+                      d.badgeCount > 99 ? '99+' : '${d.badgeCount}',
+                      style: const TextStyle(fontSize: 9),
+                    ),
+                    backgroundColor: Colors.red.shade600,
+                    child: Icon(d.icon),
+                  ),
+                  selectedIcon: Badge(
+                    isLabelVisible: d.badgeCount > 0,
+                    label: Text(
+                      d.badgeCount > 99 ? '99+' : '${d.badgeCount}',
+                      style: const TextStyle(fontSize: 9),
+                    ),
+                    backgroundColor: Colors.red.shade600,
+                    child: Icon(d.activeIcon),
+                  ),
+                  label: Text(d.label),
+                ),
+              )
+              .toList(),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Farmer FAB (rail variant — compact, no animation needed)
+// ---------------------------------------------------------------------------
+
+class _RailFab extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return FloatingActionButton.small(
+      onPressed: () => context.push('/marketplace/add'),
+      elevation: 2,
+      backgroundColor: const Color(0xFFFB8C00),
+      foregroundColor: Colors.white,
+      tooltip: 'Add Listing',
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: const Icon(Icons.add_rounded, size: 22),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Data model
 // ---------------------------------------------------------------------------
 
@@ -302,9 +556,11 @@ class _NavDestination {
     required this.label,
     required this.icon,
     required this.activeIcon,
+    this.badgeCount = 0,
   });
 
   final String label;
   final IconData icon;
   final IconData activeIcon;
+  final int badgeCount;
 }

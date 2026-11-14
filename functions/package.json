@@ -1,0 +1,22 @@
+{
+  "name": "smartagro-functions",
+  "private": true,
+  "description": "SmartAgro Connect backend: Paystack payments and webhook.",
+  "main": "index.js",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "test": "node --test test/payments.test.js",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-smartagro \"node --test test/rules.test.js\"",
+    "deploy": "firebase deploy --only functions"
+  },
+  "dependencies": {
+    "firebase-admin": "^14.5.1",
+    "firebase-functions": "^7.4.0"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^6.0.0",
+    "firebase": "^13.3.0"
+  }
+}

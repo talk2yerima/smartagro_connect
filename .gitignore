@@ -46,3 +46,16 @@ android/local.properties
 .env
 **/google-services.json.bak
 **/GoogleService-Info.plist.bak
+
+# Android signing — never commit keystores or key.properties
+android/key.properties
+android/app/*.jks
+android/app/*.keystore
+build/debug-info/
+
+# Cloud Functions backend
+functions/node_modules/
+functions/*.log
+firebase-debug.log
+firestore-debug.log
+.firebase/

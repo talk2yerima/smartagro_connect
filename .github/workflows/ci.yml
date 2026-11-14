@@ -21,7 +21,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.x"
+          flutter-version: "3.41.9"
           channel: stable
           cache: true
 
@@ -44,9 +44,43 @@ jobs:
           files: coverage/lcov.info
           fail_ci_if_error: false
 
-  # ── Build Android debug ───────────────────────────────────────────────────────
+  # ── Backend: payment logic + Firestore security rules ───────────────────────
+  backend:
+    name: Functions & Security Rules
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: functions
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Payment logic tests
+        run: npm test
+
+      - name: Firestore rules tests (emulator)
+        run: |
+          npm install -g firebase-tools
+          npm run test:rules
+
+  # ── Build Android debug (dev flavor) ─────────────────────────────────────────
   build-android:
-    name: Build Android APK
+    name: Build Android APK (dev)
     runs-on: ubuntu-latest
     needs: test
 
@@ -60,36 +94,45 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.x"
+          flutter-version: "3.41.9"
           channel: stable
           cache: true
 
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Inject build number
+      - name: Inject google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
         run: |
-          BUILD_NUMBER=$(git rev-list --count HEAD)
-          echo "BUILD_NUMBER=$BUILD_NUMBER" >> $GITHUB_ENV
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            echo "$GOOGLE_SERVICES_JSON" | base64 --decode > android/app/google-services.json
+          fi
 
-      - name: Build APK (debug)
+      - name: Inject build number
+        run: echo "BUILD_NUMBER=$(git rev-list --count HEAD)" >> $GITHUB_ENV
+
+      - name: Build APK (dev debug)
+        env:
+          MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
         run: |
           flutter build apk --debug --no-pub \
+            --flavor dev \
             --build-number=$BUILD_NUMBER \
-            --dart-define=API_BASE=${{ vars.API_BASE || 'https://api.smartagro.connect' }}
+            --dart-define=API_BASE=${{ vars.API_BASE || 'https://dev-api.smartagro.ng' }}
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: debug-apk-${{ github.sha }}
-          path: build/app/outputs/flutter-apk/app-debug.apk
+          path: build/app/outputs/flutter-apk/app-dev-debug.apk
           retention-days: 7
 
   # ── Build Android release (main branch only) ─────────────────────────────────
   build-android-release:
-    name: Build Android Release
+    name: Build Android Release (prod)
     runs-on: ubuntu-latest
-    needs: test
+    needs: [test, backend]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     steps:
@@ -102,64 +145,66 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.x"
+          flutter-version: "3.41.9"
           channel: stable
           cache: true
 
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Inject google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            echo "$GOOGLE_SERVICES_JSON" | base64 --decode > android/app/google-services.json
+          fi
+
+      - name: Inject keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > android/app/release.jks
+            cat > android/key.properties <<EOF
+          storeFile=../app/release.jks
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF
+          fi
+
       - name: Inject build number
         run: echo "BUILD_NUMBER=$(git rev-list --count HEAD)" >> $GITHUB_ENV
 
-      - name: Decode keystore
-        if: ${{ env.KEYSTORE_BASE64 != '' }}
+      - name: Build App Bundle (prod release)
         env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-        run: echo "$KEYSTORE_BASE64" | base64 --decode > android/app/release.jks
-
-      - name: Build App Bundle
+          MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
         run: |
           flutter build appbundle --release --no-pub \
+            --flavor prod \
             --build-number=$BUILD_NUMBER \
             --obfuscate \
             --split-debug-info=build/debug-info \
+            --dart-define=FLAVOR=prod \
             --dart-define=API_BASE=${{ secrets.API_BASE }}
 
       - name: Analyze bundle size
-        run: flutter build apk --release --analyze-size --no-pub || true
+        run: flutter build apk --release --flavor prod --analyze-size --no-pub || true
 
       - name: Upload App Bundle
         uses: actions/upload-artifact@v4
         with:
           name: release-aab-${{ github.sha }}
-          path: build/app/outputs/bundle/release/app-release.aab
+          path: build/app/outputs/bundle/prodRelease/app-prod-release.aab
           retention-days: 14
 
-  # ── Build Web ──────────────────────────────────────────────────────────────
-  build-web:
-    name: Build Web
-    runs-on: ubuntu-latest
-    needs: test
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: "3.x"
-          channel: stable
-          cache: true
-
-      - name: Install dependencies
-        run: flutter pub get
-
-      - name: Build web (release, canvaskit)
-        run: flutter build web --release --web-renderer canvaskit --no-pub
-
-      - name: Upload web artifact
+      - name: Upload debug symbols (for Crashlytics)
         uses: actions/upload-artifact@v4
         with:
-          name: web-build-${{ github.sha }}
-          path: build/web/
-          retention-days: 7
+          name: debug-symbols-${{ github.sha }}
+          path: build/debug-info/
+          retention-days: 30

@@ -36,15 +36,15 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       vsync: this,
       duration: const Duration(milliseconds: 600),
     );
-    Future<void>.delayed(const Duration(milliseconds: 200),
-        () => _dot2.repeat(reverse: true));
+    Future<void>.delayed(
+        const Duration(milliseconds: 200), () => _dot2.repeat(reverse: true));
 
     _dot3 = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
     );
-    Future<void>.delayed(const Duration(milliseconds: 400),
-        () => _dot3.repeat(reverse: true));
+    Future<void>.delayed(
+        const Duration(milliseconds: 400), () => _dot3.repeat(reverse: true));
 
     Future<void>.delayed(const Duration(milliseconds: 2500), _routeNext);
   }

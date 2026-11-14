@@ -69,11 +69,11 @@ class QueueSyncService {
       } catch (e) {
         // 404 / 409 → server conflict; mark immediately without retrying.
         final isConflict = e is DioException &&
-            (e.response?.statusCode == 404 ||
-                e.response?.statusCode == 409);
+            (e.response?.statusCode == 404 || e.response?.statusCode == 409);
         if (isConflict) {
           await _db.markWriteConflict(id);
-          log.w('[QueueSync] conflict op=$operation id=$id — marked conflict.', error: e);
+          log.w('[QueueSync] conflict op=$operation id=$id — marked conflict.',
+              error: e);
         } else {
           final exceeded = retries + 1 >= _maxRetries;
           await _db.incrementWriteRetry(id, markFailed: exceeded);

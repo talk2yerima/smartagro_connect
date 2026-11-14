@@ -6,19 +6,51 @@ plugins {
     id 'com.google.firebase.crashlytics'
 }
 
+// Machine-local settings (not committed): android/local.properties.
+def localProps = new Properties()
+def localPropsFile = rootProject.file("local.properties")
+if (localPropsFile.exists()) {
+    localPropsFile.withReader("UTF-8") { localProps.load(it) }
+}
+
+// Google Maps key: -PMAPS_API_KEY=..., env MAPS_API_KEY (CI secret), or
+// MAPS_API_KEY=... in android/local.properties. Never commit it.
+def mapsApiKey = project.findProperty("MAPS_API_KEY") ?:
+        System.getenv("MAPS_API_KEY") ?:
+        localProps.getProperty("MAPS_API_KEY") ?:
+        ""
+
+// Load signing credentials from key.properties (not committed to git).
+def keystorePropsFile = rootProject.file("key.properties")
+def keystoreProps = new Properties()
+if (keystorePropsFile.exists()) {
+    keystoreProps.load(new FileInputStream(keystorePropsFile))
+}
+
 android {
     namespace "com.smartagro.connect"
     compileSdk flutter.compileSdkVersion
     ndkVersion flutter.ndkVersion
 
     compileOptions {
-    sourceCompatibility JavaVersion.VERSION_17
-    targetCompatibility JavaVersion.VERSION_17
-}
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
 
-kotlinOptions {
-    jvmTarget = '17'
-}
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+
+    signingConfigs {
+        release {
+            if (keystorePropsFile.exists()) {
+                storeFile     file(keystoreProps['storeFile'])
+                storePassword keystoreProps['storePassword']
+                keyAlias      keystoreProps['keyAlias']
+                keyPassword   keystoreProps['keyPassword']
+            }
+        }
+    }
 
     defaultConfig {
         applicationId "com.smartagro.connect"
@@ -28,15 +60,43 @@ kotlinOptions {
         versionName flutter.versionName
 
         manifestPlaceholders += [
-                MAPS_API_KEY: project.findProperty("MAPS_API_KEY") ?: "YOUR_ANDROID_MAPS_KEY_HERE"
+                MAPS_API_KEY: mapsApiKey
         ]
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix ""
+        }
         release {
-            signingConfig signingConfigs.debug
-            minifyEnabled false
-            shrinkResources false
+            // Use release keystore when available, fall back to debug for local builds.
+            signingConfig keystorePropsFile.exists()
+                ? signingConfigs.release
+                : signingConfigs.debug
+
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'),
+                          'proguard-rules.pro'
+        }
+    }
+
+    flavorDimensions "environment"
+
+    productFlavors {
+        dev {
+            dimension "environment"
+            versionNameSuffix "-dev"
+            resValue "string", "app_name", "SmartAgro Dev"
+        }
+        staging {
+            dimension "environment"
+            versionNameSuffix "-staging"
+            resValue "string", "app_name", "SmartAgro Staging"
+        }
+        prod {
+            dimension "environment"
+            resValue "string", "app_name", "SmartAgro Connect"
         }
     }
 }

@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shimmer/shimmer.dart';
 
 import '../../core/constants/app_colors.dart';
@@ -16,6 +17,39 @@ import '../../domain/entities/app_user.dart';
 import '../../domain/entities/product_listing.dart';
 import '../../shared/widgets/connectivity_banner.dart';
 import '../../shared/widgets/empty_state.dart';
+
+class _FavIdsNotifier extends StateNotifier<Set<String>> {
+  _FavIdsNotifier() : super({}) {
+    _load();
+  }
+
+  static const _kKey = 'smartagro_favourite_ids';
+
+  Future<void> _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    state = Set<String>.from(prefs.getStringList(_kKey) ?? []);
+  }
+
+  void toggle(String id) {
+    final next = Set<String>.from(state);
+    if (next.contains(id)) {
+      next.remove(id);
+    } else {
+      next.add(id);
+    }
+    state = next;
+    _persist();
+  }
+
+  Future<void> _persist() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_kKey, state.toList());
+  }
+}
+
+final _favouriteIdsProvider =
+    StateNotifierProvider<_FavIdsNotifier, Set<String>>(
+        (_) => _FavIdsNotifier());
 
 // ─── Category model ──────────────────────────────────────────────────────────
 
@@ -53,11 +87,47 @@ class MarketplaceScreen extends ConsumerStatefulWidget {
 }
 
 class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
+  static const _kCategory = 'mkt_category';
+  static const _kSort = 'mkt_sort';
+
   final _searchController = TextEditingController();
   _Category _selectedCategory = _Category.all;
   _SortOption _selectedSort = _SortOption.newest;
   String _searchQuery = '';
   Timer? _debounce;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPrefs();
+  }
+
+  Future<void> _loadPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final cat = prefs.getString(_kCategory);
+    final sort = prefs.getString(_kSort);
+    if (!mounted) return;
+    setState(() {
+      if (cat != null) {
+        _selectedCategory = _Category.values.firstWhere(
+          (c) => c.name == cat,
+          orElse: () => _Category.all,
+        );
+      }
+      if (sort != null) {
+        _selectedSort = _SortOption.values.firstWhere(
+          (s) => s.name == sort,
+          orElse: () => _SortOption.newest,
+        );
+      }
+    });
+  }
+
+  Future<void> _savePrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kCategory, _selectedCategory.name);
+    await prefs.setString(_kSort, _selectedSort.name);
+  }
 
   @override
   void dispose() {
@@ -71,6 +141,16 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
     _debounce = Timer(const Duration(milliseconds: 350), () {
       if (mounted) setState(() => _searchQuery = value.trim());
     });
+  }
+
+  // ── Spotlight (verified + top-rated, up to 5) ─────────────────────────────
+
+  List<ProductListing> _spotlight(List<ProductListing> all) {
+    final sorted = [...all]..sort((a, b) {
+        if (a.verified != b.verified) return a.verified ? -1 : 1;
+        return b.sellerRating.compareTo(a.sellerRating);
+      });
+    return sorted.take(5).toList();
   }
 
   // ── Filtering + sorting ───────────────────────────────────────────────────
@@ -169,6 +249,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                     : null,
                 onTap: () {
                   setState(() => _selectedSort = opt);
+                  _savePrefs();
                   Navigator.pop(context);
                 },
               ),
@@ -230,145 +311,161 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
           const ConnectivityBanner(),
           Expanded(
             child: async.when(
-        loading: () => _LoadingGrid(isDark: isDark),
-        error: (e, _) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.cloud_off_rounded,
-                    size: 48,
-                    color: AppColors.gray.withValues(alpha: 0.5)),
-                const SizedBox(height: 12),
-                Text(
-                  'Failed to load listings',
-                  style: TextStyle(
-                    fontFamily: 'Poppins',
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.text(isDark),
+              loading: () => _LoadingGrid(isDark: isDark),
+              error: (e, _) => Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.cloud_off_rounded,
+                          size: 48,
+                          color: AppColors.gray.withValues(alpha: 0.5)),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Failed to load listings',
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.text(isDark),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '$e',
+                        textAlign: TextAlign.center,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            color: AppColors.gray, fontSize: 12),
+                      ),
+                      const SizedBox(height: 16),
+                      OutlinedButton.icon(
+                        onPressed: () => ref.invalidate(productsProvider),
+                        icon: const Icon(Icons.refresh_rounded, size: 16),
+                        label: const Text('Retry'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.deepGreen,
+                          side: const BorderSide(color: AppColors.deepGreen),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  '$e',
-                  textAlign: TextAlign.center,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: AppColors.gray, fontSize: 12),
-                ),
-                const SizedBox(height: 16),
-                OutlinedButton.icon(
-                  onPressed: () => ref.invalidate(productsProvider),
-                  icon: const Icon(Icons.refresh_rounded, size: 16),
-                  label: const Text('Retry'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.deepGreen,
-                    side: const BorderSide(color: AppColors.deepGreen),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        data: (items) {
-          final filtered = _applyFilters(items);
-          return RefreshIndicator(
-            color: AppColors.deepGreen,
-            onRefresh: () async => ref.invalidate(productsProvider),
-            child: CustomScrollView(
-              slivers: [
-                // ── Search + filter row ─────────────────────────────────
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.fromLTRB(16, 14, 16, 0),
-                    child: _SearchFilterRow(
-                      controller: _searchController,
-                      isDark: isDark,
-                      onChanged: _onSearchChanged,
-                      onSortTap: _showSortSheet,
-                      sortLabel: _selectedSort.label,
-                    ),
-                  ),
-                ),
-
-                // ── Category chips ──────────────────────────────────────
-                SliverToBoxAdapter(
-                  child: _CategoryChips(
-                    selected: _selectedCategory,
-                    isDark: isDark,
-                    onSelected: (c) =>
-                        setState(() => _selectedCategory = c),
-                  ),
-                ),
-
-                // ── Stats bar ───────────────────────────────────────────
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.fromLTRB(16, 6, 16, 10),
-                    child: Text(
-                      '${filtered.length} listing${filtered.length == 1 ? '' : 's'}'
-                      ' · Updated now',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.gray,
-                            fontSize: 11,
-                          ),
-                    ),
-                  ),
-                ),
-
-                // ── Product grid ────────────────────────────────────────
-                if (filtered.isEmpty)
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: EmptyState(
-                      icon: Icons.storefront_outlined,
-                      title: 'No listings',
-                      subtitle: 'Be the first to list your produce',
-                      actionLabel:
-                          canAddListing ? 'Add listing' : null,
-                      onAction: canAddListing
-                          ? () => context.push('/marketplace/add')
-                          : null,
-                    ),
-                  )
-                else
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                    sliver: SliverGrid(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, i) {
-                          final p = filtered[i];
-                          return _ProductCard(
-                            key: ValueKey(p.id),
-                            product: p,
+              ),
+              data: (items) {
+                final filtered = _applyFilters(items);
+                return RefreshIndicator(
+                  color: AppColors.deepGreen,
+                  onRefresh: () async {
+                    HapticFeedback.mediumImpact();
+                    ref.invalidate(productsProvider);
+                  },
+                  child: CustomScrollView(
+                    slivers: [
+                      // ── Search + filter row ─────────────────────────────────
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                          child: _SearchFilterRow(
+                            controller: _searchController,
                             isDark: isDark,
-                            index: i,
-                          );
-                        },
-                        findChildIndexCallback: (key) {
-                          final id = (key as ValueKey<String>).value;
-                          final idx = filtered.indexWhere((p) => p.id == id);
-                          return idx == -1 ? null : idx;
-                        },
-                        childCount: filtered.length,
+                            onChanged: _onSearchChanged,
+                            onSortTap: _showSortSheet,
+                            sortLabel: _selectedSort.label,
+                          ),
+                        ),
                       ),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        childAspectRatio: 0.72,
-                        mainAxisSpacing: 12,
-                        crossAxisSpacing: 12,
+
+                      // ── Category chips ──────────────────────────────────────
+                      SliverToBoxAdapter(
+                        child: _CategoryChips(
+                          selected: _selectedCategory,
+                          isDark: isDark,
+                          onSelected: (c) {
+                            setState(() => _selectedCategory = c);
+                            _savePrefs();
+                          },
+                        ),
                       ),
-                    ),
+
+                      // ── Spotlight strip ─────────────────────────────────────
+                      if (_selectedCategory == _Category.all &&
+                          _searchQuery.isEmpty)
+                        SliverToBoxAdapter(
+                          child: _SpotlightStrip(
+                            products: _spotlight(items),
+                            isDark: isDark,
+                          ),
+                        ),
+
+                      // ── Stats bar ───────────────────────────────────────────
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
+                          child: Text(
+                            '${filtered.length} listing${filtered.length == 1 ? '' : 's'}'
+                            ' · Updated now',
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: AppColors.gray,
+                                      fontSize: 11,
+                                    ),
+                          ),
+                        ),
+                      ),
+
+                      // ── Product grid ────────────────────────────────────────
+                      if (filtered.isEmpty)
+                        SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: EmptyState(
+                            type: EmptyStateType.marketplace,
+                            icon: Icons.storefront_outlined,
+                            title: 'No listings',
+                            subtitle: 'Be the first to list your produce',
+                            actionLabel: canAddListing ? 'Add listing' : null,
+                            onAction: canAddListing
+                                ? () => context.push('/marketplace/add')
+                                : null,
+                          ),
+                        )
+                      else
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                          sliver: SliverGrid(
+                            delegate: SliverChildBuilderDelegate(
+                              (context, i) {
+                                final p = filtered[i];
+                                return _ProductCard(
+                                  key: ValueKey(p.id),
+                                  product: p,
+                                  isDark: isDark,
+                                  index: i,
+                                );
+                              },
+                              findChildIndexCallback: (key) {
+                                final id = (key as ValueKey<String>).value;
+                                final idx =
+                                    filtered.indexWhere((p) => p.id == id);
+                                return idx == -1 ? null : idx;
+                              },
+                              childCount: filtered.length,
+                            ),
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              childAspectRatio: 0.72,
+                              mainAxisSpacing: 12,
+                              crossAxisSpacing: 12,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-              ],
+                );
+              },
             ),
-          );
-        },
-      ),
           ),
         ],
       ),
@@ -395,8 +492,7 @@ class _SearchFilterRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fillColor =
-        isDark ? AppColors.cardDark : AppColors.surfaceLight;
+    final fillColor = isDark ? AppColors.cardDark : AppColors.surfaceLight;
     final borderColor =
         isDark ? const Color(0xFF2E3C2E) : AppColors.borderLight;
 
@@ -460,8 +556,7 @@ class _SearchFilterRow extends StatelessWidget {
         GestureDetector(
           onTap: onSortTap,
           child: Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
               color: fillColor,
               borderRadius: BorderRadius.circular(10),
@@ -528,9 +623,7 @@ class _CategoryChips extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: isSelected
                       ? AppColors.deepGreen
-                      : (isDark
-                          ? AppColors.cardDark
-                          : AppColors.surfaceLight),
+                      : (isDark ? AppColors.cardDark : AppColors.surfaceLight),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
                     color: isSelected
@@ -545,11 +638,9 @@ class _CategoryChips extends StatelessWidget {
                   style: TextStyle(
                     fontFamily: 'Poppins',
                     fontSize: 12,
-                    fontWeight:
-                        isSelected ? FontWeight.w600 : FontWeight.w400,
-                    color: isSelected
-                        ? Colors.white
-                        : AppColors.subText(isDark),
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                    color:
+                        isSelected ? Colors.white : AppColors.subText(isDark),
                   ),
                 ),
               ),
@@ -561,9 +652,184 @@ class _CategoryChips extends StatelessWidget {
   }
 }
 
+// ─── Spotlight Strip ──────────────────────────────────────────────────────────
+
+class _SpotlightStrip extends StatelessWidget {
+  const _SpotlightStrip({
+    required this.products,
+    required this.isDark,
+  });
+
+  final List<ProductListing> products;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    if (products.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          child: Row(
+            children: [
+              Container(
+                width: 3,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: AppColors.golden,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'FEATURED',
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w700,
+                  fontSize: 10,
+                  letterSpacing: 1.2,
+                  color: AppColors.emerald,
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 130,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            itemCount: products.length,
+            itemBuilder: (context, i) {
+              final p = products[i];
+              return GestureDetector(
+                onTap: () => context.push('/marketplace/product/${p.id}'),
+                child: SizedBox(
+                  width: 220,
+                  child: Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(14),
+                        child: CachedNetworkImage(
+                          imageUrl: p.imageUrl,
+                          width: 220,
+                          height: 130,
+                          fit: BoxFit.cover,
+                          memCacheWidth: 440,
+                          memCacheHeight: 260,
+                          errorWidget: (_, __, ___) => Container(
+                            color: isDark
+                                ? const Color(0xFF2A2A2A)
+                                : AppColors.surfaceLight,
+                            child: const Center(
+                              child: Icon(Icons.image_outlined,
+                                  size: 32, color: AppColors.gray),
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Gradient overlay
+                      Positioned.fill(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(14),
+                            gradient: const LinearGradient(
+                              colors: [Colors.transparent, Colors.black54],
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Title + price
+                      Positioned(
+                        left: 10,
+                        right: 10,
+                        bottom: 10,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              p.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontFamily: 'Poppins',
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              formatNgn(p.priceNgn),
+                              style: const TextStyle(
+                                fontFamily: 'Poppins',
+                                fontWeight: FontWeight.w600,
+                                fontSize: 11,
+                                color: Color(0xFFFDD835),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Verified chip — top right
+                      if (p.verified)
+                        const Positioned(
+                          top: 8,
+                          right: 8,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: AppColors.infoBlue,
+                              borderRadius:
+                                  BorderRadius.all(Radius.circular(20)),
+                            ),
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 3),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.verified_rounded,
+                                      size: 10, color: Colors.white),
+                                  SizedBox(width: 3),
+                                  Text(
+                                    'Verified',
+                                    style: TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              )
+                  .animate(delay: (50 * i).ms)
+                  .fadeIn(duration: 300.ms)
+                  .slideX(begin: 0.04, end: 0, duration: 300.ms);
+            },
+          ),
+        ),
+        const SizedBox(height: 4),
+      ],
+    );
+  }
+}
+
 // ─── Product Card ─────────────────────────────────────────────────────────────
 
-class _ProductCard extends StatelessWidget {
+class _ProductCard extends ConsumerWidget {
   const _ProductCard({
     super.key,
     required this.product,
@@ -598,7 +864,7 @@ class _ProductCard extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final textTheme = Theme.of(context).textTheme;
 
     return GestureDetector(
@@ -623,33 +889,30 @@ class _ProductCard extends StatelessWidget {
             Stack(
               children: [
                 // Product image
-                Hero(
-                  tag: 'product-image-${product.id}',
-                  child: SizedBox(
-                    height: 140,
+                SizedBox(
+                  height: 140,
+                  width: double.infinity,
+                  child: CachedNetworkImage(
+                    imageUrl: product.imageUrl,
+                    fit: BoxFit.cover,
                     width: double.infinity,
-                    child: CachedNetworkImage(
-                      imageUrl: product.imageUrl,
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      height: 140,
-                      memCacheWidth: 400,
-                      memCacheHeight: 280,
-                      placeholder: (_, __) => Shimmer.fromColors(
-                        baseColor: Colors.grey.shade200,
-                        highlightColor: Colors.grey.shade50,
-                        child: Container(color: Colors.white),
-                      ),
-                      errorWidget: (_, __, ___) => Container(
-                        color: isDark
-                            ? const Color(0xFF2A2A2A)
-                            : const Color(0xFFF0F4EE),
-                        child: Center(
-                          child: Icon(
-                            Icons.image_outlined,
-                            size: 40,
-                            color: AppColors.gray.withValues(alpha: 0.45),
-                          ),
+                    height: 140,
+                    memCacheWidth: 400,
+                    memCacheHeight: 280,
+                    placeholder: (_, __) => Shimmer.fromColors(
+                      baseColor: Colors.grey.shade200,
+                      highlightColor: Colors.grey.shade50,
+                      child: Container(color: Colors.white),
+                    ),
+                    errorWidget: (_, __, ___) => Container(
+                      color: isDark
+                          ? const Color(0xFF2A2A2A)
+                          : const Color(0xFFF0F4EE),
+                      child: Center(
+                        child: Icon(
+                          Icons.image_outlined,
+                          size: 40,
+                          color: AppColors.gray.withValues(alpha: 0.45),
                         ),
                       ),
                     ),
@@ -661,8 +924,8 @@ class _ProductCard extends StatelessWidget {
                   top: 8,
                   left: 8,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 3),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                       color: _availabilityColor.withValues(alpha: 0.88),
                       borderRadius: BorderRadius.circular(20),
@@ -684,8 +947,8 @@ class _ProductCard extends StatelessWidget {
                   top: 8,
                   right: 8,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 3),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                       color: const Color(0xFFF9A825).withValues(alpha: 0.92),
                       borderRadius: BorderRadius.circular(20),
@@ -702,6 +965,47 @@ class _ProductCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                ),
+
+                // Verified seller badge — bottom left of image
+                if (product.verified)
+                  const Positioned(
+                    bottom: 8,
+                    left: 8,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: AppColors.infoBlue,
+                        borderRadius: BorderRadius.all(Radius.circular(20)),
+                      ),
+                      child: Padding(
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.verified_rounded,
+                                size: 10, color: Colors.white),
+                            SizedBox(width: 3),
+                            Text(
+                              'Verified',
+                              style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 9,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                // Favourite button — bottom right of image
+                Positioned(
+                  bottom: 8,
+                  right: 8,
+                  child: _FavouriteButton(productId: product.id),
                 ),
               ],
             ),
@@ -770,8 +1074,7 @@ class _ProductCard extends StatelessWidget {
                                 size: 12,
                                 color: filled
                                     ? AppColors.golden
-                                    : AppColors.gray
-                                        .withValues(alpha: 0.3),
+                                    : AppColors.gray.withValues(alpha: 0.3),
                               );
                             }),
                             const SizedBox(width: 3),
@@ -793,8 +1096,7 @@ class _ProductCard extends StatelessWidget {
                               horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
                             color: isDark
-                                ? AppColors.deepGreen
-                                    .withValues(alpha: 0.25)
+                                ? AppColors.deepGreen.withValues(alpha: 0.25)
                                 : AppColors.surfaceLight,
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -816,14 +1118,81 @@ class _ProductCard extends StatelessWidget {
             ),
           ],
         ),
-      )
-          .animate(delay: (40 * index).ms)
-          .fadeIn(duration: 280.ms)
-          .scale(
+      ).animate(delay: (40 * index).ms).fadeIn(duration: 280.ms).scale(
             begin: const Offset(0.97, 0.97),
             duration: 280.ms,
             curve: Curves.easeOut,
           ),
+    );
+  }
+}
+
+// ─── Favourite Button ─────────────────────────────────────────────────────────
+
+class _FavouriteButton extends ConsumerStatefulWidget {
+  const _FavouriteButton({required this.productId});
+
+  final String productId;
+
+  @override
+  ConsumerState<_FavouriteButton> createState() => _FavouriteButtonState();
+}
+
+class _FavouriteButtonState extends ConsumerState<_FavouriteButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _scale = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.35), weight: 50),
+      TweenSequenceItem(tween: Tween(begin: 1.35, end: 1.0), weight: 50),
+    ]).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _toggle() {
+    HapticFeedback.lightImpact();
+    ref.read(_favouriteIdsProvider.notifier).toggle(widget.productId);
+    _controller.forward(from: 0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isFav = ref.watch(_favouriteIdsProvider).contains(widget.productId);
+    return Semantics(
+      label: isFav ? 'Remove from favourites' : 'Add to favourites',
+      button: true,
+      child: GestureDetector(
+        onTap: _toggle,
+        child: ScaleTransition(
+          scale: _scale,
+          child: Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.35),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+              size: 16,
+              color: isFav ? const Color(0xFFEF5350) : Colors.white,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
