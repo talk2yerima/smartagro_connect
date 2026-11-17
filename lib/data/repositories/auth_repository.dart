@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:firebase_auth/firebase_auth.dart' as fb;
@@ -117,11 +118,6 @@ class AuthRepository {
     } else {
       log.d('[Auth] Password reset (demo): $email');
     }
-  }
-
-  Future<void> verifyOtp({required String code}) async {
-    if (code.length < 4) throw const ValidationFailure('Enter a valid OTP');
-    // Wire to Firebase phone auth / custom OTP gateway when ready.
   }
 
   Future<AppUser> googleSignIn() async {
@@ -315,10 +311,13 @@ class AuthRepository {
       name: nameOverride ??
           (profile?['name'] as String?) ??
           fbUser.displayName ??
-          fbUser.email!.split('@').first,
+          // Phone-only accounts have no email.
+          fbUser.email?.split('@').first ??
+          fbUser.phoneNumber ??
+          'SmartAgro user',
       email: fbUser.email ?? '',
       role: role,
-      phone: profile?['phone'] as String?,
+      phone: profile?['phone'] as String? ?? fbUser.phoneNumber,
       location: profile?['location'] as String?,
       avatarUrl: profile?['avatarUrl'] as String?,
       rating: (profile?['rating'] as num?)?.toDouble() ?? 5.0,
@@ -327,6 +326,132 @@ class AuthRepository {
       verified: (profile?['verified'] as bool?) ?? false,
     );
   }
+
+  // ── Phone-number sign-in (Firebase SMS codes) ──────────────────────────────
+
+  /// Sends a 6-digit SMS code to [e164Phone] (e.g. "+2348036582546").
+  ///
+  /// Android can sometimes confirm the number without the person typing
+  /// the code (instant verification); the result then carries a ready
+  /// [PhoneCodeRequest.instantCredential] and no SMS needs typing.
+  Future<PhoneCodeRequest> sendPhoneCode(
+    String e164Phone, {
+    int? resendToken,
+  }) {
+    if (!_firebaseReady) {
+      throw const AuthFailure('Phone sign-in needs an internet connection.');
+    }
+    final done = Completer<PhoneCodeRequest>();
+    _auth.verifyPhoneNumber(
+      phoneNumber: e164Phone,
+      timeout: const Duration(seconds: 60),
+      forceResendingToken: resendToken,
+      verificationCompleted: (credential) {
+        if (!done.isCompleted) {
+          done.complete(PhoneCodeRequest(instantCredential: credential));
+        }
+      },
+      verificationFailed: (e) {
+        if (!done.isCompleted) {
+          done.completeError(AuthFailure(_mapPhoneError(e)));
+        }
+      },
+      codeSent: (verificationId, token) {
+        if (!done.isCompleted) {
+          done.complete(PhoneCodeRequest(
+            verificationId: verificationId,
+            resendToken: token,
+          ));
+        }
+      },
+      codeAutoRetrievalTimeout: (_) {},
+    );
+    return done.future;
+  }
+
+  /// Signs in with the SMS code (or an instant credential).
+  ///
+  /// Returns the signed-in user, or null when this phone number has no
+  /// SmartAgro profile yet; then call [completePhoneProfile].
+  Future<AppUser?> confirmPhoneCode({
+    String? verificationId,
+    String? smsCode,
+    fb.PhoneAuthCredential? instantCredential,
+  }) async {
+    final credential = instantCredential ??
+        fb.PhoneAuthProvider.credential(
+          verificationId: verificationId ?? '',
+          smsCode: smsCode ?? '',
+        );
+    try {
+      final cred = await _auth.signInWithCredential(credential);
+      final fbUser = cred.user!;
+      final profile = await _firestore.fetchUserProfile(fbUser.uid);
+      if (profile == null) return null; // new person: needs name + role
+      if (profile['banned'] == true) {
+        await _auth.signOut();
+        throw const AuthFailure(
+            'This account has been suspended. Contact support.');
+      }
+      final user = _buildUserFromFirebase(fbUser,
+          fallbackRole: UserRole.farmer, profile: profile);
+      await _persistLocal(user);
+      return user;
+    } on fb.FirebaseAuthException catch (e) {
+      throw AuthFailure(_mapPhoneError(e));
+    }
+  }
+
+  /// Creates the profile for someone who just signed in by phone for the
+  /// first time. The phone number is the one Firebase verified by SMS.
+  Future<AppUser> completePhoneProfile({
+    required String name,
+    required UserRole role,
+  }) async {
+    final fbUser = _auth.currentUser;
+    if (fbUser == null) {
+      throw const AuthFailure('Your session expired. Request a new code.');
+    }
+    final safeRole = _selfServiceRole(role);
+    await fbUser.updateDisplayName(name);
+    await _firestore.saveUserProfile(
+      fbUser.uid,
+      name: name,
+      email: '',
+      role: safeRole,
+    );
+    final phone = fbUser.phoneNumber;
+    if (phone != null) {
+      await _firestore.updateUserProfile(fbUser.uid, phone: phone);
+    }
+    final user = _buildUserFromFirebase(fbUser,
+        fallbackRole: safeRole,
+        nameOverride: name,
+        profile: {'role': safeRole.name, 'phone': phone});
+    await _persistLocal(user);
+    return user;
+  }
+
+  String _mapPhoneError(fb.FirebaseAuthException e) => switch (e.code) {
+        'invalid-phone-number' =>
+          'That phone number is not valid. Check it and try again.',
+        'invalid-verification-code' =>
+          "That code is not right. Check the SMS and try again.",
+        'session-expired' ||
+        'code-expired' =>
+          'That code has expired. Tap "Send a new code".',
+        'too-many-requests' ||
+        'quota-exceeded' =>
+          'Too many attempts. Wait a while, then try again.',
+        'operation-not-allowed' =>
+          'Phone sign-in is not switched on yet. Use email for now.',
+        'missing-client-identifier' ||
+        'app-not-authorized' =>
+          'Phone sign-in is not set up for this app yet. Use email for now.',
+        'network-request-failed' =>
+          "You're offline or the connection is weak. Try again.",
+        _ => 'Phone sign-in failed. Please try again.',
+      };
 
   // ── Demo paths ─────────────────────────────────────────────────────────────
 
@@ -445,4 +570,19 @@ class AuthRepository {
     if (msg.contains('USER_DISABLED')) return 'This account has been disabled.';
     return 'Authentication failed. Please try again.';
   }
+}
+
+/// What [AuthRepository.sendPhoneCode] produced: a code was sent
+/// ([verificationId]), or Android confirmed the number on its own
+/// ([instantCredential]).
+class PhoneCodeRequest {
+  const PhoneCodeRequest({
+    this.verificationId,
+    this.resendToken,
+    this.instantCredential,
+  });
+
+  final String? verificationId;
+  final int? resendToken;
+  final fb.PhoneAuthCredential? instantCredential;
 }

@@ -368,6 +368,22 @@ class _FormSheet extends StatelessWidget {
                 SizedBox(
                   height: 52,
                   child: OutlinedButton.icon(
+                    onPressed: busy ? null : () => context.push('/phone'),
+                    icon: const Icon(Icons.phone_iphone_rounded),
+                    label: const Text('Continue with phone number'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.text(isDark),
+                      side: BorderSide(color: AppColors.border_(isDark)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 52,
+                  child: OutlinedButton.icon(
                     onPressed: busy ? null : onGoogle,
                     icon: const Icon(Icons.g_mobiledata_rounded, size: 30),
                     label: const Text('Continue with Google'),

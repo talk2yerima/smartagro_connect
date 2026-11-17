@@ -10,7 +10,7 @@ import '../../features/admin/admin_moderation_screen.dart';
 import '../../features/admin/admin_users_screen.dart';
 import '../../features/auth/forgot_password_screen.dart';
 import '../../features/auth/login_screen.dart';
-import '../../features/auth/otp_screen.dart';
+import '../../features/auth/phone_sign_in_screen.dart';
 import '../../features/auth/register_screen.dart';
 import '../../features/chat/chat_list_screen.dart';
 import '../../features/chat/chat_room_screen.dart';
@@ -70,7 +70,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       final authPublic = loc.startsWith('/login') ||
           loc.startsWith('/register') ||
           loc.startsWith('/forgot') ||
-          loc.startsWith('/otp');
+          loc.startsWith('/phone');
 
       final protected = loc.startsWith('/main') ||
           loc.startsWith('/marketplace') ||
@@ -138,8 +138,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ForgotPasswordScreen(),
       ),
       GoRoute(
-        path: '/otp',
-        builder: (context, state) => const OtpScreen(),
+        path: '/phone',
+        builder: (context, state) => const PhoneSignInScreen(),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
