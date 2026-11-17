@@ -35,6 +35,15 @@ void main() {
     expect(msg, contains('permission'));
   });
 
+  test('upload failures say uploads are unavailable, not "you erred"', () {
+    final msg = friendlyError(
+        FirebaseException(plugin: 'firebase_storage', code: 'canceled'));
+    expect(msg, contains("Uploads aren't working"));
+    final denied = friendlyError(
+        FirebaseException(plugin: 'firebase_storage', code: 'unauthorized'));
+    expect(denied, contains('permission'));
+  });
+
   test('anything unknown falls back to a generic sentence', () {
     expect(friendlyError(StateError('null check operator')),
         'Something went wrong. Please try again.');

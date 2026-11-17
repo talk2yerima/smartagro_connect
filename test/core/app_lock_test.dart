@@ -22,8 +22,7 @@ void main() {
     when(() => auth.authenticate(
           localizedReason: any(named: 'localizedReason'),
           biometricOnly: any(named: 'biometricOnly'),
-          persistAcrossBackgrounding:
-              any(named: 'persistAcrossBackgrounding'),
+          persistAcrossBackgrounding: any(named: 'persistAcrossBackgrounding'),
         )).thenAnswer((_) async => result);
   }
 
@@ -68,8 +67,8 @@ void main() {
     final c = await controller();
 
     expect(await c.setEnabled(true), AppLockSetupResult.unsupported);
-    verifyNever(() => auth.authenticate(
-        localizedReason: any(named: 'localizedReason')));
+    verifyNever(() =>
+        auth.authenticate(localizedReason: any(named: 'localizedReason')));
   });
 
   test('unlocking with a good fingerprint opens the app', () async {

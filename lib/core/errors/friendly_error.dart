@@ -24,6 +24,19 @@ String friendlyError(Object error) {
   if (error is SocketException || error is TimeoutException) return _offline;
 
   if (error is FirebaseAuthException) return _authMessage(error.code);
+  // Photo / voice-note uploads (Firebase Storage).
+  if (error is FirebaseException && error.plugin == 'firebase_storage') {
+    switch (error.code) {
+      case 'unauthorized':
+      case 'unauthenticated':
+        return "You don't have permission to upload this. Try signing out "
+            'and back in.';
+      case 'retry-limit-exceeded':
+        return _offline;
+    }
+    // Includes a missing storage bucket, which the person can't fix.
+    return "Uploads aren't working right now. Please try again later.";
+  }
   if (error is FirebaseException) {
     switch (error.code) {
       case 'unavailable':
