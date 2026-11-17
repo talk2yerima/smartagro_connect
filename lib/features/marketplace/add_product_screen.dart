@@ -65,7 +65,9 @@ const _kNigerianStates = [
   'Zamfara',
 ];
 
-enum _Availability { inStock, limited, preOrder }
+// No pre-order: it was stored as 'pre_order' but read back as in stock
+// and sold like normal stock. Add it back as a real availability state.
+enum _Availability { inStock, limited }
 
 // ─── Card decoration helper ───────────────────────────────────────────────────
 
@@ -313,7 +315,6 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
         'verified': session?.verified ?? false,
         'availability': switch (_availability) {
           _Availability.limited => 'limited',
-          _Availability.preOrder => 'pre_order',
           _Availability.inStock => 'in_stock',
         },
         // No photo means no photo: listings used to get a random stock
@@ -702,13 +703,13 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Icon(
-                    Icons.access_time_rounded,
+                    Icons.bolt_rounded,
                     size: 13,
                     color: AppColors.gray,
                   ),
                   const SizedBox(width: 5),
                   Text(
-                    'Your listing will be reviewed within 2 hours',
+                    'Goes live straight away. Edit it any time.',
                     style: GoogleFonts.poppins(
                       fontSize: 12,
                       color: AppColors.gray,
@@ -1105,11 +1106,6 @@ class _AvailabilitySegment extends StatelessWidget {
               value: _Availability.limited,
               label: Text('Limited'),
               icon: Icon(Icons.warning_amber_outlined, size: 15),
-            ),
-            ButtonSegment(
-              value: _Availability.preOrder,
-              label: Text('Pre-order'),
-              icon: Icon(Icons.schedule_outlined, size: 15),
             ),
           ],
         ),

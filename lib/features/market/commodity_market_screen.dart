@@ -598,7 +598,7 @@ class _MarketSummaryStrip extends StatelessWidget {
             _divider(),
             Expanded(
               child: Text(
-                'Updated ${_relTime()}',
+                'Updated ${_relTime().toLowerCase()}',
                 textAlign: TextAlign.end,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,

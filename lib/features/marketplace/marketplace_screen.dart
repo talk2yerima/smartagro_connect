@@ -725,8 +725,17 @@ class _SpotlightStrip extends StatelessWidget {
                         child: DecoratedBox(
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(14),
-                            gradient: const LinearGradient(
-                              colors: [Colors.transparent, Colors.black54],
+                            // Dark shading keeps the white title readable
+                            // on photos; with no photo a brand-green fade
+                            // does that job without a muddy grey band.
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.transparent,
+                                hasRealPhoto(p.imageUrl)
+                                    ? Colors.black54
+                                    : AppColors.deepGreen
+                                        .withValues(alpha: 0.85),
+                              ],
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
                             ),
@@ -911,33 +920,6 @@ class _ProductCard extends ConsumerWidget {
                   ),
                 ),
 
-                // Price badge — top right
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    // Dark text on solid gold: the old white 10 pt text on
-                    // gold was about 1.8:1 contrast, hard to read outdoors.
-                    decoration: BoxDecoration(
-                      color: AppColors.golden,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      '${formatNgn(product.priceNgn)}/kg',
-                      style: const TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.charcoal,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ),
-
                 // Verified seller badge — bottom left of image
                 if (product.verified)
                   const Positioned(
@@ -989,10 +971,10 @@ class _ProductCard extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Title
+                    // Title (one line keeps every card in the grid aligned)
                     Text(
                       product.title,
-                      maxLines: 2,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: textTheme.labelLarge?.copyWith(
                         fontFamily: 'Poppins',
@@ -1003,7 +985,37 @@ class _ProductCard extends ConsumerWidget {
                       ),
                     ),
 
-                    const SizedBox(height: 4),
+                    // Price per kg: the main thing buyers scan for. It used
+                    // to sit on the photo, where it hit the stock badge.
+                    Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: formatNgn(product.priceNgn),
+                            style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: isDark
+                                  ? AppColors.lightGreen
+                                  : AppColors.deepGreen,
+                            ),
+                          ),
+                          TextSpan(
+                            text: ' /kg',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.subText(isDark),
+                            ),
+                          ),
+                        ],
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+
+                    const SizedBox(height: 2),
 
                     // Location
                     Row(
