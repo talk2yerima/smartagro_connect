@@ -619,10 +619,14 @@ class _VerificationCard extends StatelessWidget {
         subtitle: accountVerified ? 'Identity confirmed' : 'Pending review',
         verified: accountVerified,
       ),
+      // The number is only typed in, never checked by SMS yet, so say
+      // "Added", not "Verified".
       _VerifItem(
         label: 'Phone Number',
         subtitle: phoneLinked ? user!.phone! : 'Not provided',
         verified: phoneLinked,
+        doneLabel: 'Added',
+        pendingLabel: 'Not added',
       ),
     ];
 
@@ -681,7 +685,7 @@ class _VerificationCard extends StatelessWidget {
                       ),
                     ),
                     trailing: StatusBadge(
-                      label: item.verified ? 'Verified' : 'Pending',
+                      label: item.verified ? item.doneLabel : item.pendingLabel,
                       color: item.verified
                           ? AppColors.mintGreen
                           : AppColors.golden,
@@ -710,10 +714,16 @@ class _VerifItem {
     required this.label,
     required this.subtitle,
     required this.verified,
+    this.doneLabel = 'Verified',
+    this.pendingLabel = 'Pending',
   });
   final String label;
   final String subtitle;
   final bool verified;
+
+  /// Badge text when [verified] is true / false.
+  final String doneLabel;
+  final String pendingLabel;
 }
 
 // ---------------------------------------------------------------------------

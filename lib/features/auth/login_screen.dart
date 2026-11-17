@@ -1,5 +1,5 @@
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -10,6 +10,13 @@ import '../../core/errors/friendly_error.dart';
 import '../../domain/entities/app_user.dart';
 import '../../shared/widgets/gradient_button.dart';
 
+/// Full-screen sign-in: a brand header that runs under the status bar and a
+/// single form sheet below it. It fits one phone screen without scrolling
+/// and only scrolls when the keyboard needs the room.
+///
+/// In live mode a person's role comes from their account, so there is no
+/// role picker. Demo mode (no Firebase) keeps a compact "demo account"
+/// picker that fills in the matching demo email.
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -21,6 +28,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _passwordFocus = FocusNode();
   UserRole _role = UserRole.farmer;
   bool _busy = false;
   bool _obscurePassword = true;
@@ -41,11 +49,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   void dispose() {
     _email.dispose();
     _password.dispose();
+    _passwordFocus.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (_busy || !_formKey.currentState!.validate()) return;
+    FocusScope.of(context).unfocus();
     setState(() {
       _busy = true;
       _error = null;
@@ -70,6 +80,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _google() async {
+    if (_busy) return;
     setState(() {
       _busy = true;
       _error = null;
@@ -89,13 +100,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
-  void _selectRole(UserRole role) {
+  void _selectDemoRole(UserRole role) {
     setState(() {
       _role = role;
-      if (!_isLiveMode) {
-        _email.text = '${role.name}@demo.ng';
-        _password.text = 'password123';
-      }
+      _email.text = '${role.name}@demo.ng';
+      _password.text = 'password123';
       _error = null;
     });
   }
@@ -103,53 +112,54 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final media = MediaQuery.of(context);
 
-    return Scaffold(
-      backgroundColor: isDark ? AppColors.darkBg : const Color(0xFFF3F6F1),
-      body: SafeArea(
-        child: LayoutBuilder(
+    // Light status-bar icons over the green header.
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: AppColors.bg(isDark),
+        body: LayoutBuilder(
           builder: (context, constraints) {
-            final wide = constraints.maxWidth >= 760;
-            final brand = _BrandPanel(selectedRole: _role);
-            final login = _LoginPanel(
-              formKey: _formKey,
-              email: _email,
-              password: _password,
-              role: _role,
-              busy: _busy,
-              error: _error,
-              obscurePassword: _obscurePassword,
-              onRoleSelected: _selectRole,
-              onSubmit: _submit,
-              onGoogle: _google,
-              onTogglePassword: () {
-                setState(() => _obscurePassword = !_obscurePassword);
-              },
-            );
-
             return SingleChildScrollView(
-              padding: EdgeInsets.all(wide ? 24 : 16),
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight: constraints.maxHeight - (wide ? 48 : 32),
-                ),
-                child: wide
-                    ? Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(flex: 5, child: brand),
-                          const SizedBox(width: 20),
-                          Expanded(flex: 4, child: login),
-                        ],
-                      )
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          brand,
-                          const SizedBox(height: 16),
-                          login,
-                        ],
+                // Exactly one screen tall; grows only if content needs it
+                // (large text, keyboard open).
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: IntrinsicHeight(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _Header(topPadding: media.padding.top),
+                      Expanded(
+                        child: Center(
+                          child: ConstrainedBox(
+                            // Comfortable width on tablets.
+                            constraints: const BoxConstraints(maxWidth: 460),
+                            child: _FormSheet(
+                              formKey: _formKey,
+                              email: _email,
+                              password: _password,
+                              passwordFocus: _passwordFocus,
+                              busy: _busy,
+                              error: _error,
+                              obscurePassword: _obscurePassword,
+                              isDark: isDark,
+                              showDemoPicker: !_isLiveMode,
+                              demoRole: _role,
+                              onDemoRole: _selectDemoRole,
+                              onSubmit: _submit,
+                              onGoogle: _google,
+                              onTogglePassword: () => setState(
+                                  () => _obscurePassword = !_obscurePassword),
+                            ),
+                          ),
+                        ),
                       ),
+                    ],
+                  ),
+                ),
               ),
             );
           },
@@ -159,20 +169,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 }
 
-class _BrandPanel extends StatelessWidget {
-  const _BrandPanel({required this.selectedRole});
+// ─── Brand header ────────────────────────────────────────────────────────────
 
-  final UserRole selectedRole;
+class _Header extends StatelessWidget {
+  const _Header({required this.topPadding});
+
+  final double topPadding;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: const BoxConstraints(minHeight: 280),
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: AppColors.deepGreen,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+      padding: EdgeInsets.fromLTRB(24, topPadding + 28, 24, 52),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [AppColors.deepGreen, AppColors.emerald],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -184,79 +197,42 @@ class _BrandPanel extends StatelessWidget {
                 height: 44,
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(
-                  Icons.eco_rounded,
-                  color: AppColors.deepGreen,
-                ),
+                child: const Icon(Icons.eco_rounded,
+                    color: AppColors.deepGreen, size: 26),
               ),
               const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'SmartAgro Connect',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                      ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 48),
-          Text(
-            _headlineForRole(selectedRole),
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              const Text(
+                'SmartAgro Connect',
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w700,
+                  fontSize: 17,
                   color: Colors.white,
-                  fontWeight: FontWeight.w800,
                 ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            _summaryForRole(selectedRole),
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.82),
-                  height: 1.45,
-                ),
-          ),
-          const SizedBox(height: 20),
-          const Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              _TrustBadge(
-                icon: Icons.verified_user_outlined,
-                label: 'Verified trade',
-              ),
-              _TrustBadge(icon: Icons.route_outlined, label: 'Logistics ready'),
-              _TrustBadge(
-                icon: Icons.analytics_outlined,
-                label: 'Market intelligence',
               ),
             ],
           ),
-          const SizedBox(height: 18),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(8),
+          const SizedBox(height: 28),
+          const Text(
+            'Welcome back',
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontWeight: FontWeight.w700,
+              fontSize: 30,
+              height: 1.15,
+              color: Colors.white,
             ),
-            child: Row(
-              children: [
-                const Icon(Icons.lock_outline, color: Colors.white),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Each role sees only the tools it needs.',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.84),
-                        ),
-                  ),
-                ),
-              ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Sign in to sell, buy and move produce.',
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 15,
+              height: 1.4,
+              color: Colors.white.withValues(alpha: 0.85),
             ),
           ),
         ],
@@ -265,16 +241,21 @@ class _BrandPanel extends StatelessWidget {
   }
 }
 
-class _LoginPanel extends StatelessWidget {
-  const _LoginPanel({
+// ─── Form sheet ──────────────────────────────────────────────────────────────
+
+class _FormSheet extends StatelessWidget {
+  const _FormSheet({
     required this.formKey,
     required this.email,
     required this.password,
-    required this.role,
+    required this.passwordFocus,
     required this.busy,
     required this.error,
     required this.obscurePassword,
-    required this.onRoleSelected,
+    required this.isDark,
+    required this.showDemoPicker,
+    required this.demoRole,
+    required this.onDemoRole,
     required this.onSubmit,
     required this.onGoogle,
     required this.onTogglePassword,
@@ -283,143 +264,156 @@ class _LoginPanel extends StatelessWidget {
   final GlobalKey<FormState> formKey;
   final TextEditingController email;
   final TextEditingController password;
-  final UserRole role;
+  final FocusNode passwordFocus;
   final bool busy;
   final String? error;
   final bool obscurePassword;
-  final ValueChanged<UserRole> onRoleSelected;
+  final bool isDark;
+  final bool showDemoPicker;
+  final UserRole demoRole;
+  final ValueChanged<UserRole> onDemoRole;
   final VoidCallback onSubmit;
   final VoidCallback onGoogle;
   final VoidCallback onTogglePassword;
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final subText = AppColors.subText(isDark);
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.08)
-              : Colors.black.withValues(alpha: 0.08),
+    // The sheet's rounded top overlaps the header, so the page reads as
+    // one surface rather than two stacked cards.
+    return Transform.translate(
+      offset: const Offset(0, -24),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.bg(isDark),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.22 : 0.06),
-            blurRadius: 24,
-            offset: const Offset(0, 16),
-          ),
-        ],
-      ),
-      child: Form(
-        key: formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Sign in',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
+        padding: const EdgeInsets.fromLTRB(24, 28, 24, 0),
+        child: Form(
+          key: formKey,
+          child: AutofillGroup(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (showDemoPicker) ...[
+                  _DemoRolePicker(selected: demoRole, onSelected: onDemoRole),
+                  const SizedBox(height: 20),
+                ],
+                TextFormField(
+                  controller: email,
+                  keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
+                  autofillHints: const [AutofillHints.email],
+                  onFieldSubmitted: (_) => passwordFocus.requestFocus(),
+                  decoration: const InputDecoration(
+                    labelText: 'Email',
+                    prefixIcon: Icon(Icons.mail_outline_rounded),
                   ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Choose how you use SmartAgro, then sign in.',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 18),
-            _RoleSelector(selected: role, onSelected: onRoleSelected),
-            const SizedBox(height: 18),
-            TextFormField(
-              controller: email,
-              keyboardType: TextInputType.emailAddress,
-              textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(
-                labelText: 'Email',
-                prefixIcon: Icon(Icons.mail_outline),
-              ),
-              validator: (v) =>
-                  v == null || !v.contains('@') ? 'Enter a valid email' : null,
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: password,
-              obscureText: obscurePassword,
-              textInputAction: TextInputAction.done,
-              onFieldSubmitted: (_) => busy ? null : onSubmit(),
-              decoration: InputDecoration(
-                labelText: 'Password',
-                prefixIcon: const Icon(Icons.lock_outline),
-                suffixIcon: IconButton(
-                  tooltip: obscurePassword ? 'Show password' : 'Hide password',
-                  onPressed: onTogglePassword,
-                  icon: Icon(
-                    obscurePassword
-                        ? Icons.visibility_outlined
-                        : Icons.visibility_off_outlined,
+                  validator: (v) => v == null || !v.contains('@')
+                      ? 'Enter a valid email'
+                      : null,
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: password,
+                  focusNode: passwordFocus,
+                  obscureText: obscurePassword,
+                  textInputAction: TextInputAction.done,
+                  autofillHints: const [AutofillHints.password],
+                  onFieldSubmitted: (_) => onSubmit(),
+                  decoration: InputDecoration(
+                    labelText: 'Password',
+                    prefixIcon: const Icon(Icons.lock_outline_rounded),
+                    suffixIcon: IconButton(
+                      tooltip:
+                          obscurePassword ? 'Show password' : 'Hide password',
+                      onPressed: onTogglePassword,
+                      icon: Icon(obscurePassword
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined),
+                    ),
+                  ),
+                  validator: (v) =>
+                      v == null || v.length < 6 ? 'Minimum 6 characters' : null,
+                ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () => context.push('/forgot'),
+                    child: const Text('Forgot password?'),
                   ),
                 ),
-              ),
-              validator: (v) =>
-                  v == null || v.length < 6 ? 'Minimum 6 characters' : null,
-            ),
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: () => context.push('/forgot'),
-                child: const Text('Forgot password?'),
-              ),
-            ),
-            if (error != null) ...[
-              const SizedBox(height: 8),
-              _ErrorBanner(message: error!),
-            ],
-            const SizedBox(height: 14),
-            PrimaryGradientButton(
-              label: busy ? 'Signing in...' : 'Sign in',
-              icon: Icons.login_rounded,
-              onPressed: busy ? null : onSubmit,
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: busy ? null : onGoogle,
-                icon: const Icon(Icons.g_mobiledata_rounded, size: 28),
-                label: const Text('Continue with Google'),
-              ),
-            ),
-            const SizedBox(height: 16),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text('New to SmartAgro?'),
-                  TextButton(
-                    onPressed: () => context.push('/register'),
-                    child: const Text('Create account'),
-                  ),
+                if (error != null) ...[
+                  _ErrorBanner(message: error!),
+                  const SizedBox(height: 14),
                 ],
-              ),
+                PrimaryGradientButton(
+                  label: busy ? 'Signing in…' : 'Sign in',
+                  icon: Icons.login_rounded,
+                  onPressed: busy ? null : onSubmit,
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(child: Divider(color: AppColors.border_(isDark))),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Text('or', style: TextStyle(color: subText)),
+                    ),
+                    Expanded(child: Divider(color: AppColors.border_(isDark))),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                SizedBox(
+                  height: 52,
+                  child: OutlinedButton.icon(
+                    onPressed: busy ? null : onGoogle,
+                    icon: const Icon(Icons.g_mobiledata_rounded, size: 30),
+                    label: const Text('Continue with Google'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.text(isDark),
+                      side: BorderSide(color: AppColors.border_(isDark)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                ),
+                // Pushes "Create account" to the bottom of the screen.
+                const Spacer(),
+                Padding(
+                  padding: EdgeInsets.only(
+                    top: 16,
+                    bottom: MediaQuery.of(context).padding.bottom + 8,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text('New to SmartAgro?',
+                          style: TextStyle(color: subText)),
+                      TextButton(
+                        onPressed: () => context.push('/register'),
+                        child: const Text(
+                          'Create account',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _RoleSelector extends StatelessWidget {
-  const _RoleSelector({
-    required this.selected,
-    required this.onSelected,
-  });
+/// Demo mode only: picks which demo account to sign in with.
+class _DemoRolePicker extends StatelessWidget {
+  const _DemoRolePicker({required this.selected, required this.onSelected});
 
   final UserRole selected;
   final ValueChanged<UserRole> onSelected;
@@ -429,72 +423,26 @@ class _RoleSelector extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'I am a',
-          style: Theme.of(context).textTheme.labelLarge,
-        ),
+        Text('Demo account', style: Theme.of(context).textTheme.labelLarge),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          // Admin accounts are granted in the Firebase console, so the
-          // chip only appears in demo mode (no Firebase).
-          children: UserRole.values
-              .where((r) => r != UserRole.admin || Firebase.apps.isEmpty)
-              .map((role) {
-            final active = selected == role;
-            final color = _roleColor(role);
-            return ChoiceChip(
-              selected: active,
-              avatar: Icon(
-                _roleIcon(role),
-                size: 18,
-                color: active ? Colors.white : color,
+          children: [
+            for (final role in UserRole.values)
+              ChoiceChip(
+                selected: role == selected,
+                onSelected: (_) => onSelected(role),
+                label: Text(switch (role) {
+                  UserRole.farmer => 'Farmer',
+                  UserRole.buyer => 'Buyer',
+                  UserRole.transporter => 'Transporter',
+                  UserRole.admin => 'Admin',
+                }),
               ),
-              label: Text(_roleLabel(role)),
-              labelStyle: TextStyle(
-                color: active ? Colors.white : null,
-                fontWeight: FontWeight.w700,
-              ),
-              selectedColor: color,
-              checkmarkColor: Colors.white,
-              onSelected: (_) => onSelected(role),
-            );
-          }).toList(),
+          ],
         ),
       ],
-    );
-  }
-}
-
-class _TrustBadge extends StatelessWidget {
-  const _TrustBadge({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: Colors.white, size: 16),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -506,67 +454,20 @@ class _ErrorBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.error;
     return Container(
-      width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.error.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Theme.of(context).colorScheme.error),
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
       ),
-      child: Text(
-        message,
-        style: TextStyle(color: Theme.of(context).colorScheme.error),
+      child: Row(
+        children: [
+          Icon(Icons.error_outline_rounded, color: color),
+          const SizedBox(width: 8),
+          Expanded(child: Text(message, style: TextStyle(color: color))),
+        ],
       ),
     );
   }
-}
-
-String _headlineForRole(UserRole role) {
-  return switch (role) {
-    UserRole.farmer => 'Sell your harvest at a fair price.',
-    UserRole.buyer => 'Buy fresh produce from trusted farmers.',
-    UserRole.transporter => 'Find haulage jobs and plan your routes.',
-    UserRole.admin => 'Keep the marketplace safe and running.',
-  };
-}
-
-String _summaryForRole(UserRole role) {
-  return switch (role) {
-    UserRole.farmer =>
-      "List your produce, check today's prices and chat with buyers, all in one place.",
-    UserRole.buyer =>
-      'Compare listings, check seller ratings and pay safely in the app.',
-    UserRole.transporter =>
-      'See delivery requests near you and keep in touch with farmers and buyers.',
-    UserRole.admin =>
-      'Review users, handle reports and keep prices and listings accurate.',
-  };
-}
-
-String _roleLabel(UserRole role) {
-  return switch (role) {
-    UserRole.farmer => 'Farmer',
-    UserRole.buyer => 'Buyer',
-    UserRole.transporter => 'Transporter',
-    UserRole.admin => 'Admin',
-  };
-}
-
-IconData _roleIcon(UserRole role) {
-  return switch (role) {
-    UserRole.farmer => Icons.agriculture_outlined,
-    UserRole.buyer => Icons.storefront_outlined,
-    UserRole.transporter => Icons.local_shipping_outlined,
-    UserRole.admin => Icons.admin_panel_settings_outlined,
-  };
-}
-
-Color _roleColor(UserRole role) {
-  return switch (role) {
-    UserRole.farmer => AppColors.deepGreen,
-    UserRole.buyer => const Color(0xFF1565C0),
-    UserRole.transporter => AppColors.warmOrange,
-    UserRole.admin => const Color(0xFF5E35B1),
-  };
 }

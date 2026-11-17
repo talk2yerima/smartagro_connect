@@ -62,7 +62,8 @@ abstract final class AppTheme {
       secondary: secondary,
       onSecondary: AppColors.charcoal,
       secondaryContainer: AppColors.golden.withValues(alpha: 0.15),
-      onSecondaryContainer: AppColors.charcoal,
+      // Gold text on the dark tonal surface; charcoal was unreadable there.
+      onSecondaryContainer: isDark ? AppColors.golden : AppColors.charcoal,
       tertiary: AppColors.infoBlue,
       onTertiary: Colors.white,
       tertiaryContainer: AppColors.infoBlue.withValues(alpha: 0.12),

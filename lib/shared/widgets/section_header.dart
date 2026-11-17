@@ -19,6 +19,8 @@ class SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final titleColor = isDark ? AppColors.softWhite : AppColors.charcoal;
+    // Deep green is too dark to read on the dark background.
+    final accent = isDark ? AppColors.lightGreen : AppColors.deepGreen;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
@@ -28,7 +30,7 @@ class SectionHeader extends StatelessWidget {
             Icon(
               icon,
               size: 18,
-              color: AppColors.deepGreen,
+              color: accent,
             ),
             const SizedBox(width: 6),
           ],
@@ -48,16 +50,17 @@ class SectionHeader extends StatelessWidget {
             TextButton(
               onPressed: onAction,
               style: TextButton.styleFrom(
-                foregroundColor: AppColors.deepGreen,
+                foregroundColor: accent,
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                minimumSize: Size.zero,
+                // 40 px tall so the link is easy to hit without growing the row much.
+                minimumSize: const Size(0, 40),
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
               child: Text(
                 actionLabel!,
                 style: Theme.of(context).textTheme.labelMedium?.copyWith(
                       fontWeight: FontWeight.w600,
-                      color: AppColors.deepGreen,
+                      color: accent,
                     ),
               ),
             ),
