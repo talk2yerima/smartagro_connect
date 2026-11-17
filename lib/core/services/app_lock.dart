@@ -8,8 +8,10 @@ import '../utils/app_logger.dart';
 
 /// Fingerprint / face (or the phone's PIN) unlock for SmartAgro.
 ///
-/// When on, the app locks on a cold start and whenever it comes back after
-/// [relockAfter] in the background. It only ever applies to a signed-in
+/// When on, the app locks on a cold start and every time the person comes
+/// back to it, except after a trip SmartAgro started itself (camera,
+/// gallery, payment page, permission dialog; see [allowNextReturn]). It
+/// only ever applies to a signed-in
 /// person; signing out (from the lock screen too) always works, so nobody
 /// can be locked out of their account by a broken fingerprint sensor.
 class AppLockState {
@@ -29,8 +31,12 @@ enum AppLockSetupResult { enabled, disabled, cancelled, unsupported }
 
 class AppLockController extends StateNotifier<AppLockState>
     with WidgetsBindingObserver {
-  AppLockController(this._prefs, {LocalAuthentication? auth})
-      : _auth = auth ?? LocalAuthentication(),
+  AppLockController(
+    this._prefs, {
+    LocalAuthentication? auth,
+    DateTime Function()? clock,
+  })  : _auth = auth ?? LocalAuthentication(),
+        _now = clock ?? DateTime.now,
         super(AppLockState(
           enabled: _prefs.getBool(prefsKey) ?? false,
           // Locked from the first frame on a cold start when switched on.
@@ -41,13 +47,21 @@ class AppLockController extends StateNotifier<AppLockState>
 
   static const prefsKey = 'app_lock_enabled';
 
-  /// Time in the background before the app asks again. Short trips (taking
-  /// a listing photo, answering a call) don't re-lock.
-  static const relockAfter = Duration(seconds: 60);
+  /// Grace for brief system pop-ups that pause the app (a notification
+  /// shade swipe). Anything longer locks. It used to be 60 s, which meant
+  /// reopening the app from recents (Xiaomi keeps it running) never locked.
+  static const relockAfter = Duration(seconds: 3);
+
+  /// Trips SmartAgro starts itself are exempt, but never for longer than
+  /// this: someone who walks away from the camera still gets locked.
+  static const maxExemptTrip = Duration(minutes: 10);
 
   final SharedPreferences _prefs;
   final LocalAuthentication _auth;
+  final DateTime Function() _now; // injectable for tests
   DateTime? _backgroundedAt;
+  DateTime? _exemptUntil;
+  bool _tripExempt = false;
 
   /// The system unlock sheet briefly pauses the app; ignore those events.
   bool _authenticating = false;
@@ -57,15 +71,34 @@ class AppLockController extends StateNotifier<AppLockState>
   // ignore: avoid_renaming_method_parameters
   void didChangeAppLifecycleState(AppLifecycleState lifecycle) {
     if (!state.enabled || _authenticating) return;
+    final now = _now();
     if (lifecycle == AppLifecycleState.paused) {
-      _backgroundedAt = DateTime.now();
+      _backgroundedAt = now;
+      // Exempt only if the app announced this trip a moment ago.
+      final until = _exemptUntil;
+      _tripExempt = until != null && now.isBefore(until);
+      _exemptUntil = null;
     } else if (lifecycle == AppLifecycleState.resumed) {
       final since = _backgroundedAt;
+      final exempt = _tripExempt;
       _backgroundedAt = null;
-      if (since != null && DateTime.now().difference(since) >= relockAfter) {
+      _tripExempt = false;
+      if (since == null) return;
+      final away = now.difference(since);
+      final lock = exempt ? away >= maxExemptTrip : away >= relockAfter;
+      if (lock) {
+        log.i('[AppLock] locking after ${away.inSeconds}s away');
         state = state.copyWith(locked: true);
       }
     }
+  }
+
+  /// Call right before SmartAgro itself opens another screen (camera,
+  /// gallery, payment page, a permission dialog) so returning from it
+  /// doesn't ask to unlock again. Only covers a trip that starts within
+  /// the next few seconds.
+  void allowNextReturn() {
+    _exemptUntil = _now().add(const Duration(seconds: 5));
   }
 
   /// Whether this phone has a fingerprint, face or screen lock to use.

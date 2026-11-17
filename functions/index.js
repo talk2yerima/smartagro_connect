@@ -12,12 +12,15 @@
  */
 
 const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https');
+const { onDocumentCreated } = require('firebase-functions/v2/firestore');
 const { defineSecret } = require('firebase-functions/params');
 const logger = require('firebase-functions/logger');
 const { initializeApp } = require('firebase-admin/app');
-const { getFirestore } = require('firebase-admin/firestore');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+const { getMessaging } = require('firebase-admin/messaging');
 
 const payments = require('./src/payments');
+const notifications = require('./src/notifications');
 
 initializeApp();
 
@@ -98,6 +101,51 @@ exports.paystackWebhook = onRequest(
       // 500 makes Paystack retry the webhook later.
       logger.error('paystackWebhook failed', err);
       res.sendStatus(500);
+    }
+  },
+);
+
+// ── Notifications ───────────────────────────────────────────────────────────
+// Firestore triggers must run in the database's location. us-central1 suits
+// the default (nam5 / us-central1) database; change REGION if yours differs.
+
+function notificationDeps() {
+  const db = getFirestore();
+  return {
+    getUser: async (uid) => (await db.collection('users').doc(uid).get()).data(),
+    addNotification: (uid, doc) =>
+      db.collection('users').doc(uid).collection('notifications').add({
+        ...doc,
+        createdAt: FieldValue.serverTimestamp(),
+      }),
+    send: (message) => getMessaging().send(message),
+    clearToken: (uid) =>
+      db.collection('users').doc(uid).update({ fcmToken: FieldValue.delete() }),
+    log: logger,
+  };
+}
+
+/** Push the other person in a chat when a message arrives. */
+exports.notifyOnChatMessage = onDocumentCreated(
+  { document: 'chats/{threadId}/messages/{messageId}', region: REGION },
+  async (event) => {
+    const message = event.data && event.data.data();
+    if (!message) return;
+    const { threadId } = event.params;
+    const thread = (await getFirestore().collection('chats').doc(threadId).get()).data();
+    const note = notifications.messageNotification({ threadId, message, thread });
+    if (note) await notifications.deliver(note, notificationDeps());
+  },
+);
+
+/** Tell the seller (new order) and the buyer (payment confirmed). */
+exports.notifyOnOrder = onDocumentCreated(
+  { document: 'orders/{orderId}', region: REGION },
+  async (event) => {
+    const order = event.data && event.data.data();
+    const deps = notificationDeps();
+    for (const note of notifications.orderNotifications(order)) {
+      await notifications.deliver(note, deps);
     }
   },
 );

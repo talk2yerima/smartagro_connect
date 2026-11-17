@@ -12,6 +12,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/di/auth_providers.dart';
 import '../../core/errors/friendly_error.dart';
+import '../../core/services/app_lock.dart';
 import '../../shared/widgets/app_avatar.dart';
 
 class ProfileEditScreen extends ConsumerStatefulWidget {
@@ -87,6 +88,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     final user = ref.read(authSessionProvider);
     if (user == null) return;
 
+    ref.read(appLockProvider.notifier).allowNextReturn();
     final picked = await ImagePicker().pickImage(
       source: ImageSource.gallery,
       maxWidth: 512,

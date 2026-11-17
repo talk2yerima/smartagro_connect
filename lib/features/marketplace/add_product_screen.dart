@@ -12,6 +12,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/di/auth_providers.dart';
 import '../../core/di/repositories_provider.dart';
 import '../../core/di/upload_providers.dart';
+import '../../core/services/app_lock.dart';
 import '../../core/utils/money_format.dart';
 import '../../shared/widgets/gradient_button.dart';
 
@@ -199,6 +200,8 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
 
   Future<void> _pickImage(ImageSource source) async {
     try {
+      // Camera/gallery/permission screens are an expected trip: no re-lock.
+      ref.read(appLockProvider.notifier).allowNextReturn();
       final picker = ImagePicker();
       final file = await picker.pickImage(
           source: source, imageQuality: 80, maxWidth: 1200);
@@ -262,6 +265,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
       }
       var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
+        ref.read(appLockProvider.notifier).allowNextReturn();
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
           _showSnack('Location permission denied.');

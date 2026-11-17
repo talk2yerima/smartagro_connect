@@ -17,6 +17,7 @@ import '../../core/di/auth_providers.dart';
 import '../../core/di/firestore_providers.dart';
 import '../../core/di/repositories_provider.dart';
 import '../../core/errors/friendly_error.dart';
+import '../../core/services/app_lock.dart';
 import '../../core/utils/app_logger.dart';
 import '../../domain/entities/chat_models.dart';
 import '../../shared/widgets/app_avatar.dart';
@@ -678,6 +679,8 @@ class _InputBarState extends ConsumerState<_InputBar> {
     HapticFeedback.mediumImpact();
     bool started;
     try {
+      // Camera/gallery/permission screens are an expected trip: no re-lock.
+      ref.read(appLockProvider.notifier).allowNextReturn();
       started = await _recorder.start();
     } catch (e) {
       log.e('[Voice] start failed', error: e);
@@ -810,6 +813,7 @@ class _InputBarState extends ConsumerState<_InputBar> {
       }
       return;
     }
+    ref.read(appLockProvider.notifier).allowNextReturn();
     final picked = await ImagePicker()
         .pickImage(source: ImageSource.gallery, imageQuality: 90);
     if (picked == null || !mounted) return;

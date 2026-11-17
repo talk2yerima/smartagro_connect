@@ -83,6 +83,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       return;
     }
     try {
+      ref.read(appLockProvider.notifier).allowNextReturn();
       await FirebaseMessaging.instance.requestPermission(
         alert: true,
         badge: true,

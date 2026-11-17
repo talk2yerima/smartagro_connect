@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/di/auth_providers.dart';
 import '../../core/di/payment_providers.dart';
+import '../../core/services/app_lock.dart';
 import '../../core/utils/money_format.dart';
 import '../../data/services/payments_api.dart';
 
@@ -115,6 +116,8 @@ class _PaymentSheetState extends ConsumerState<PaymentSheet> {
       );
       _reference = result.reference;
 
+      // The Paystack page is an expected trip: no re-lock on return.
+      ref.read(appLockProvider.notifier).allowNextReturn();
       final opened = await launchUrl(
         Uri.parse(result.authorizationUrl),
         mode: LaunchMode.externalApplication,

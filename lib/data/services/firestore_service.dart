@@ -186,6 +186,7 @@ class FirestoreService {
                 createdAt:
                     (d['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
                 read: d['read'] as bool? ?? false,
+                route: d['route'] as String?,
               );
             }).toList());
   }

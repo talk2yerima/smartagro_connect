@@ -80,6 +80,10 @@ class PushMessagingService {
     // 2. Get device token.
     _fcmToken = await messaging.getToken();
     log.d('[Push] FCM token: $_fcmToken');
+    // Registration runs in the background at start-up, so the screen that
+    // saves the token may already be listening: pass it on now.
+    final token = _fcmToken;
+    if (token != null) onTokenRefresh?.call(token);
 
     // Refresh token when FCM rotates it.
     messaging.onTokenRefresh.listen((token) {

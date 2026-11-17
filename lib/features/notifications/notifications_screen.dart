@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/di/auth_providers.dart';
@@ -24,6 +25,8 @@ const Map<String, _TypeConfig> _typeConfigs = {
       _TypeConfig(icon: Icons.person_add_outlined, color: AppColors.infoBlue),
   'order':
       _TypeConfig(icon: Icons.inventory_2_outlined, color: AppColors.deepGreen),
+  'message': _TypeConfig(
+      icon: Icons.chat_bubble_outline_rounded, color: AppColors.infoBlue),
   'system': _TypeConfig(icon: Icons.info_outline, color: AppColors.gray),
 };
 
@@ -240,7 +243,12 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
             textTheme: textTheme,
             animIndex: animIndex,
             formatTime: _formatTime,
-            onTap: () => _markRead(n.notification.id),
+            onTap: () {
+              _markRead(n.notification.id);
+              // Open what it's about (e.g. the order), if anything.
+              final route = n.notification.route;
+              if (route != null && route.isNotEmpty) context.push(route);
+            },
           );
         }
         cursor++;
