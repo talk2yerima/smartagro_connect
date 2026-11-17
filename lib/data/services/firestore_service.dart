@@ -27,6 +27,12 @@ class FirestoreService {
 
   FirebaseFirestore get _db => FirebaseFirestore.instance;
 
+  // Caps on how much one screen downloads: data is expensive for most users.
+  static const chatMessageLimit = 100;
+  static const chatThreadLimit = 50;
+  static const productLimit = 200;
+  static const buyerLimit = 50;
+
   /// How long to wait for the server to confirm a write. Firestore applies
   /// writes to its local cache at once and keeps retrying in the background,
   /// but the returned future only completes when the server answers, which
@@ -268,6 +274,8 @@ class FirestoreService {
           .collection('products')
           .where('status', isEqualTo: 'active')
           .orderBy('createdAt', descending: true)
+          // Safety cap until the marketplace pages through results.
+          .limit(productLimit)
           .get();
       return snap.docs.map((doc) {
         final data = doc.data();
@@ -298,6 +306,7 @@ class FirestoreService {
         .collection('chats')
         .where('participants', arrayContains: uid)
         .orderBy('updatedAt', descending: true)
+        .limit(chatThreadLimit)
         .snapshots()
         .map((snap) => snap.docs.map((doc) {
               final data = doc.data();
@@ -335,9 +344,13 @@ class FirestoreService {
         .collection('chats')
         .doc(threadId)
         .collection('messages')
-        .orderBy('sentAt', descending: false)
+        // Newest first + limit, so opening a long chat downloads only the
+        // recent messages (it used to stream the entire history).
+        .orderBy('sentAt', descending: true)
+        .limit(chatMessageLimit)
         .snapshots()
-        .map((snap) => snap.docs.map((doc) {
+        .map((snap) => snap.docs
+            .map((doc) {
               final data = doc.data();
               final fromId = data['fromId'] as String? ?? '';
               final ts = data['sentAt'];
@@ -356,7 +369,11 @@ class FirestoreService {
                 kind: kind,
                 imageUrl: data['imageUrl'] as String?,
               );
-            }).toList());
+            })
+            // Back to oldest-first for display.
+            .toList()
+            .reversed
+            .toList());
   }
 
   Future<void> sendChatMessage({
@@ -662,8 +679,11 @@ class FirestoreService {
   Future<List<Map<String, dynamic>>> fetchBuyers() async {
     if (!isAvailable) return [];
     try {
-      final snap =
-          await _db.collection('users').where('role', isEqualTo: 'buyer').get();
+      final snap = await _db
+          .collection('users')
+          .where('role', isEqualTo: 'buyer')
+          .limit(buyerLimit)
+          .get();
       return snap.docs.map((doc) {
         final data = doc.data();
         return <String, dynamic>{'id': doc.id, ...data};

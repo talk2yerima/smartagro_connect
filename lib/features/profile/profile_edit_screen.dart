@@ -9,7 +9,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/constants/app_colors.dart';
 import '../../core/di/auth_providers.dart';
+import '../../core/errors/friendly_error.dart';
 import '../../shared/widgets/app_avatar.dart';
 
 class ProfileEditScreen extends ConsumerStatefulWidget {
@@ -27,8 +29,8 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   bool _saving = false;
   bool _uploadingAvatar = false;
 
-  static const _green = Color(0xFF2E7D32);
-  static const _darkGreen = Color(0xFF1B5E20);
+  static const _green = AppColors.emerald;
+  static const _darkGreen = AppColors.deepGreen;
 
   @override
   void initState() {
@@ -70,7 +72,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.toString()),
+            content: Text(friendlyError(e)),
             backgroundColor: Colors.red.shade700,
             behavior: SnackBarBehavior.floating,
           ),
@@ -134,7 +136,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Upload failed: $e'),
+            content: Text('Upload failed. ${friendlyError(e)}'),
             backgroundColor: Colors.red.shade700,
             behavior: SnackBarBehavior.floating,
           ),
@@ -151,12 +153,11 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor:
-          isDark ? const Color(0xFF121212) : const Color(0xFFF8FAF5),
+      backgroundColor: isDark ? AppColors.darkBg : AppColors.softWhite,
       appBar: AppBar(
         elevation: 0,
         scrolledUnderElevation: 0.5,
-        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        backgroundColor: isDark ? AppColors.cardDark : Colors.white,
         title: const Text(
           'Edit Profile',
           style: TextStyle(
@@ -224,7 +225,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                             width: 32,
                             height: 32,
                             decoration: BoxDecoration(
-                              color: const Color(0xFFF9A825),
+                              color: AppColors.golden,
                               shape: BoxShape.circle,
                               border: Border.all(color: Colors.white, width: 2),
                             ),
@@ -424,7 +425,7 @@ class _Field extends StatelessWidget {
         hintText: hint,
         prefixIcon: Icon(icon, size: 20),
         filled: true,
-        fillColor: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+        fillColor: isDark ? AppColors.darkSurface : Colors.white,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
@@ -439,7 +440,7 @@ class _Field extends StatelessWidget {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 1.5),
+          borderSide: const BorderSide(color: AppColors.emerald, width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),

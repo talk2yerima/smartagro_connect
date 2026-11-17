@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/di/auth_providers.dart';
 import '../../core/errors/failures.dart';
+import '../../core/errors/friendly_error.dart';
 import '../../shared/widgets/gradient_button.dart';
 
 /// OTP verification UI (demo validation; wire to SMS provider in production).
@@ -37,7 +38,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
     } on Failure catch (e) {
       setState(() => _error = e.message);
     } catch (e) {
-      setState(() => _error = e.toString());
+      setState(() => _error = friendlyError(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }

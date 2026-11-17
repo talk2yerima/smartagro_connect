@@ -5,7 +5,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'app.dart';
 import 'core/utils/app_logger.dart';
@@ -20,6 +22,10 @@ void main() {
 
 Future<void> _boot() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Fonts ship inside the app (assets/fonts). Never fetch them at runtime:
+  // that cost mobile data and made text jump when the font arrived.
+  GoogleFonts.config.allowRuntimeFetching = false;
+  LicenseRegistry.addLicense(_fontLicenses);
   await _tryInitFirebase();
   _setupCrashlytics();
 
@@ -29,6 +35,18 @@ Future<void> _boot() async {
       child: SmartAgroConnectApp(),
     ),
   );
+}
+
+/// The bundled fonts are under the SIL Open Font License, which asks that
+/// the licence travels with them; it shows in Settings → licences.
+Stream<LicenseEntry> _fontLicenses() async* {
+  for (final (family, file) in [
+    ('Poppins', 'assets/fonts/OFL-Poppins.txt'),
+    ('Inter', 'assets/fonts/OFL-Inter.txt'),
+  ]) {
+    final text = await rootBundle.loadString(file);
+    yield LicenseEntryWithLineBreaks([family], text);
+  }
 }
 
 // ── Zone-level uncaught error handler ─────────────────────────────────────────

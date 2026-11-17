@@ -14,10 +14,10 @@ import '../../shared/widgets/status_badge.dart';
 // ─── Card box decoration helper ─────────────────────────────────────────────
 
 BoxDecoration _card(bool isDark) => BoxDecoration(
-      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      color: isDark ? AppColors.cardDark : Colors.white,
       borderRadius: BorderRadius.circular(12),
       border: Border.all(
-        color: isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0),
+        color: isDark ? AppColors.darkBorder : AppColors.borderLight,
       ),
       boxShadow: [
         BoxShadow(
@@ -123,7 +123,7 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
       appBar: AppBar(
         elevation: 0,
         scrolledUnderElevation: 0.5,
-        backgroundColor: isDark ? const Color(0xFF121212) : Colors.white,
+        backgroundColor: isDark ? AppColors.darkBg : Colors.white,
         title: const Text(
           'Admin Console',
           style: TextStyle(
@@ -693,7 +693,7 @@ class _ActivityRow extends StatelessWidget {
             height: 1,
             indent: 64,
             endIndent: 16,
-            color: isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0),
+            color: isDark ? AppColors.darkBorder : AppColors.borderLight,
           ),
       ],
     );
@@ -819,7 +819,7 @@ class _StatusRow extends StatelessWidget {
         if (showDivider)
           Divider(
             height: 1,
-            color: isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0),
+            color: isDark ? AppColors.darkBorder : AppColors.borderLight,
           ),
       ],
     );

@@ -36,7 +36,7 @@ const _kPages = [
     icon: Icons.storefront_rounded,
     title: AppStrings.onboarding1Title,
     body: AppStrings.onboarding1Body,
-    gradientStart: Color(0xFF1B5E20),
+    gradientStart: AppColors.deepGreen,
     gradientEnd: Color(0xFF388E3C),
     accent: AppColors.golden,
     decorIcon: Icons.grain_rounded,

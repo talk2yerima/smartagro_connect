@@ -24,12 +24,11 @@ class ProfileScreen extends ConsumerWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor:
-          isDark ? const Color(0xFF121212) : const Color(0xFFF8FAF5),
+      backgroundColor: isDark ? AppColors.darkBg : AppColors.softWhite,
       appBar: AppBar(
         elevation: 0,
         scrolledUnderElevation: 0.5,
-        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        backgroundColor: isDark ? AppColors.cardDark : Colors.white,
         title: const Text(
           'Profile',
           style: TextStyle(
@@ -51,7 +50,7 @@ class ProfileScreen extends ConsumerWidget {
         ],
       ),
       body: RefreshIndicator(
-        color: const Color(0xFF2E7D32),
+        color: AppColors.emerald,
         onRefresh: () async {
           await Future.wait([
             ref.refresh(myListingsProvider.future),
@@ -166,7 +165,7 @@ class _HeroSection extends StatelessWidget {
       width: double.infinity,
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF1B5E20), Color(0xFF2E7D32)],
+          colors: [AppColors.deepGreen, AppColors.emerald],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -192,7 +191,7 @@ class _HeroSection extends StatelessWidget {
                     width: 28,
                     height: 28,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF9A825),
+                      color: AppColors.golden,
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white, width: 2),
                     ),
@@ -256,7 +255,7 @@ class _HeroSection extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(Icons.verified_rounded,
-                    size: 16, color: Color(0xFF00C853)),
+                    size: 16, color: AppColors.mintGreen),
                 SizedBox(width: 4),
                 Text(
                   'Verified Account',
@@ -284,7 +283,7 @@ class _HeroSection extends StatelessWidget {
                           ? Icons.star_half_rounded
                           : Icons.star_outline_rounded,
                   size: 20,
-                  color: const Color(0xFFF9A825),
+                  color: AppColors.golden,
                 ),
               const SizedBox(width: 6),
               Text(
@@ -315,9 +314,9 @@ class _StatsRow extends ConsumerWidget {
 
   BoxDecoration get _card => isDark
       ? BoxDecoration(
-          color: const Color(0xFF1E1E1E),
+          color: AppColors.cardDark,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF2E3C2E)),
+          border: Border.all(color: AppColors.darkBorder),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.22),
@@ -329,7 +328,7 @@ class _StatsRow extends ConsumerWidget {
       : BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFE2EAE0)),
+          border: Border.all(color: AppColors.borderLight),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.05),
@@ -376,8 +375,8 @@ class _StatsRow extends ConsumerWidget {
                     : Border(
                         right: BorderSide(
                           color: isDark
-                              ? const Color(0xFF2E3C2E)
-                              : const Color(0xFFE2EAE0),
+                              ? AppColors.darkBorder
+                              : AppColors.borderLight,
                         ),
                       ),
               ),
@@ -389,7 +388,7 @@ class _StatsRow extends ConsumerWidget {
                       fontFamily: 'Poppins',
                       fontWeight: FontWeight.w800,
                       fontSize: 20,
-                      color: Color(0xFF1B5E20),
+                      color: AppColors.deepGreen,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -399,9 +398,7 @@ class _StatsRow extends ConsumerWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 11,
-                      color: isDark
-                          ? const Color(0xFF9CA3AF)
-                          : const Color(0xFF6B7280),
+                      color: isDark ? AppColors.silver : AppColors.gray,
                     ),
                   ),
                 ],
@@ -432,9 +429,9 @@ class _ContactCard extends StatelessWidget {
 
   BoxDecoration get _card => isDark
       ? BoxDecoration(
-          color: const Color(0xFF1E1E1E),
+          color: AppColors.cardDark,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF2E3C2E)),
+          border: Border.all(color: AppColors.darkBorder),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.22),
@@ -446,7 +443,7 @@ class _ContactCard extends StatelessWidget {
       : BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFE2EAE0)),
+          border: Border.all(color: AppColors.borderLight),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.05),
@@ -458,10 +455,9 @@ class _ContactCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textColor =
-        isDark ? const Color(0xFFF8FAF5) : const Color(0xFF1F2937);
-    final subColor = isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280);
-    final iconColor = const Color(0xFF2E7D32);
+    final textColor = isDark ? AppColors.softWhite : AppColors.charcoal;
+    final subColor = isDark ? AppColors.silver : AppColors.gray;
+    final iconColor = AppColors.emerald;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -477,7 +473,7 @@ class _ContactCard extends StatelessWidget {
                   width: 38,
                   height: 38,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1B5E20).withValues(alpha: 0.1),
+                    color: AppColors.deepGreen.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(Icons.email_outlined, size: 18, color: iconColor),
@@ -504,15 +500,14 @@ class _ContactCard extends StatelessWidget {
                 height: 1,
                 indent: 16,
                 endIndent: 16,
-                color:
-                    isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0),
+                color: isDark ? AppColors.darkBorder : AppColors.borderLight,
               ),
               ListTile(
                 leading: Container(
                   width: 38,
                   height: 38,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1B5E20).withValues(alpha: 0.1),
+                    color: AppColors.deepGreen.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(Icons.phone_outlined, size: 18, color: iconColor),
@@ -540,16 +535,14 @@ class _ContactCard extends StatelessWidget {
                   height: 1,
                   indent: 16,
                   endIndent: 16,
-                  color: isDark
-                      ? const Color(0xFF2E3C2E)
-                      : const Color(0xFFE2EAE0),
+                  color: isDark ? AppColors.darkBorder : AppColors.borderLight,
                 ),
                 ListTile(
                   leading: Container(
                     width: 38,
                     height: 38,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1B5E20).withValues(alpha: 0.1),
+                      color: AppColors.deepGreen.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(Icons.location_on_outlined,
@@ -591,9 +584,9 @@ class _VerificationCard extends StatelessWidget {
 
   BoxDecoration get _card => isDark
       ? BoxDecoration(
-          color: const Color(0xFF1E1E1E),
+          color: AppColors.cardDark,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF2E3C2E)),
+          border: Border.all(color: AppColors.darkBorder),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.22),
@@ -605,7 +598,7 @@ class _VerificationCard extends StatelessWidget {
       : BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFE2EAE0)),
+          border: Border.all(color: AppColors.borderLight),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.05),
@@ -653,8 +646,8 @@ class _VerificationCard extends StatelessWidget {
                       height: 38,
                       decoration: BoxDecoration(
                         color: item.verified
-                            ? const Color(0xFF00C853).withValues(alpha: 0.12)
-                            : const Color(0xFFF9A825).withValues(alpha: 0.12),
+                            ? AppColors.mintGreen.withValues(alpha: 0.12)
+                            : AppColors.golden.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(
@@ -663,8 +656,8 @@ class _VerificationCard extends StatelessWidget {
                             : Icons.hourglass_top_rounded,
                         size: 18,
                         color: item.verified
-                            ? const Color(0xFF00C853)
-                            : const Color(0xFFF9A825),
+                            ? AppColors.mintGreen
+                            : AppColors.golden,
                       ),
                     ),
                     title: Text(
@@ -674,9 +667,8 @@ class _VerificationCard extends StatelessWidget {
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 14,
-                        color: isDark
-                            ? const Color(0xFFF8FAF5)
-                            : const Color(0xFF1F2937),
+                        color:
+                            isDark ? AppColors.softWhite : AppColors.charcoal,
                       ),
                     ),
                     subtitle: Text(
@@ -685,16 +677,14 @@ class _VerificationCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 12,
-                        color: isDark
-                            ? const Color(0xFF9CA3AF)
-                            : const Color(0xFF6B7280),
+                        color: isDark ? AppColors.silver : AppColors.gray,
                       ),
                     ),
                     trailing: StatusBadge(
                       label: item.verified ? 'Verified' : 'Pending',
                       color: item.verified
-                          ? const Color(0xFF00C853)
-                          : const Color(0xFFF9A825),
+                          ? AppColors.mintGreen
+                          : AppColors.golden,
                     ),
                   ),
                   if (!isLast)
@@ -702,9 +692,8 @@ class _VerificationCard extends StatelessWidget {
                       height: 1,
                       indent: 16,
                       endIndent: 16,
-                      color: isDark
-                          ? const Color(0xFF2E3C2E)
-                          : const Color(0xFFE2EAE0),
+                      color:
+                          isDark ? AppColors.darkBorder : AppColors.borderLight,
                     ),
                 ],
               );
@@ -738,9 +727,9 @@ class _MyListingsCard extends StatelessWidget {
 
   BoxDecoration get _card => isDark
       ? BoxDecoration(
-          color: const Color(0xFF1E1E1E),
+          color: AppColors.cardDark,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF2E3C2E)),
+          border: Border.all(color: AppColors.darkBorder),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.22),
@@ -752,7 +741,7 @@ class _MyListingsCard extends StatelessWidget {
       : BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFE2EAE0)),
+          border: Border.all(color: AppColors.borderLight),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.05),
@@ -776,13 +765,13 @@ class _MyListingsCard extends StatelessWidget {
               width: 38,
               height: 38,
               decoration: BoxDecoration(
-                color: const Color(0xFF1B5E20).withValues(alpha: 0.1),
+                color: AppColors.deepGreen.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Icon(
                 Icons.inventory_2_outlined,
                 size: 18,
-                color: Color(0xFF2E7D32),
+                color: AppColors.emerald,
               ),
             ),
             title: Text(
@@ -790,8 +779,7 @@ class _MyListingsCard extends StatelessWidget {
               style: TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: 14,
-                color:
-                    isDark ? const Color(0xFFF8FAF5) : const Color(0xFF1F2937),
+                color: isDark ? AppColors.softWhite : AppColors.charcoal,
               ),
             ),
             subtitle: Text(
@@ -800,13 +788,12 @@ class _MyListingsCard extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 12,
-                color:
-                    isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+                color: isDark ? AppColors.silver : AppColors.gray,
               ),
             ),
             trailing: const Icon(
               Icons.chevron_right_rounded,
-              color: Color(0xFF2E7D32),
+              color: AppColors.emerald,
             ),
             onTap: () => context.push('/my-listings'),
           ),
@@ -837,9 +824,9 @@ class _QuickLinkTile extends StatelessWidget {
 
   BoxDecoration get _card => isDark
       ? BoxDecoration(
-          color: const Color(0xFF1E1E1E),
+          color: AppColors.cardDark,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF2E3C2E)),
+          border: Border.all(color: AppColors.darkBorder),
           boxShadow: [
             BoxShadow(
                 color: Colors.black.withValues(alpha: 0.22),
@@ -850,7 +837,7 @@ class _QuickLinkTile extends StatelessWidget {
       : BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFE2EAE0)),
+          border: Border.all(color: AppColors.borderLight),
           boxShadow: [
             BoxShadow(
                 color: Colors.black.withValues(alpha: 0.05),
@@ -879,7 +866,7 @@ class _QuickLinkTile extends StatelessWidget {
           style: TextStyle(
             fontWeight: FontWeight.w600,
             fontSize: 14,
-            color: isDark ? const Color(0xFFF8FAF5) : const Color(0xFF1F2937),
+            color: isDark ? AppColors.softWhite : AppColors.charcoal,
           ),
         ),
         subtitle: Text(
@@ -888,7 +875,7 @@ class _QuickLinkTile extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
             fontSize: 12,
-            color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+            color: isDark ? AppColors.silver : AppColors.gray,
           ),
         ),
         trailing:
@@ -910,9 +897,9 @@ class _RecentActivity extends ConsumerWidget {
 
   BoxDecoration get _card => isDark
       ? BoxDecoration(
-          color: const Color(0xFF1E1E1E),
+          color: AppColors.cardDark,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF2E3C2E)),
+          border: Border.all(color: AppColors.darkBorder),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.22),
@@ -924,7 +911,7 @@ class _RecentActivity extends ConsumerWidget {
       : BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFE2EAE0)),
+          border: Border.all(color: AppColors.borderLight),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.05),
@@ -950,13 +937,13 @@ class _RecentActivity extends ConsumerWidget {
   Color _colorFor(String type) {
     switch (type) {
       case 'price_alert':
-        return const Color(0xFFF9A825);
+        return AppColors.golden;
       case 'new_buyer':
-        return const Color(0xFF0277BD);
+        return AppColors.infoBlue;
       case 'order':
-        return const Color(0xFF2E7D32);
+        return AppColors.emerald;
       default:
-        return const Color(0xFF6B7280);
+        return AppColors.gray;
     }
   }
 
@@ -980,7 +967,7 @@ class _RecentActivity extends ConsumerWidget {
         height: 80,
         child: const Center(
           child: CircularProgressIndicator(
-              strokeWidth: 2, color: Color(0xFF2E7D32)),
+              strokeWidth: 2, color: AppColors.emerald),
         ),
       ),
       error: (_, __) => body = const SizedBox.shrink(),
@@ -995,9 +982,7 @@ class _RecentActivity extends ConsumerWidget {
                 'No recent activity yet',
                 style: TextStyle(
                   fontSize: 13,
-                  color: isDark
-                      ? const Color(0xFF9CA3AF)
-                      : const Color(0xFF6B7280),
+                  color: isDark ? AppColors.silver : AppColors.gray,
                 ),
               ),
             ),
@@ -1033,9 +1018,8 @@ class _RecentActivity extends ConsumerWidget {
                       style: TextStyle(
                         fontWeight: FontWeight.w500,
                         fontSize: 13,
-                        color: isDark
-                            ? const Color(0xFFF8FAF5)
-                            : const Color(0xFF1F2937),
+                        color:
+                            isDark ? AppColors.softWhite : AppColors.charcoal,
                       ),
                     ),
                     subtitle: Text(
@@ -1044,18 +1028,14 @@ class _RecentActivity extends ConsumerWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 11,
-                        color: isDark
-                            ? const Color(0xFF9CA3AF)
-                            : const Color(0xFF6B7280),
+                        color: isDark ? AppColors.silver : AppColors.gray,
                       ),
                     ),
                     trailing: Text(
                       _timeAgo(n.createdAt),
                       style: TextStyle(
                         fontSize: 10,
-                        color: isDark
-                            ? const Color(0xFF9CA3AF)
-                            : const Color(0xFF6B7280),
+                        color: isDark ? AppColors.silver : AppColors.gray,
                       ),
                     ),
                   ),
@@ -1064,9 +1044,8 @@ class _RecentActivity extends ConsumerWidget {
                       height: 1,
                       indent: 16,
                       endIndent: 16,
-                      color: isDark
-                          ? const Color(0xFF2E3C2E)
-                          : const Color(0xFFE2EAE0),
+                      color:
+                          isDark ? AppColors.darkBorder : AppColors.borderLight,
                     ),
                 ],
               )
@@ -1106,10 +1085,9 @@ class _DangerZone extends StatelessWidget {
 
   BoxDecoration get _card => isDark
       ? BoxDecoration(
-          color: const Color(0xFF1E1E1E),
+          color: AppColors.cardDark,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-              color: const Color(0xFFC62828).withValues(alpha: 0.30)),
+          border: Border.all(color: AppColors.errorRed.withValues(alpha: 0.30)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.22),
@@ -1121,8 +1099,7 @@ class _DangerZone extends StatelessWidget {
       : BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-              color: const Color(0xFFC62828).withValues(alpha: 0.25)),
+          border: Border.all(color: AppColors.errorRed.withValues(alpha: 0.25)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.05),
@@ -1151,7 +1128,7 @@ class _DangerZone extends StatelessWidget {
           ),
           TextButton(
             style: TextButton.styleFrom(
-              foregroundColor: const Color(0xFFC62828),
+              foregroundColor: AppColors.errorRed,
             ),
             onPressed: () => Navigator.of(ctx).pop(true),
             child: const Text('Sign Out'),
@@ -1180,13 +1157,13 @@ class _DangerZone extends StatelessWidget {
               width: 38,
               height: 38,
               decoration: BoxDecoration(
-                color: const Color(0xFFC62828).withValues(alpha: 0.10),
+                color: AppColors.errorRed.withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Icon(
                 Icons.logout_rounded,
                 size: 18,
-                color: Color(0xFFC62828),
+                color: AppColors.errorRed,
               ),
             ),
             title: const Text(
@@ -1194,7 +1171,7 @@ class _DangerZone extends StatelessWidget {
               style: TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: 14,
-                color: Color(0xFFC62828),
+                color: AppColors.errorRed,
               ),
             ),
             subtitle: Text(
@@ -1203,13 +1180,12 @@ class _DangerZone extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 12,
-                color:
-                    isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+                color: isDark ? AppColors.silver : AppColors.gray,
               ),
             ),
             trailing: const Icon(
               Icons.chevron_right_rounded,
-              color: Color(0xFFC62828),
+              color: AppColors.errorRed,
             ),
             onTap: _handleSignOut,
           ),

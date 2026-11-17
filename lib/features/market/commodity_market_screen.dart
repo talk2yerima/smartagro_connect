@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/di/repositories_provider.dart';
+import '../../core/errors/friendly_error.dart';
 import '../../core/utils/money_format.dart';
 import '../../domain/entities/commodity.dart';
 import '../../shared/widgets/connectivity_banner.dart';
@@ -19,10 +20,10 @@ import '../../shared/widgets/sparkline_chart.dart';
 // Local card decoration helper
 // ---------------------------------------------------------------------------
 BoxDecoration _card(bool isDark) => BoxDecoration(
-      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      color: isDark ? AppColors.cardDark : Colors.white,
       borderRadius: BorderRadius.circular(12),
       border: Border.all(
-        color: isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0),
+        color: isDark ? AppColors.darkBorder : AppColors.borderLight,
       ),
       boxShadow: [
         BoxShadow(
@@ -85,21 +86,21 @@ IconData _categoryIcon(String category) {
 Color _categoryColor(String category) {
   switch (category.toLowerCase()) {
     case 'grains':
-      return const Color(0xFFF9A825);
+      return AppColors.golden;
     case 'tubers':
-      return const Color(0xFFFB8C00);
+      return AppColors.warmOrange;
     case 'vegetables':
-      return const Color(0xFF4CAF50);
+      return AppColors.freshGreen;
     case 'fruits':
-      return const Color(0xFF2E7D32);
+      return AppColors.emerald;
     case 'oils':
-      return const Color(0xFF0277BD);
+      return AppColors.infoBlue;
     case 'legumes':
-      return const Color(0xFF00C853);
+      return AppColors.mintGreen;
     case 'spices':
-      return const Color(0xFFC62828);
+      return AppColors.errorRed;
     default:
-      return const Color(0xFF2E7D32);
+      return AppColors.emerald;
   }
 }
 
@@ -246,7 +247,7 @@ class _CommodityMarketScreenState extends ConsumerState<CommodityMarketScreen> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        '$e',
+                        friendlyError(e),
                         textAlign: TextAlign.center,
                         maxLines: 3,
                         overflow: TextOverflow.ellipsis,
@@ -550,7 +551,7 @@ class _MarketSummaryStrip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [Color(0xFF1B5E20), Color(0xFF2E7D32)],
+            colors: [AppColors.deepGreen, AppColors.emerald],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -564,41 +565,49 @@ class _MarketSummaryStrip extends StatelessWidget {
               color: AppColors.mintGreen,
             ),
             const SizedBox(width: 6),
+            // Short labels so all three fit on one line at phone width
+            // ("9 commodities live" used to be cut to "9 commoditi...").
+            Text(
+              '${summary.count} prices',
+              maxLines: 1,
+              style: const TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+            _divider(),
+            Icon(
+              avgUp ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+              size: 13,
+              color: Colors.white,
+            ),
+            Text(
+              'Avg $avgText',
+              maxLines: 1,
+              // White, not bright green: green on the green bar was hard to
+              // read; the arrow carries the direction.
+              style: const TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+            _divider(),
             Expanded(
               child: Text(
-                '${summary.count} commodities live',
+                'Updated ${_relTime()}',
+                textAlign: TextAlign.end,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontFamily: 'Poppins',
                   fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white70,
                 ),
-              ),
-            ),
-            _divider(),
-            Text(
-              'Avg move: $avgText',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: avgUp ? AppColors.mintGreen : const Color(0xFFEF9A9A),
-              ),
-            ),
-            _divider(),
-            Text(
-              'Updated ${_relTime()}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-                color: Colors.white70,
               ),
             ),
           ],

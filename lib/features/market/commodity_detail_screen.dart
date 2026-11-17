@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/di/repositories_provider.dart';
+import '../../core/errors/friendly_error.dart';
 import '../../core/utils/money_format.dart';
 import '../../domain/entities/commodity.dart';
 import '../../shared/widgets/empty_state.dart';
@@ -16,10 +17,10 @@ import '../../shared/widgets/stat_card.dart';
 // ─── Local card decoration helper ────────────────────────────────────────────
 
 BoxDecoration _card(bool isDark) => BoxDecoration(
-      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      color: isDark ? AppColors.cardDark : Colors.white,
       borderRadius: BorderRadius.circular(12),
       border: Border.all(
-        color: isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0),
+        color: isDark ? AppColors.darkBorder : AppColors.borderLight,
       ),
       boxShadow: [
         BoxShadow(
@@ -73,7 +74,7 @@ class CommodityDetailScreen extends ConsumerWidget {
         body: EmptyState(
           icon: Icons.error_outline_rounded,
           title: 'Failed to load',
-          subtitle: e.toString(),
+          subtitle: friendlyError(e),
           actionLabel: 'Retry',
           onAction: () => ref.invalidate(commoditiesProvider),
         ),
@@ -197,14 +198,14 @@ class _HeroPriceCard extends StatelessWidget {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF1B5E20), Color(0xFF2E7D32)],
+          colors: [AppColors.deepGreen, AppColors.emerald],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF1B5E20).withValues(alpha: 0.38),
+            color: AppColors.deepGreen.withValues(alpha: 0.38),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -482,7 +483,7 @@ class _MarketStatsGrid extends StatelessWidget {
       _StatEntry(
         label: 'Current Price',
         value: formatNgn(commodity.priceNgn),
-        icon: Icons.monetization_on_outlined,
+        icon: Icons.sell_outlined,
         color: AppColors.deepGreen,
         trend: null,
       ),
@@ -694,7 +695,7 @@ class _DetailsCard extends StatelessWidget {
           Divider(
             height: 1,
             thickness: 1,
-            color: isDark ? const Color(0xFF2E3C2E) : AppColors.borderLight,
+            color: isDark ? AppColors.darkBorder : AppColors.borderLight,
           ),
       ],
     );
@@ -868,7 +869,7 @@ class _PriceAlertSheetState extends State<_PriceAlertSheet> {
             keyboardType: TextInputType.number,
             decoration: InputDecoration(
               labelText: 'Target price (₦)',
-              prefixIcon: const Icon(Icons.monetization_on_outlined, size: 20),
+              prefixIcon: const Icon(Icons.sell_outlined, size: 20),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -886,7 +887,7 @@ class _PriceAlertSheetState extends State<_PriceAlertSheet> {
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF1B5E20), Color(0xFF2E7D32)],
+                  colors: [AppColors.deepGreen, AppColors.emerald],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),

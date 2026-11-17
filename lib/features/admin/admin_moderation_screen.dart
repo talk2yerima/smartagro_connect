@@ -247,9 +247,8 @@ class _ReportCard extends StatelessWidget {
     final ts = _formatTs(item['reportedAt'] as String?);
     final status = item['status'] as String? ?? 'pending';
     final isPending = status == 'pending';
-    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final borderColor =
-        isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0);
+    final cardColor = isDark ? AppColors.cardDark : Colors.white;
+    final borderColor = isDark ? AppColors.darkBorder : AppColors.borderLight;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/di/repositories_provider.dart';
+import '../../core/errors/friendly_error.dart';
 import '../../core/utils/money_format.dart';
 import '../../domain/entities/commodity.dart';
 import '../../shared/widgets/section_header.dart';
@@ -53,7 +54,7 @@ class MarketTrendsScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  '$e',
+                  friendlyError(e),
                   textAlign: TextAlign.center,
                   style: TextStyle(color: AppColors.subText(isDark)),
                 ),
@@ -255,9 +256,8 @@ class _SummaryCard extends StatelessWidget {
                           ? Icons.arrow_upward_rounded
                           : Icons.arrow_downward_rounded,
                       size: 12,
-                      color: avgUp
-                          ? const Color(0xFF00C853)
-                          : const Color(0xFFEF9A9A),
+                      color:
+                          avgUp ? AppColors.mintGreen : const Color(0xFFEF9A9A),
                     ),
                     const SizedBox(width: 3),
                     Text(
@@ -266,7 +266,7 @@ class _SummaryCard extends StatelessWidget {
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                         color: avgUp
-                            ? const Color(0xFF00C853)
+                            ? AppColors.mintGreen
                             : const Color(0xFFEF9A9A),
                       ),
                     ),
@@ -283,7 +283,7 @@ class _SummaryCard extends StatelessWidget {
                   icon: Icons.trending_up_rounded,
                   label: 'Gainers',
                   value: '$gainers',
-                  chipColor: const Color(0xFF00C853),
+                  chipColor: AppColors.mintGreen,
                 ),
               ),
               const SizedBox(width: 10),
@@ -384,9 +384,9 @@ class _CommodityTrendCard extends StatelessWidget {
   BoxDecoration _card() {
     return isDark
         ? BoxDecoration(
-            color: const Color(0xFF1E1E1E),
+            color: AppColors.cardDark,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF2E3C2E)),
+            border: Border.all(color: AppColors.darkBorder),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.22),
@@ -398,7 +398,7 @@ class _CommodityTrendCard extends StatelessWidget {
         : BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE2EAE0)),
+            border: Border.all(color: AppColors.borderLight),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.05),
@@ -413,8 +413,8 @@ class _CommodityTrendCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = commodity;
     final up = c.changePct >= 0;
-    final pctColor = up ? const Color(0xFF00C853) : const Color(0xFFC62828);
-    final sparkColor = up ? const Color(0xFF00C853) : const Color(0xFFC62828);
+    final pctColor = up ? AppColors.mintGreen : AppColors.errorRed;
+    final sparkColor = up ? AppColors.mintGreen : AppColors.errorRed;
     final sparkData = trendFromChange(c.changePct);
 
     return Container(
@@ -428,17 +428,15 @@ class _CommodityTrendCard extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color:
-                  (isGainer ? const Color(0xFF00C853) : const Color(0xFFC62828))
-                      .withValues(alpha: 0.10),
+              color: (isGainer ? AppColors.mintGreen : AppColors.errorRed)
+                  .withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
               isGainer
                   ? Icons.trending_up_rounded
                   : Icons.trending_down_rounded,
-              color:
-                  isGainer ? const Color(0xFF00C853) : const Color(0xFFC62828),
+              color: isGainer ? AppColors.mintGreen : AppColors.errorRed,
               size: 22,
             ),
           ),
@@ -545,9 +543,9 @@ class _CategoryPerformanceCard extends StatelessWidget {
   BoxDecoration _card() {
     return isDark
         ? BoxDecoration(
-            color: const Color(0xFF1E1E1E),
+            color: AppColors.cardDark,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF2E3C2E)),
+            border: Border.all(color: AppColors.darkBorder),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.22),
@@ -559,7 +557,7 @@ class _CategoryPerformanceCard extends StatelessWidget {
         : BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE2EAE0)),
+            border: Border.all(color: AppColors.borderLight),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.05),
@@ -587,8 +585,7 @@ class _CategoryPerformanceCard extends StatelessWidget {
           final i = entry.key;
           final cat = entry.value;
           final up = cat.avg >= 0;
-          final barColor =
-              up ? const Color(0xFF00C853) : const Color(0xFFC62828);
+          final barColor = up ? AppColors.mintGreen : AppColors.errorRed;
           final barFraction = cat.avg.abs() / effectiveMax;
 
           return Padding(

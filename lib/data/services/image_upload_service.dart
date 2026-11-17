@@ -1,11 +1,8 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:firebase_core/firebase_core.dart' show Firebase;
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:flutter_image_compress/flutter_image_compress.dart';
 
 /// Uploads product images to Firebase Storage (production) or simulates
 /// progress for demo / dev mode.
@@ -64,18 +61,16 @@ class ImageUploadService {
     final ref = FirebaseStorage.instance
         .ref('product_images/${userId ?? 'anon'}/$productId.jpg');
 
-    final Uint8List? compressed =
-        (!kIsWeb && (Platform.isAndroid || Platform.isIOS || Platform.isMacOS))
-            ? await FlutterImageCompress.compressWithFile(
-                filePath,
-                minWidth: 1080,
-                minHeight: 1080,
-                quality: 82,
-              )
-            : null;
-    final task = compressed != null
-        ? ref.putData(compressed)
-        : ref.putFile(File(filePath));
+    // The photo picker already resized (max 1200 px) and compressed it
+    // (quality 80); compressing again only lost quality and cost time.
+    // Cache headers let phones keep the photo instead of re-downloading it.
+    final task = ref.putFile(
+      File(filePath),
+      SettableMetadata(
+        contentType: 'image/jpeg',
+        cacheControl: 'public, max-age=604800',
+      ),
+    );
 
     StreamSubscription<TaskSnapshot>? sub;
     sub = task.snapshotEvents.listen((snap) {

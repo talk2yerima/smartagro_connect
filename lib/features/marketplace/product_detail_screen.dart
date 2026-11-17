@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -10,10 +9,12 @@ import '../../core/constants/app_colors.dart';
 import '../../core/di/auth_providers.dart';
 import '../../core/di/firestore_providers.dart';
 import '../../core/di/repositories_provider.dart';
+import '../../core/errors/friendly_error.dart';
 import '../../core/utils/money_format.dart';
 import '../../domain/entities/product_listing.dart';
 import '../../shared/widgets/app_avatar.dart';
 import '../../shared/widgets/gradient_button.dart';
+import '../../shared/widgets/produce_image.dart';
 import '../../shared/widgets/section_header.dart';
 import '../../shared/widgets/skeleton_list.dart';
 import '../../shared/widgets/status_badge.dart';
@@ -24,10 +25,10 @@ import '../payment/payment_sheet.dart';
 // ---------------------------------------------------------------------------
 
 BoxDecoration _card(bool isDark) => BoxDecoration(
-      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      color: isDark ? AppColors.cardDark : Colors.white,
       borderRadius: BorderRadius.circular(12),
       border: Border.all(
-        color: isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0),
+        color: isDark ? AppColors.darkBorder : AppColors.borderLight,
       ),
       boxShadow: [
         BoxShadow(
@@ -74,7 +75,7 @@ class ProductDetailScreen extends ConsumerWidget {
         ),
         body: Center(
           child: Text(
-            'Failed to load product.\n$e',
+            'Could not load this product.\n${friendlyError(e)}',
             textAlign: TextAlign.center,
           ),
         ),
@@ -156,7 +157,7 @@ class _ProductDetailViewState extends ConsumerState<_ProductDetailView> {
               20 + MediaQuery.of(ctx).viewInsets.bottom,
             ),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              color: isDark ? AppColors.cardDark : Colors.white,
               borderRadius:
                   const BorderRadius.vertical(top: Radius.circular(24)),
             ),
@@ -375,11 +376,12 @@ class _ProductDetailViewState extends ConsumerState<_ProductDetailView> {
       pinned: true,
       elevation: 0,
       scrolledUnderElevation: 0.5,
-      backgroundColor: isDark ? const Color(0xFF121212) : Colors.white,
+      backgroundColor: isDark ? AppColors.darkBg : Colors.white,
       leading: Padding(
         padding: const EdgeInsets.all(8),
         child: _CircleIconButton(
           icon: Icons.arrow_back_rounded,
+          label: 'Back',
           isDark: isDark,
           onTap: () => context.pop(),
         ),
@@ -389,6 +391,7 @@ class _ProductDetailViewState extends ConsumerState<_ProductDetailView> {
           padding: const EdgeInsets.only(right: 4),
           child: _CircleIconButton(
             icon: Icons.share_rounded,
+            label: 'Share listing',
             isDark: isDark,
             onTap: () async {
               HapticFeedback.lightImpact();
@@ -416,6 +419,7 @@ class _ProductDetailViewState extends ConsumerState<_ProductDetailView> {
         Padding(
           padding: const EdgeInsets.only(right: 4),
           child: _CircleIconButton(
+            label: _bookmarked ? 'Remove from saved' : 'Save listing',
             icon: _bookmarked
                 ? Icons.bookmark_rounded
                 : Icons.bookmark_border_rounded,
@@ -441,6 +445,7 @@ class _ProductDetailViewState extends ConsumerState<_ProductDetailView> {
           padding: const EdgeInsets.only(right: 8),
           child: _CircleIconButton(
             icon: Icons.flag_outlined,
+            label: 'Report listing',
             isDark: isDark,
             onTap: () {
               HapticFeedback.lightImpact();
@@ -456,26 +461,9 @@ class _ProductDetailViewState extends ConsumerState<_ProductDetailView> {
           children: [
             Hero(
               tag: 'product-image-${p.id}',
-              child: CachedNetworkImage(
-                imageUrl: p.imageUrl,
+              child: ProduceImage(
+                url: p.imageUrl,
                 fit: BoxFit.cover,
-                placeholder: (_, __) => Container(
-                  color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
-                  child: const Center(
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: AppColors.deepGreen,
-                    ),
-                  ),
-                ),
-                errorWidget: (_, __, ___) => Container(
-                  color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
-                  child: const Icon(
-                    Icons.image_not_supported_outlined,
-                    size: 48,
-                    color: AppColors.gray,
-                  ),
-                ),
               ),
             ),
             // Bottom gradient overlay
@@ -511,6 +499,7 @@ class _ProductDetailViewState extends ConsumerState<_ProductDetailView> {
 class _CircleIconButton extends StatelessWidget {
   const _CircleIconButton({
     required this.icon,
+    required this.label,
     required this.isDark,
     required this.onTap,
     this.activeColor,
@@ -518,6 +507,9 @@ class _CircleIconButton extends StatelessWidget {
   });
 
   final IconData icon;
+
+  /// Spoken by screen readers and shown on long-press.
+  final String label;
   final bool isDark;
   final VoidCallback onTap;
   final Color? activeColor;
@@ -525,23 +517,40 @@ class _CircleIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Solid enough to stay visible over busy product photos.
     final bgColor = isDark
-        ? Colors.white.withValues(alpha: 0.12)
-        : Colors.black.withValues(alpha: 0.06);
+        ? Colors.black.withValues(alpha: 0.45)
+        : Colors.white.withValues(alpha: 0.88);
     final iconColor = isActive && activeColor != null
         ? activeColor!
         : (isDark ? Colors.white : AppColors.charcoal);
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: bgColor,
-          shape: BoxShape.circle,
+    // 36 px circle drawn inside a 48 px touch area (the minimum
+    // comfortable target); the old 36 px GestureDetector was easy to miss.
+    return Tooltip(
+      message: label,
+      child: Semantics(
+        button: true,
+        label: label,
+        child: InkResponse(
+          onTap: onTap,
+          radius: 24,
+          child: SizedBox(
+            width: 48,
+            height: 48,
+            child: Center(
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: bgColor,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 20, color: iconColor),
+              ),
+            ),
+          ),
         ),
-        child: Icon(icon, size: 20, color: iconColor),
       ),
     );
   }
@@ -576,7 +585,7 @@ class _PriceHeroSection extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  '${formatNgn(product.priceNgn)} / kg',
+                  '${formatNgn(product.priceNgn)} per kg',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
@@ -999,9 +1008,8 @@ class _DetailsCard extends StatelessWidget {
                       : AppColors.softWhite,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: isDark
-                        ? const Color(0xFF2E3C2E)
-                        : AppColors.borderLight,
+                    color:
+                        isDark ? AppColors.darkBorder : AppColors.borderLight,
                   ),
                 ),
                 child: Row(
@@ -1187,26 +1195,11 @@ class _SimilarCard extends StatelessWidget {
             ClipRRect(
               borderRadius:
                   const BorderRadius.vertical(top: Radius.circular(12)),
-              child: CachedNetworkImage(
-                imageUrl: product.imageUrl,
+              child: ProduceImage(
+                url: product.imageUrl,
                 width: 148,
                 height: 90,
                 fit: BoxFit.cover,
-                placeholder: (_, __) => Container(
-                  width: 148,
-                  height: 90,
-                  color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
-                ),
-                errorWidget: (_, __, ___) => Container(
-                  width: 148,
-                  height: 90,
-                  color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
-                  child: const Icon(
-                    Icons.image_not_supported_outlined,
-                    color: AppColors.gray,
-                    size: 28,
-                  ),
-                ),
               ),
             ),
 
@@ -1280,10 +1273,10 @@ class _BottomBar extends ConsumerWidget {
         12 + MediaQuery.of(context).padding.bottom,
       ),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF121212) : Colors.white,
+        color: isDark ? AppColors.darkBg : Colors.white,
         border: Border(
           top: BorderSide(
-            color: isDark ? const Color(0xFF2E3C2E) : AppColors.borderLight,
+            color: isDark ? AppColors.darkBorder : AppColors.borderLight,
             width: 1,
           ),
         ),
@@ -1302,18 +1295,27 @@ class _BottomBar extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
+              // The buyer pays for the whole lot (price per kg x quantity),
+              // so lead with that total; the per-kg price sits underneath.
               Text(
-                'Price per kg',
+                'Total for ${product.quantityKg} kg',
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       color: subTextColor,
                     ),
               ),
               Text(
-                formatNgn(product.priceNgn),
+                formatNgn(product.priceNgn * product.quantityKg),
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontFamily: 'Poppins',
                       fontWeight: FontWeight.w800,
-                      color: AppColors.deepGreen,
+                      color:
+                          isDark ? AppColors.lightGreen : AppColors.deepGreen,
+                    ),
+              ),
+              Text(
+                '${formatNgn(product.priceNgn)} per kg',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: subTextColor,
                     ),
               ),
             ],

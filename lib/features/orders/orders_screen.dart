@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/di/payment_providers.dart';
+import '../../core/errors/friendly_error.dart';
 import '../../core/utils/money_format.dart';
 import '../../data/repositories/transaction_ref_queue.dart';
 import '../../shared/widgets/empty_state.dart';
@@ -23,7 +24,7 @@ class OrdersScreen extends ConsumerWidget {
       appBar: AppBar(
         elevation: 0,
         scrolledUnderElevation: 0.5,
-        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        backgroundColor: isDark ? AppColors.cardDark : Colors.white,
         title: Text(
           'Payment History',
           style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
@@ -33,7 +34,9 @@ class OrdersScreen extends ConsumerWidget {
         loading: () => const Center(
           child: CircularProgressIndicator(color: AppColors.deepGreen),
         ),
-        error: (e, _) => Center(child: Text('Failed to load history.\n$e')),
+        error: (e, _) => Center(
+            child: Text('Could not load your orders.\n${friendlyError(e)}',
+                textAlign: TextAlign.center)),
         data: (refs) {
           if (refs.isEmpty) {
             return const EmptyState(
@@ -72,7 +75,7 @@ class _OrderTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final cardColor = isDark ? AppColors.cardDark : Colors.white;
     final textColor = AppColors.text(isDark);
     final subColor = AppColors.subText(isDark);
 
@@ -83,7 +86,7 @@ class _OrderTile extends StatelessWidget {
         color: cardColor,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0),
+          color: isDark ? AppColors.darkBorder : AppColors.borderLight,
         ),
         boxShadow: [
           BoxShadow(

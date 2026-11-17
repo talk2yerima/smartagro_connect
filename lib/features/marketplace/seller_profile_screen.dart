@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,6 +12,7 @@ import '../../core/utils/money_format.dart';
 import '../../domain/entities/product_listing.dart';
 import '../../shared/widgets/app_avatar.dart';
 import '../../shared/widgets/empty_state.dart';
+import '../../shared/widgets/produce_image.dart';
 
 final _sellerProfileProvider =
     FutureProvider.family<Map<String, dynamic>?, String>(
@@ -360,10 +360,10 @@ class _ListingCard extends StatelessWidget {
       onTap: () => context.push('/marketplace/product/${product.id}'),
       child: Container(
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          color: isDark ? AppColors.cardDark : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0),
+            color: isDark ? AppColors.darkBorder : AppColors.borderLight,
           ),
           boxShadow: [
             BoxShadow(
@@ -388,16 +388,9 @@ class _ListingCard extends StatelessWidget {
                 ),
               ),
               child: product.imageUrl.isNotEmpty
-                  ? CachedNetworkImage(
-                      imageUrl: product.imageUrl,
+                  ? ProduceImage(
+                      url: product.imageUrl,
                       fit: BoxFit.cover,
-                      memCacheWidth: 300,
-                      memCacheHeight: 270,
-                      errorWidget: (_, __, ___) => const Icon(
-                        Icons.image_not_supported_rounded,
-                        color: Colors.white54,
-                        size: 28,
-                      ),
                     )
                   : const Icon(
                       Icons.storefront_rounded,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/constants/app_colors.dart';
 
 class SectionHeader extends StatelessWidget {
   const SectionHeader({
@@ -17,8 +18,7 @@ class SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final titleColor =
-        isDark ? const Color(0xFFF8FAF5) : const Color(0xFF1F2937);
+    final titleColor = isDark ? AppColors.softWhite : AppColors.charcoal;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
@@ -28,7 +28,7 @@ class SectionHeader extends StatelessWidget {
             Icon(
               icon,
               size: 18,
-              color: const Color(0xFF1B5E20),
+              color: AppColors.deepGreen,
             ),
             const SizedBox(width: 6),
           ],
@@ -48,7 +48,7 @@ class SectionHeader extends StatelessWidget {
             TextButton(
               onPressed: onAction,
               style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFF1B5E20),
+                foregroundColor: AppColors.deepGreen,
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -57,7 +57,7 @@ class SectionHeader extends StatelessWidget {
                 actionLabel!,
                 style: Theme.of(context).textTheme.labelMedium?.copyWith(
                       fontWeight: FontWeight.w600,
-                      color: const Color(0xFF1B5E20),
+                      color: AppColors.deepGreen,
                     ),
               ),
             ),

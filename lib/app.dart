@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/config/app_env.dart';
 import 'core/di/initialization_provider.dart';
+import 'core/errors/friendly_error.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 
@@ -109,7 +110,9 @@ class SmartAgroConnectApp extends ConsumerWidget {
       ),
       error: (e, _) => MaterialApp(
         home: Scaffold(
-          body: Center(child: Text('Startup error: $e')),
+          body: Center(
+              child: Text('SmartAgro could not start. ${friendlyError(e)}',
+                  textAlign: TextAlign.center)),
         ),
       ),
     );

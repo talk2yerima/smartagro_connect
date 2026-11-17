@@ -305,9 +305,8 @@ class _NotificationTile extends StatelessWidget {
     final n = item.notification;
     final config = _configFor(n.type);
     final isUnread = !item.read;
-    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final borderColor =
-        isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0);
+    final cardColor = isDark ? AppColors.cardDark : Colors.white;
+    final borderColor = isDark ? AppColors.darkBorder : AppColors.borderLight;
 
     return GestureDetector(
       onTap: onTap,

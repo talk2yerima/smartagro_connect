@@ -12,6 +12,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/di/auth_providers.dart';
 import '../../core/di/repositories_provider.dart';
 import '../../core/di/upload_providers.dart';
+import '../../core/utils/money_format.dart';
 import '../../shared/widgets/gradient_button.dart';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -69,10 +70,10 @@ enum _Availability { inStock, limited, preOrder }
 // ─── Card decoration helper ───────────────────────────────────────────────────
 
 BoxDecoration _card(bool isDark) => BoxDecoration(
-      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      color: isDark ? AppColors.cardDark : Colors.white,
       borderRadius: BorderRadius.circular(12),
       border: Border.all(
-        color: isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0),
+        color: isDark ? AppColors.darkBorder : AppColors.borderLight,
       ),
       boxShadow: [
         BoxShadow(
@@ -128,7 +129,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      backgroundColor: isDark ? AppColors.cardDark : Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -225,7 +226,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
         .read(imageUploadServiceProvider)
         .uploadProductImage(
           filePath: path,
-          productId: 'listing-${path.hashCode.abs()}',
+          // Unique per pick, filed under the seller (was product_images/anon).
+          productId: 'listing-${DateTime.now().millisecondsSinceEpoch}',
+          userId: ref.read(authSessionProvider)?.id,
           onProgress: (p) {
             if (mounted) setState(() => _uploadProgress = p);
           },
@@ -313,8 +316,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
           _Availability.preOrder => 'pre_order',
           _Availability.inStock => 'in_stock',
         },
-        'imageUrl': _uploadedImageUrl ??
-            'https://picsum.photos/seed/${_titleCtrl.text.hashCode}/400/300',
+        // No photo means no photo: listings used to get a random stock
+        // picture (picsum), which looked like the real produce.
+        'imageUrl': _uploadedImageUrl ?? '',
         'lat': 0.0,
         'lng': 0.0,
       };
@@ -337,7 +341,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
               ),
             ],
           ),
-          backgroundColor: const Color(0xFF1B5E20),
+          backgroundColor: AppColors.deepGreen,
           behavior: SnackBarBehavior.floating,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -521,23 +525,24 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                         Expanded(
                           child: _buildTextFormField(
                             controller: _priceCtrl,
-                            label: 'Price (NGN)',
-                            hint: '0.00',
+                            // Per kg: buyers pay price x quantity. Whole naira
+                            // only (decimals passed validation, then crashed
+                            // the save, and the rules reject them anyway).
+                            label: 'Price per kg',
+                            hint: '0',
                             isDark: isDark,
                             prefixText: '₦ ',
-                            keyboardType: const TextInputType.numberWithOptions(
-                                decimal: true),
+                            keyboardType: TextInputType.number,
                             inputFormatters: [
-                              FilteringTextInputFormatter.allow(
-                                  RegExp(r'[\d.]'))
+                              FilteringTextInputFormatter.digitsOnly
                             ],
                             validator: (v) {
                               if (v == null || v.trim().isEmpty) {
-                                return 'Enter price';
+                                return 'Enter the price per kg';
                               }
-                              final parsed = double.tryParse(v.trim());
+                              final parsed = int.tryParse(v.trim());
                               if (parsed == null || parsed <= 0) {
-                                return 'Enter a valid price';
+                                return 'Enter a whole naira amount';
                               }
                               return null;
                             },
@@ -568,6 +573,38 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                           ),
                         ),
                       ],
+                    ),
+                    // Live total, so sellers see what a buyer will pay.
+                    ListenableBuilder(
+                      listenable: Listenable.merge([_priceCtrl, _qtyCtrl]),
+                      builder: (context, _) {
+                        final price = int.tryParse(_priceCtrl.text.trim());
+                        final qty = int.tryParse(_qtyCtrl.text.trim());
+                        if (price == null || qty == null || qty <= 0) {
+                          return const SizedBox.shrink();
+                        }
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: Row(
+                            children: [
+                              Icon(Icons.info_outline_rounded,
+                                  size: 16, color: AppColors.subText(isDark)),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'Buyers pay ${formatNgn(price * qty)} '
+                                  'for all $qty kg',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.text(isDark),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
                     ),
                     const SizedBox(height: 16),
                     _AvailabilitySegment(
@@ -705,10 +742,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
     List<TextInputFormatter>? inputFormatters,
     String? Function(String?)? validator,
   }) {
-    final borderColor =
-        isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0);
+    final borderColor = isDark ? AppColors.darkBorder : AppColors.borderLight;
     final focusColor = AppColors.deepGreen;
-    final fillColor = isDark ? const Color(0xFF121212) : AppColors.surfaceLight;
+    final fillColor = isDark ? AppColors.darkBg : AppColors.surfaceLight;
     final textColor = AppColors.text(isDark);
     final hintColor = AppColors.subText(isDark);
 
@@ -757,9 +793,8 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
   }
 
   Widget _buildCategoryDropdown(bool isDark, Color textPrimary, Color textSub) {
-    final borderColor =
-        isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0);
-    final fillColor = isDark ? const Color(0xFF121212) : AppColors.surfaceLight;
+    final borderColor = isDark ? AppColors.darkBorder : AppColors.borderLight;
+    final fillColor = isDark ? AppColors.darkBg : AppColors.surfaceLight;
 
     return DropdownButtonFormField<String>(
       initialValue: _selectedCategory,
@@ -779,7 +814,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
       onChanged: (v) => setState(() => _selectedCategory = v),
       validator: (v) => v == null ? 'Please select a category' : null,
       style: GoogleFonts.poppins(fontSize: 14, color: textPrimary),
-      dropdownColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      dropdownColor: isDark ? AppColors.cardDark : Colors.white,
       decoration: InputDecoration(
         labelText: 'Category',
         labelStyle: GoogleFonts.poppins(fontSize: 13, color: textSub),
@@ -810,9 +845,8 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
   }
 
   Widget _buildStateDropdown(bool isDark, Color textPrimary, Color textSub) {
-    final borderColor =
-        isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0);
-    final fillColor = isDark ? const Color(0xFF121212) : AppColors.surfaceLight;
+    final borderColor = isDark ? AppColors.darkBorder : AppColors.borderLight;
+    final fillColor = isDark ? AppColors.darkBg : AppColors.surfaceLight;
 
     return DropdownButtonFormField<String>(
       initialValue: _selectedState,
@@ -832,7 +866,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
       onChanged: (v) => setState(() => _selectedState = v),
       validator: (v) => v == null ? 'Please select a state' : null,
       style: GoogleFonts.poppins(fontSize: 14, color: textPrimary),
-      dropdownColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      dropdownColor: isDark ? AppColors.cardDark : Colors.white,
       decoration: InputDecoration(
         labelText: 'State',
         labelStyle: GoogleFonts.poppins(fontSize: 13, color: textSub),
@@ -1048,10 +1082,9 @@ class _AvailabilitySegment extends StatelessWidget {
             selectedBackgroundColor: AppColors.deepGreen,
             selectedForegroundColor: Colors.white,
             foregroundColor: AppColors.subText(isDark),
-            backgroundColor:
-                isDark ? const Color(0xFF121212) : AppColors.surfaceLight,
+            backgroundColor: isDark ? AppColors.darkBg : AppColors.surfaceLight,
             side: BorderSide(
-              color: isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0),
+              color: isDark ? AppColors.darkBorder : AppColors.borderLight,
             ),
             textStyle:
                 GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w500),

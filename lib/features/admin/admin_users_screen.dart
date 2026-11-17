@@ -241,12 +241,12 @@ class _UserCardState extends ConsumerState<_UserCard> {
       decoration: BoxDecoration(
         color: _banned
             ? AppColors.errorRed.withValues(alpha: 0.06)
-            : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
+            : (isDark ? AppColors.cardDark : Colors.white),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: _banned
               ? AppColors.errorRed.withValues(alpha: 0.35)
-              : (isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0)),
+              : (isDark ? AppColors.darkBorder : AppColors.borderLight),
         ),
         boxShadow: [
           BoxShadow(

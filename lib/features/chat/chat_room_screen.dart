@@ -24,8 +24,8 @@ import '../../shared/widgets/status_badge.dart';
 // ---------------------------------------------------------------------------
 // Local state: extra messages appended via the input bar
 // ---------------------------------------------------------------------------
-final _localMessagesProvider =
-    StateProvider.family<List<ChatMessage>, String>((ref, threadId) => []);
+final _localMessagesProvider = StateProvider.autoDispose
+    .family<List<ChatMessage>, String>((ref, threadId) => []);
 
 // ---------------------------------------------------------------------------
 // Date helper
@@ -399,7 +399,7 @@ class _ChatBubble extends StatelessWidget {
 
     final bubbleColor = fromMe
         ? AppColors.deepGreen
-        : (isDark ? const Color(0xFF1E1E1E) : Colors.white);
+        : (isDark ? AppColors.cardDark : Colors.white);
 
     final textColor = fromMe
         ? Colors.white
@@ -842,7 +842,7 @@ class _InputBarState extends ConsumerState<_InputBar> {
 
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        color: isDark ? AppColors.cardDark : Colors.white,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),

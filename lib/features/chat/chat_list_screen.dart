@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/di/repositories_provider.dart';
+import '../../core/errors/friendly_error.dart';
 import '../../domain/entities/chat_models.dart';
 import '../../shared/widgets/app_avatar.dart';
 import '../../shared/widgets/empty_state.dart';
@@ -30,9 +31,9 @@ Color _roleColor(String role) {
 
 BoxDecoration _card(bool isDark) => isDark
     ? BoxDecoration(
-        color: const Color(0xFF1E1E1E),
+        color: AppColors.cardDark,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF2E3C2E)),
+        border: Border.all(color: AppColors.darkBorder),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.22),
@@ -44,7 +45,7 @@ BoxDecoration _card(bool isDark) => isDark
     : BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2EAE0)),
+        border: Border.all(color: AppColors.borderLight),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
@@ -154,7 +155,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
       body: async.when(
         loading: () =>
             const SkeletonList(count: 5, showAvatar: true, height: 72),
-        error: (error, _) => _ErrorBody(error: error.toString()),
+        error: (error, _) => _ErrorBody(error: friendlyError(error)),
         data: (threads) {
           final filtered = _applyFilters(threads);
           return RefreshIndicator(
@@ -398,7 +399,7 @@ class _ThreadTile extends StatelessWidget {
                       color: AppColors.mintGreen,
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                        color: isDark ? AppColors.cardDark : Colors.white,
                         width: 2,
                       ),
                     ),

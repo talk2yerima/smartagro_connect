@@ -15,6 +15,7 @@ import '../../domain/entities/product_listing.dart';
 import '../../shared/widgets/app_avatar.dart';
 import '../../shared/widgets/connectivity_banner.dart';
 import '../../shared/widgets/empty_state.dart';
+import '../../shared/widgets/produce_image.dart';
 import '../../shared/widgets/section_header.dart';
 import '../../shared/widgets/skeleton_list.dart';
 import '../../shared/widgets/sparkline_chart.dart';
@@ -26,10 +27,10 @@ import '../../shared/widgets/status_badge.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 
 BoxDecoration _card(bool isDark) => BoxDecoration(
-      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      color: isDark ? AppColors.cardDark : Colors.white,
       borderRadius: BorderRadius.circular(12),
       border: Border.all(
-        color: isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0),
+        color: isDark ? AppColors.darkBorder : AppColors.borderLight,
       ),
       boxShadow: [
         BoxShadow(
@@ -166,14 +167,19 @@ class DashboardScreen extends ConsumerWidget {
 
                   const SizedBox(height: 16),
 
-                  // [3] KPI GRID
-                  _KpiGrid(
-                    commodities: commodities,
-                    buyers: buyers,
-                    products: products,
-                  ),
-
-                  const SizedBox(height: 16),
+                  // [3] KPI GRID: farmer/buyer numbers. Transporters get
+                  // their own dispatch figures below instead.
+                  if (role != UserRole.transporter) ...[
+                    _KpiGrid(
+                      commodities: commodities,
+                      buyers: buyers,
+                      products: products,
+                      // Farmers see their own listings and stock; "3 active
+                      // listings" next to "1 listing" in My Listings confused.
+                      sellerId: role == UserRole.farmer ? user?.id : null,
+                    ),
+                    const SizedBox(height: 16),
+                  ],
 
                   // Role-specific sections
                   if (role == UserRole.transporter) ...[
@@ -348,7 +354,7 @@ class _HeroBanner extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF1B5E20), Color(0xFF2E7D32)],
+          colors: [AppColors.deepGreen, AppColors.emerald],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -370,14 +376,26 @@ class _HeroBanner extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Two lines: "Good afternoon," on one, the name on the
+                    // next, so the name is no longer cut to "Good aftern...".
                     Text(
-                      '${_greeting()}, ${name.split(' ').first}',
+                      '${_greeting()},',
+                      maxLines: 1,
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontWeight: FontWeight.w500,
+                        fontSize: 13,
+                        color: Colors.white.withValues(alpha: 0.85),
+                      ),
+                    ),
+                    Text(
+                      name.split(' ').first,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontFamily: 'Poppins',
                         fontWeight: FontWeight.w700,
-                        fontSize: 17,
+                        fontSize: 20,
                         color: Colors.white,
                         height: 1.2,
                       ),
@@ -391,10 +409,11 @@ class _HeroBanner extends StatelessWidget {
                   ],
                 ),
               ),
+              // White, not green: green on the green banner was hard to read.
               if (verified)
                 const StatusBadge(
                   label: 'Verified',
-                  color: AppColors.mintGreen,
+                  color: Colors.white,
                   icon: Icons.verified_rounded,
                 ),
             ],
@@ -542,12 +561,11 @@ class _MarketTickerStrip extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                  color: isDark ? AppColors.cardDark : Colors.white,
                   borderRadius: BorderRadius.circular(99),
                   border: Border.all(
-                    color: isDark
-                        ? const Color(0xFF2E3C2E)
-                        : const Color(0xFFE2EAE0),
+                    color:
+                        isDark ? AppColors.darkBorder : AppColors.borderLight,
                   ),
                 ),
                 child: Row(
@@ -630,15 +648,25 @@ class _KpiGrid extends StatelessWidget {
     required this.commodities,
     required this.buyers,
     required this.products,
+    this.sellerId,
   });
 
   final AsyncValue<List<Commodity>> commodities;
   final AsyncValue<List<NearbyBuyer>> buyers;
   final AsyncValue<List<ProductListing>> products;
 
+  /// When set (farmers), listing and stock tiles count only this seller's
+  /// listings; otherwise they cover the whole marketplace.
+  final String? sellerId;
+
   @override
   Widget build(BuildContext context) {
-    final activeListings = products.maybeWhen(
+    final mine = sellerId != null;
+    final scoped = products.whenData(
+      (list) =>
+          mine ? list.where((p) => p.sellerId == sellerId).toList() : list,
+    );
+    final activeListings = scoped.maybeWhen(
       data: (list) => list
           .where((p) => p.availability != ProductAvailability.soldOut)
           .length,
@@ -652,7 +680,7 @@ class _KpiGrid extends StatelessWidget {
       data: _averageChangePct,
       orElse: () => null,
     );
-    final stockKg = products.maybeWhen(
+    final stockKg = scoped.maybeWhen(
       data: _totalStockKg,
       orElse: () => null,
     );
@@ -662,7 +690,7 @@ class _KpiGrid extends StatelessWidget {
 
     final cards = [
       StatCard(
-        label: 'Active Listings',
+        label: mine ? 'My Active Listings' : 'Listings on Sale',
         value: activeListings?.toString() ?? '—',
         icon: Icons.inventory_2_outlined,
         color: AppColors.deepGreen,
@@ -681,7 +709,7 @@ class _KpiGrid extends StatelessWidget {
         trend: avgChange,
       ),
       StatCard(
-        label: 'Stock',
+        label: mine ? 'My Stock' : 'Produce on Sale',
         value: stockKg == null ? '—' : _compactKg(stockKg),
         icon: Icons.scale_outlined,
         color: AppColors.warmOrange,
@@ -996,26 +1024,11 @@ class _PriorityListings extends StatelessWidget {
                   // Product image
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      p.imageUrl,
+                    child: ProduceImage(
+                      url: p.imageUrl,
                       width: 52,
                       height: 52,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          color: isDark
-                              ? const Color(0xFF2A2A2A)
-                              : const Color(0xFFF0F4EE),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(
-                          Icons.image_not_supported_outlined,
-                          size: 22,
-                          color: AppColors.gray,
-                        ),
-                      ),
                     ),
                   ),
                   const SizedBox(width: 12),

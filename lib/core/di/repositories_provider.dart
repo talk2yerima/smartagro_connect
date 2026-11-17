@@ -118,8 +118,8 @@ final chatThreadsProvider = StreamProvider<List<ChatThread>>((ref) {
   return Stream.fromFuture(ref.watch(chatRepositoryProvider).threads());
 });
 
-final chatMessagesProvider =
-    StreamProvider.family<List<ChatMessage>, String>((ref, threadId) {
+final chatMessagesProvider = StreamProvider.autoDispose
+    .family<List<ChatMessage>, String>((ref, threadId) {
   final user = ref.watch(authSessionProvider);
   final firestore = ref.watch(firestoreServiceProvider);
   if (user != null && firestore.isAvailable) {
@@ -167,7 +167,8 @@ final adminActivityProvider = FutureProvider<List<Map<String, dynamic>>>((ref) {
 
 /// Whether the peer is currently typing in a thread.
 /// Key format: "threadId|peerId" (UIDs are alphanumeric, safe to split on |).
-final peerTypingProvider = StreamProvider.family<bool, String>((ref, key) {
+final peerTypingProvider =
+    StreamProvider.autoDispose.family<bool, String>((ref, key) {
   final parts = key.split('|');
   if (parts.length != 2) return Stream.value(false);
   return ref

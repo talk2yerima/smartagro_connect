@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,6 +13,7 @@ import '../../domain/entities/commodity.dart';
 import '../../domain/entities/nearby_buyer.dart';
 import '../../domain/entities/product_listing.dart';
 import '../../shared/widgets/empty_state.dart';
+import '../../shared/widgets/produce_image.dart';
 import '../../shared/widgets/section_header.dart';
 import '../../shared/widgets/status_badge.dart';
 
@@ -21,10 +21,10 @@ import '../../shared/widgets/status_badge.dart';
 // Card decoration helper
 // ---------------------------------------------------------------------------
 BoxDecoration _card(bool isDark) => BoxDecoration(
-      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      color: isDark ? AppColors.cardDark : Colors.white,
       borderRadius: BorderRadius.circular(12),
       border: Border.all(
-        color: isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0),
+        color: isDark ? AppColors.darkBorder : AppColors.borderLight,
       ),
       boxShadow: [
         BoxShadow(
@@ -56,14 +56,14 @@ const List<_TrendingCategory> _trendingCategories = [
   _TrendingCategory(
     name: 'Maize',
     icon: Icons.grain,
-    gradientStart: Color(0xFFF9A825),
-    gradientEnd: Color(0xFFFF8F00),
+    gradientStart: AppColors.golden,
+    gradientEnd: AppColors.amber,
   ),
   _TrendingCategory(
     name: 'Tomatoes',
     icon: Icons.eco,
     gradientStart: Color(0xFFE53935),
-    gradientEnd: Color(0xFFC62828),
+    gradientEnd: AppColors.errorRed,
   ),
   _TrendingCategory(
     name: 'Cassava',
@@ -74,19 +74,19 @@ const List<_TrendingCategory> _trendingCategories = [
   _TrendingCategory(
     name: 'Rice',
     icon: Icons.rice_bowl,
-    gradientStart: Color(0xFF1B5E20),
-    gradientEnd: Color(0xFF2E7D32),
+    gradientStart: AppColors.deepGreen,
+    gradientEnd: AppColors.emerald,
   ),
   _TrendingCategory(
     name: 'Yam',
     icon: Icons.local_dining,
-    gradientStart: Color(0xFFFB8C00),
-    gradientEnd: Color(0xFFE65100),
+    gradientStart: AppColors.warmOrange,
+    gradientEnd: AppColors.warningOrange,
   ),
   _TrendingCategory(
     name: 'Palm Oil',
     icon: Icons.opacity,
-    gradientStart: Color(0xFF0277BD),
+    gradientStart: AppColors.infoBlue,
     gradientEnd: Color(0xFF01579B),
   ),
 ];
@@ -966,16 +966,9 @@ class _ProductCard extends StatelessWidget {
               ),
             ),
             child: product.imageUrl.isNotEmpty
-                ? CachedNetworkImage(
-                    imageUrl: product.imageUrl,
+                ? ProduceImage(
+                    url: product.imageUrl,
                     fit: BoxFit.cover,
-                    memCacheWidth: 300,
-                    memCacheHeight: 270,
-                    errorWidget: (_, __, ___) => const Icon(
-                      Icons.image_not_supported_rounded,
-                      color: Colors.white54,
-                      size: 28,
-                    ),
                   )
                 : const Icon(
                     Icons.storefront_rounded,

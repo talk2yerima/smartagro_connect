@@ -5,9 +5,11 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/di/repositories_provider.dart';
+import '../../core/errors/friendly_error.dart';
 import '../../core/utils/money_format.dart' show formatNgn;
 import '../../domain/entities/product_listing.dart';
 import '../../shared/widgets/empty_state.dart';
+import '../../shared/widgets/produce_image.dart';
 import '../../shared/widgets/skeleton_list.dart';
 
 // ---------------------------------------------------------------------------
@@ -15,10 +17,10 @@ import '../../shared/widgets/skeleton_list.dart';
 // ---------------------------------------------------------------------------
 
 BoxDecoration _card(bool isDark) => BoxDecoration(
-      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      color: isDark ? AppColors.cardDark : Colors.white,
       borderRadius: BorderRadius.circular(12),
       border: Border.all(
-        color: isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0),
+        color: isDark ? AppColors.darkBorder : AppColors.borderLight,
       ),
       boxShadow: [
         BoxShadow(
@@ -46,7 +48,7 @@ class MyListingsScreen extends ConsumerWidget {
       appBar: AppBar(
         elevation: 0,
         scrolledUnderElevation: 0.5,
-        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        backgroundColor: isDark ? AppColors.cardDark : Colors.white,
         title: const Text(
           'My Listings',
           style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700),
@@ -100,7 +102,7 @@ class MyListingsScreen extends ConsumerWidget {
                 const Icon(Icons.cloud_off_rounded,
                     size: 48, color: AppColors.gray),
                 const SizedBox(height: 12),
-                Text('$e',
+                Text(friendlyError(e),
                     textAlign: TextAlign.center,
                     style: const TextStyle(color: AppColors.gray)),
                 const SizedBox(height: 16),
@@ -218,7 +220,7 @@ class _ListingCard extends ConsumerWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Delete failed: $e'),
+            content: Text('Delete failed. ${friendlyError(e)}'),
             backgroundColor: AppColors.errorRed,
             behavior: SnackBarBehavior.floating,
           ),
@@ -254,11 +256,9 @@ class _ListingCard extends ConsumerWidget {
               width: 90,
               height: 100,
               child: listing.imageUrl.isNotEmpty
-                  ? Image.network(
-                      listing.imageUrl,
+                  ? ProduceImage(
+                      url: listing.imageUrl,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
-                          _PlaceholderThumb(isDark: isDark),
                     )
                   : _PlaceholderThumb(isDark: isDark),
             ),
@@ -362,7 +362,7 @@ class _PlaceholderThumb extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: isDark ? const Color(0xFF2A2A2A) : AppColors.surfaceLight,
+      color: isDark ? AppColors.darkSurface : AppColors.surfaceLight,
       child: const Center(
         child: Icon(Icons.image_outlined, size: 28, color: AppColors.gray),
       ),
@@ -392,7 +392,7 @@ class _EditListingSheetState extends State<_EditListingSheet> {
   late ProductAvailability _availability;
   bool _saving = false;
 
-  static const _green = Color(0xFF2E7D32);
+  static const _green = AppColors.emerald;
 
   @override
   void initState() {
@@ -463,7 +463,7 @@ class _EditListingSheetState extends State<_EditListingSheet> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Update failed: $e'),
+            content: Text('Update failed. ${friendlyError(e)}'),
             backgroundColor: Colors.red.shade700,
             behavior: SnackBarBehavior.floating,
           ),
@@ -477,7 +477,7 @@ class _EditListingSheetState extends State<_EditListingSheet> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final sheetBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final sheetBg = isDark ? AppColors.cardDark : Colors.white;
 
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
@@ -537,7 +537,7 @@ class _EditListingSheetState extends State<_EditListingSheet> {
                       controller: _priceCtrl,
                       keyboardType: TextInputType.number,
                       decoration: _inputDeco(
-                          'Price (₦)', Icons.attach_money_rounded, isDark),
+                          'Price per kg (₦)', Icons.sell_outlined, isDark),
                       validator: (v) {
                         final n = int.tryParse(v ?? '');
                         if (n == null || n <= 0) return 'Invalid';
@@ -663,7 +663,7 @@ class _EditListingSheetState extends State<_EditListingSheet> {
       labelText: label,
       prefixIcon: Icon(icon, size: 18),
       filled: true,
-      fillColor: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF8FAF5),
+      fillColor: isDark ? AppColors.darkSurface : AppColors.softWhite,
       border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
       enabledBorder: OutlineInputBorder(

@@ -191,7 +191,7 @@ class _PaymentSheetState extends ConsumerState<PaymentSheet> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final sheetColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final sheetColor = isDark ? AppColors.cardDark : Colors.white;
     final padding = MediaQuery.viewInsetsOf(context);
 
     return Container(

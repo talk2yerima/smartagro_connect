@@ -1,3 +1,4 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -5,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/di/auth_providers.dart';
 import '../../core/errors/failures.dart';
+import '../../core/errors/friendly_error.dart';
 import '../../domain/entities/app_user.dart';
 import '../../shared/widgets/gradient_button.dart';
 
@@ -61,7 +63,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } on Failure catch (e) {
       setState(() => _error = e.message);
     } catch (e) {
-      setState(() => _error = e.toString());
+      setState(() => _error = friendlyError(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -81,7 +83,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } on Failure catch (e) {
       setState(() => _error = e.message);
     } catch (e) {
-      setState(() => _error = e.toString());
+      setState(() => _error = friendlyError(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -248,7 +250,7 @@ class _BrandPanel extends StatelessWidget {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Role-aware access keeps each workspace focused and secure.',
+                    'Each role sees only the tools it needs.',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Colors.white.withValues(alpha: 0.84),
                         ),
@@ -326,7 +328,7 @@ class _LoginPanel extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              'Choose a workspace and continue into your enterprise console.',
+              'Choose how you use SmartAgro, then sign in.',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 18),
@@ -337,7 +339,7 @@ class _LoginPanel extends StatelessWidget {
               keyboardType: TextInputType.emailAddress,
               textInputAction: TextInputAction.next,
               decoration: const InputDecoration(
-                labelText: 'Work email',
+                labelText: 'Email',
                 prefixIcon: Icon(Icons.mail_outline),
               ),
               validator: (v) =>
@@ -379,7 +381,7 @@ class _LoginPanel extends StatelessWidget {
             ],
             const SizedBox(height: 14),
             PrimaryGradientButton(
-              label: busy ? 'Signing in...' : 'Enter workspace',
+              label: busy ? 'Signing in...' : 'Sign in',
               icon: Icons.login_rounded,
               onPressed: busy ? null : onSubmit,
             ),
@@ -428,14 +430,18 @@ class _RoleSelector extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Workspace',
+          'I am a',
           style: Theme.of(context).textTheme.labelLarge,
         ),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: UserRole.values.map((role) {
+          // Admin accounts are granted in the Firebase console, so the
+          // chip only appears in demo mode (no Firebase).
+          children: UserRole.values
+              .where((r) => r != UserRole.admin || Firebase.apps.isEmpty)
+              .map((role) {
             final active = selected == role;
             final color = _roleColor(role);
             return ChoiceChip(
@@ -518,23 +524,23 @@ class _ErrorBanner extends StatelessWidget {
 
 String _headlineForRole(UserRole role) {
   return switch (role) {
-    UserRole.farmer => 'Run your farm trade desk with confidence.',
-    UserRole.buyer => 'Source verified produce with market clarity.',
-    UserRole.transporter => 'Coordinate routes, hubs, and dispatch work.',
-    UserRole.admin => 'Govern users, listings, and platform risk.',
+    UserRole.farmer => 'Sell your harvest at a fair price.',
+    UserRole.buyer => 'Buy fresh produce from trusted farmers.',
+    UserRole.transporter => 'Find haulage jobs and plan your routes.',
+    UserRole.admin => 'Keep the marketplace safe and running.',
   };
 }
 
 String _summaryForRole(UserRole role) {
   return switch (role) {
     UserRole.farmer =>
-      'Manage listings, watch commodity prices, and connect with trusted buyers from one focused workspace.',
+      "List your produce, check today's prices and chat with buyers, all in one place.",
     UserRole.buyer =>
-      'Compare listings, validate supplier quality, and move quickly from sourcing to negotiation.',
+      'Compare listings, check seller ratings and pay safely in the app.',
     UserRole.transporter =>
-      'Track delivery opportunities, route lanes, and dispatch conversations without marketplace clutter.',
+      'See delivery requests near you and keep in touch with farmers and buyers.',
     UserRole.admin =>
-      'Monitor platform health, review users, moderate commodities, and keep marketplace operations clean.',
+      'Review users, handle reports and keep prices and listings accurate.',
   };
 }
 

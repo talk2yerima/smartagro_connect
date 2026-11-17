@@ -8,6 +8,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/constants/app_colors.dart';
 import '../../core/di/auth_providers.dart';
 import '../../core/di/firestore_providers.dart';
 import '../../core/di/payment_providers.dart';
@@ -250,16 +251,20 @@ class _BottomNav extends StatelessWidget {
   final ValueChanged<int> onTap;
   final bool isDark;
 
-  static const _selectedColor = Color(0xFF1B5E20); // deepGreen
-  static const _unselectedColor = Color(0xFF6B7280); // gray
   static const _indicatorColor = Color(0xFFE8F5E9); // very light green pill
   static const _indicatorColorDark = Color(0xFF1E3A1E);
 
   @override
   Widget build(BuildContext context) {
-    final bgColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final borderColor =
-        isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0);
+    final bgColor = isDark ? AppColors.cardDark : Colors.white;
+    final borderColor = isDark ? AppColors.darkBorder : AppColors.borderLight;
+    // Deep green on the dark bar was ~2:1 contrast; use the light green there.
+    final selectedColor = isDark ? AppColors.lightGreen : AppColors.deepGreen;
+    final unselectedColor =
+        isDark ? AppColors.darkTextSecondary : AppColors.gray;
+    // Grow with the phone's text size so labels don't clip at large fonts.
+    final barHeight =
+        72 * MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.4);
 
     return Container(
       decoration: BoxDecoration(
@@ -278,15 +283,15 @@ class _BottomNav extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: SizedBox(
-          height: 72,
+          height: barHeight,
           child: Row(
             children: List.generate(destinations.length, (i) {
               return Expanded(
                 child: _NavItem(
                   destination: destinations[i],
                   isSelected: i == currentIndex,
-                  selectedColor: _selectedColor,
-                  unselectedColor: _unselectedColor,
+                  selectedColor: selectedColor,
+                  unselectedColor: unselectedColor,
                   indicatorColor:
                       isDark ? _indicatorColorDark : _indicatorColor,
                   onTap: () => onTap(i),
@@ -325,6 +330,15 @@ class _NavItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = isSelected ? selectedColor : unselectedColor;
 
+    // Tells screen readers this is a tab and which one is selected.
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      child: _buildTap(color),
+    );
+  }
+
+  Widget _buildTap(Color color) {
     return InkWell(
       onTap: onTap,
       splashColor: selectedColor.withValues(alpha: 0.10),
@@ -405,7 +419,7 @@ class _FarmerFab extends StatelessWidget {
     return FloatingActionButton(
       onPressed: () => context.push('/marketplace/add'),
       elevation: 4,
-      backgroundColor: const Color(0xFFFB8C00), // warmOrange
+      backgroundColor: AppColors.warmOrange, // warmOrange
       foregroundColor: Colors.white,
       tooltip: 'Add Listing',
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -442,14 +456,13 @@ class _NavRail extends StatelessWidget {
   final bool isDark;
   final bool showFab;
 
-  static const _selectedColor = Color(0xFF1B5E20);
-  static const _unselectedColor = Color(0xFF6B7280);
+  static const _selectedColor = AppColors.deepGreen;
+  static const _unselectedColor = AppColors.gray;
 
   @override
   Widget build(BuildContext context) {
-    final bgColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final borderColor =
-        isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0);
+    final bgColor = isDark ? AppColors.cardDark : Colors.white;
+    final borderColor = isDark ? AppColors.darkBorder : AppColors.borderLight;
     final indicatorColor =
         isDark ? const Color(0xFF1E3A1E) : const Color(0xFFE8F5E9);
 
@@ -538,7 +551,7 @@ class _RailFab extends StatelessWidget {
     return FloatingActionButton.small(
       onPressed: () => context.push('/marketplace/add'),
       elevation: 2,
-      backgroundColor: const Color(0xFFFB8C00),
+      backgroundColor: AppColors.warmOrange,
       foregroundColor: Colors.white,
       tooltip: 'Add Listing',
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

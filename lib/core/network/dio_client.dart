@@ -28,7 +28,9 @@ class DioClient {
             Dio(
               BaseOptions(
                 baseUrl: baseUrl,
-                connectTimeout: const Duration(seconds: 20),
+                // Short connect timeout + one retry: a dead network now falls back
+                // to saved data in ~25 s, not ~87 s (20 s x 4 tries + delays).
+                connectTimeout: const Duration(seconds: 10),
                 receiveTimeout: const Duration(seconds: 30),
                 sendTimeout: const Duration(seconds: 30),
                 headers: {
@@ -73,11 +75,9 @@ class DioClient {
     _dio.interceptors.add(
       RetryInterceptor(
         dio: _dio,
-        retries: 3,
+        retries: 1,
         retryDelays: const [
-          Duration(seconds: 1),
           Duration(seconds: 2),
-          Duration(seconds: 4),
         ],
         retryEvaluator: (error, attempt) =>
             error.type == DioExceptionType.connectionTimeout ||

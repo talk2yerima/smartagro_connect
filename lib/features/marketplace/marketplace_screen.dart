@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -12,11 +11,14 @@ import 'package:shimmer/shimmer.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/di/auth_providers.dart';
 import '../../core/di/repositories_provider.dart';
+import '../../core/errors/friendly_error.dart';
 import '../../core/utils/money_format.dart';
 import '../../domain/entities/app_user.dart';
 import '../../domain/entities/product_listing.dart';
 import '../../shared/widgets/connectivity_banner.dart';
 import '../../shared/widgets/empty_state.dart';
+import '../../shared/widgets/produce_image.dart';
+import '../../shared/widgets/skeleton_list.dart';
 
 class _FavIdsNotifier extends StateNotifier<Set<String>> {
   _FavIdsNotifier() : super({}) {
@@ -332,7 +334,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        '$e',
+                        friendlyError(e),
                         textAlign: TextAlign.center,
                         maxLines: 3,
                         overflow: TextOverflow.ellipsis,
@@ -493,8 +495,7 @@ class _SearchFilterRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fillColor = isDark ? AppColors.cardDark : AppColors.surfaceLight;
-    final borderColor =
-        isDark ? const Color(0xFF2E3C2E) : AppColors.borderLight;
+    final borderColor = isDark ? AppColors.darkBorder : AppColors.borderLight;
 
     return Row(
       children: [
@@ -629,7 +630,7 @@ class _CategoryChips extends StatelessWidget {
                     color: isSelected
                         ? AppColors.deepGreen
                         : (isDark
-                            ? const Color(0xFF2E3C2E)
+                            ? AppColors.darkBorder
                             : AppColors.borderLight),
                   ),
                 ),
@@ -713,22 +714,10 @@ class _SpotlightStrip extends StatelessWidget {
                     children: [
                       ClipRRect(
                         borderRadius: BorderRadius.circular(14),
-                        child: CachedNetworkImage(
-                          imageUrl: p.imageUrl,
+                        child: ProduceImage(
+                          url: p.imageUrl,
                           width: 220,
                           height: 130,
-                          fit: BoxFit.cover,
-                          memCacheWidth: 440,
-                          memCacheHeight: 260,
-                          errorWidget: (_, __, ___) => Container(
-                            color: isDark
-                                ? const Color(0xFF2A2A2A)
-                                : AppColors.surfaceLight,
-                            child: const Center(
-                              child: Icon(Icons.image_outlined,
-                                  size: 32, color: AppColors.gray),
-                            ),
-                          ),
                         ),
                       ),
                       // Gradient overlay
@@ -871,7 +860,7 @@ class _ProductCard extends ConsumerWidget {
       onTap: () => context.push('/marketplace/product/${product.id}'),
       child: Container(
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          color: isDark ? AppColors.cardDark : Colors.white,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
@@ -892,30 +881,10 @@ class _ProductCard extends ConsumerWidget {
                 SizedBox(
                   height: 140,
                   width: double.infinity,
-                  child: CachedNetworkImage(
-                    imageUrl: product.imageUrl,
-                    fit: BoxFit.cover,
-                    width: double.infinity,
+                  child: ProduceImage(
+                    url: product.imageUrl,
                     height: 140,
-                    memCacheWidth: 400,
-                    memCacheHeight: 280,
-                    placeholder: (_, __) => Shimmer.fromColors(
-                      baseColor: Colors.grey.shade200,
-                      highlightColor: Colors.grey.shade50,
-                      child: Container(color: Colors.white),
-                    ),
-                    errorWidget: (_, __, ___) => Container(
-                      color: isDark
-                          ? const Color(0xFF2A2A2A)
-                          : const Color(0xFFF0F4EE),
-                      child: Center(
-                        child: Icon(
-                          Icons.image_outlined,
-                          size: 40,
-                          color: AppColors.gray.withValues(alpha: 0.45),
-                        ),
-                      ),
-                    ),
+                    width: double.infinity,
                   ),
                 ),
 
@@ -934,7 +903,7 @@ class _ProductCard extends ConsumerWidget {
                       _availabilityLabel,
                       style: const TextStyle(
                         fontFamily: 'Poppins',
-                        fontSize: 9,
+                        fontSize: 11,
                         fontWeight: FontWeight.w600,
                         color: Colors.white,
                       ),
@@ -949,17 +918,19 @@ class _ProductCard extends ConsumerWidget {
                   child: Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    // Dark text on solid gold: the old white 10 pt text on
+                    // gold was about 1.8:1 contrast, hard to read outdoors.
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF9A825).withValues(alpha: 0.92),
+                      color: AppColors.golden,
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
-                      formatNgn(product.priceNgn),
+                      '${formatNgn(product.priceNgn)}/kg',
                       style: const TextStyle(
                         fontFamily: 'Poppins',
-                        fontSize: 10,
+                        fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: Colors.white,
+                        color: AppColors.charcoal,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -1003,8 +974,9 @@ class _ProductCard extends ConsumerWidget {
 
                 // Favourite button — bottom right of image
                 Positioned(
-                  bottom: 8,
-                  right: 8,
+                  bottom:
+                      1, // 44 px touch area; the visible heart stays ~8 px in
+                  right: 1,
                   child: _FavouriteButton(productId: product.id),
                 ),
               ],
@@ -1174,21 +1146,32 @@ class _FavouriteButtonState extends ConsumerState<_FavouriteButton>
     return Semantics(
       label: isFav ? 'Remove from favourites' : 'Add to favourites',
       button: true,
+      // 30 px heart inside a 44 px touch area; the bare 30 px target was
+      // easy to miss on a moving card.
       child: GestureDetector(
         onTap: _toggle,
-        child: ScaleTransition(
-          scale: _scale,
-          child: Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.35),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-              size: 16,
-              color: isFav ? const Color(0xFFEF5350) : Colors.white,
+        behavior: HitTestBehavior.opaque,
+        child: SizedBox(
+          width: 44,
+          height: 44,
+          child: Center(
+            child: ScaleTransition(
+              scale: _scale,
+              child: Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.35),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  isFav
+                      ? Icons.favorite_rounded
+                      : Icons.favorite_border_rounded,
+                  size: 16,
+                  color: isFav ? const Color(0xFFEF5350) : Colors.white,
+                ),
+              ),
             ),
           ),
         ),
@@ -1229,11 +1212,11 @@ class _SkeletonCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Shimmer.fromColors(
-      baseColor: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200,
-      highlightColor: isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade50,
+      baseColor: skeletonBase(isDark),
+      highlightColor: skeletonHighlight(isDark),
       child: Container(
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          color: isDark ? AppColors.cardDark : Colors.white,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(

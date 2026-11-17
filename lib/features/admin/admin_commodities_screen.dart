@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/di/firestore_providers.dart';
+import '../../core/errors/friendly_error.dart';
 import '../../core/utils/money_format.dart';
 import '../../shared/widgets/status_badge.dart';
 
@@ -240,7 +241,7 @@ class _AdminCommoditiesScreenState
               } catch (e) {
                 if (ctx.mounted) {
                   ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
-                    content: Text('Save failed: $e'),
+                    content: Text('Save failed. ${friendlyError(e)}'),
                     backgroundColor: AppColors.errorRed,
                   ));
                 }
@@ -394,10 +395,10 @@ class _CommodityCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        color: isDark ? AppColors.cardDark : Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-            color: isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0)),
+            color: isDark ? AppColors.darkBorder : AppColors.borderLight),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: isDark ? 0.22 : 0.05),
