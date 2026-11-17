@@ -39,6 +39,8 @@ class ChatMessage extends Equatable {
     required this.sentAt,
     required this.kind,
     this.imageUrl,
+    this.audioUrl,
+    this.duration,
   });
 
   final String id;
@@ -50,6 +52,12 @@ class ChatMessage extends Equatable {
 
   /// Download URL for image messages (kind == ChatMessageKind.image).
   final String? imageUrl;
+
+  /// Voice notes: download URL (or a local file path while sending).
+  final String? audioUrl;
+
+  /// Voice notes: length of the recording.
+  final Duration? duration;
 
   @override
   List<Object?> get props => [id];

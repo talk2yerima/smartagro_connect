@@ -106,4 +106,7 @@ flutter {
 }
 
 dependencies {
+    // Theme.AppCompat for the launch theme, required by local_auth's
+    // fingerprint dialog on older Android versions.
+    implementation "androidx.appcompat:appcompat:1.7.0"
 }

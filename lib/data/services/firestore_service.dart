@@ -368,6 +368,11 @@ class FirestoreService {
                 sentAt: sentAt,
                 kind: kind,
                 imageUrl: data['imageUrl'] as String?,
+                audioUrl: data['audioUrl'] as String?,
+                duration: data['durationMs'] is num
+                    ? Duration(
+                        milliseconds: (data['durationMs'] as num).toInt())
+                    : null,
               );
             })
             // Back to oldest-first for display.
@@ -386,6 +391,8 @@ class FirestoreService {
     required String peerRole,
     required String text,
     String? imageUrl,
+    String? audioUrl,
+    Duration? duration,
   }) async {
     if (!isAvailable) return;
     try {
@@ -398,9 +405,17 @@ class FirestoreService {
         'fromId': fromId,
         'text': text,
         'sentAt': FieldValue.serverTimestamp(),
-        'kind': imageUrl != null ? 'image' : 'text',
+        'kind': audioUrl != null
+            ? 'voice'
+            : imageUrl != null
+                ? 'image'
+                : 'text',
       };
       if (imageUrl != null) msgData['imageUrl'] = imageUrl;
+      if (audioUrl != null) {
+        msgData['audioUrl'] = audioUrl;
+        if (duration != null) msgData['durationMs'] = duration.inMilliseconds;
+      }
 
       batch.set(msgRef, msgData);
 
@@ -410,7 +425,11 @@ class FirestoreService {
             'participants': ([fromId, peerId]..sort()),
             'names': {fromId: fromName, peerId: peerName},
             'roles': {fromId: fromRole, peerId: peerRole},
-            'lastMessage': imageUrl != null ? '📷 Image' : text,
+            'lastMessage': audioUrl != null
+                ? '🎤 Voice note'
+                : imageUrl != null
+                    ? '📷 Image'
+                    : text,
             'updatedAt': FieldValue.serverTimestamp(),
             // set() treats a dotted key like 'unreadCounts.uid' as a literal
             // field name, so the counts must be a nested map (merged deeply).

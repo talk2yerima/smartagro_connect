@@ -1,0 +1,63 @@
+rules_version = '2';
+
+// Firebase Storage rules for SmartAgro Connect.
+// Deploy with: firebase deploy --only storage
+//
+// Everything is private by default. Signed-in people can see listing
+// photos and avatars; only the owner can upload or replace their own files;
+// chat photos and voice notes are visible only to the two people in the
+// chat. Size and type limits stop the bucket being used for other files.
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isImage(maxMb) {
+      return request.resource.size < maxMb * 1024 * 1024 &&
+             request.resource.contentType.matches('image/.*');
+    }
+
+    function isAudio(maxMb) {
+      return request.resource.size < maxMb * 1024 * 1024 &&
+             request.resource.contentType.matches('audio/.*');
+    }
+
+    // Chat ids are the two user ids, sorted and joined with "_".
+    function inChat(threadId) {
+      return signedIn() && request.auth.uid in threadId.split('_');
+    }
+
+    // ── Listing photos: product_images/{sellerUid}/{file} ──────────────
+    match /product_images/{sellerUid}/{fileName} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() &&
+                               request.auth.uid == sellerUid &&
+                               isImage(5);
+      allow delete: if signedIn() && request.auth.uid == sellerUid;
+    }
+
+    // ── Profile photos: avatars/{uid}.jpg ──────────────────────────────
+    match /avatars/{fileName} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() &&
+                               fileName == request.auth.uid + '.jpg' &&
+                               isImage(2);
+      allow delete: if signedIn() && fileName == request.auth.uid + '.jpg';
+    }
+
+    // ── Chat photos: chat_images/{threadId}/{file} ─────────────────────
+    match /chat_images/{threadId}/{fileName} {
+      allow read: if inChat(threadId);
+      allow create: if inChat(threadId) && isImage(5);
+    }
+
+    // ── Chat voice notes: chat_audio/{threadId}/{file} ─────────────────
+    // A 2-minute note at 32 kbps is about 0.5 MB.
+    match /chat_audio/{threadId}/{fileName} {
+      allow read: if inChat(threadId);
+      allow create: if inChat(threadId) && isAudio(3);
+    }
+  }
+}

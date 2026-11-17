@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/config/app_env.dart';
 import '../../core/di/initialization_provider.dart';
+import '../../core/services/app_lock.dart';
 
 bool _fcmSupported() => kIsWeb || (!Platform.isWindows && !Platform.isLinux);
 
@@ -29,6 +30,22 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  Future<void> _toggleAppLock(bool enable) async {
+    final result = await ref.read(appLockProvider.notifier).setEnabled(enable);
+    if (!mounted) return;
+    final message = switch (result) {
+      AppLockSetupResult.enabled =>
+        'App lock is on. SmartAgro will ask for your fingerprint, face or PIN.',
+      AppLockSetupResult.disabled => 'App lock is off.',
+      AppLockSetupResult.cancelled => 'App lock was not turned on.',
+      AppLockSetupResult.unsupported =>
+        'Set up a fingerprint, face unlock or screen lock in your phone '
+            'settings first.',
+    };
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
+
   bool _priceAlerts = true;
 
   @override
@@ -148,10 +165,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             subtitle: const Text('Notify me when commodity prices change'),
           ),
           const Divider(),
-          const ListTile(
-            leading: Icon(Icons.lock_outline),
-            title: Text('Security'),
-            subtitle: Text('Biometrics / PIN coming soon'),
+          SwitchListTile(
+            secondary: const Icon(Icons.fingerprint_rounded),
+            value: ref.watch(appLockProvider).enabled,
+            onChanged: _toggleAppLock,
+            title: const Text('App lock'),
+            subtitle: const Text(
+                'Ask for your fingerprint, face or phone PIN when opening '
+                'SmartAgro'),
           ),
           const ListTile(
             leading: Icon(Icons.language_outlined),

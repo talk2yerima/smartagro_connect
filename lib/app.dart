@@ -6,6 +6,7 @@ import 'core/config/app_env.dart';
 import 'core/di/initialization_provider.dart';
 import 'core/errors/friendly_error.dart';
 import 'core/router/app_router.dart';
+import 'core/services/app_lock.dart';
 import 'core/theme/app_theme.dart';
 
 // ---------------------------------------------------------------------------
@@ -80,8 +81,10 @@ class SmartAgroConnectApp extends ConsumerWidget {
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
-          builder: (context, child) {
+          builder: (context, routed) {
             if (isJailbroken) return const _JailbreakBlocker();
+            // Fingerprint / face lock sits over every signed-in screen.
+            final child = AppLockGate(child: routed ?? const SizedBox.shrink());
             if (!AppEnv.isProd) {
               return Banner(
                 message: AppEnv.isStaging ? 'STAGING' : 'DEV',
@@ -96,10 +99,10 @@ class SmartAgroConnectApp extends ConsumerWidget {
                   height: 1.0,
                   letterSpacing: 0.5,
                 ),
-                child: child ?? const SizedBox.shrink(),
+                child: child,
               );
             }
-            return child ?? const SizedBox.shrink();
+            return child;
           },
         );
       },

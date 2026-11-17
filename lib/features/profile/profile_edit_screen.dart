@@ -109,9 +109,12 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
             )
           : null;
       if (compressed != null) {
-        await storageRef.putData(compressed);
+        // Content type is required by storage.rules (images only).
+        await storageRef.putData(
+            compressed, SettableMetadata(contentType: 'image/jpeg'));
       } else {
-        await storageRef.putFile(File(picked.path));
+        await storageRef.putFile(
+            File(picked.path), SettableMetadata(contentType: 'image/jpeg'));
       }
       final url = await storageRef.getDownloadURL();
 

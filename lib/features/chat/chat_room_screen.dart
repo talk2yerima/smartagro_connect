@@ -16,10 +16,12 @@ import '../../core/constants/app_colors.dart';
 import '../../core/di/auth_providers.dart';
 import '../../core/di/firestore_providers.dart';
 import '../../core/di/repositories_provider.dart';
+import '../../core/errors/friendly_error.dart';
 import '../../core/utils/app_logger.dart';
 import '../../domain/entities/chat_models.dart';
 import '../../shared/widgets/app_avatar.dart';
 import '../../shared/widgets/status_badge.dart';
+import 'voice_note.dart';
 
 // ---------------------------------------------------------------------------
 // Local state: extra messages appended via the input bar
@@ -452,20 +454,12 @@ class _ChatBubble extends StatelessWidget {
                 ],
               );
       case ChatMessageKind.voice:
-        bubbleContent = Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.graphic_eq_rounded, size: 18, color: textColor),
-            const SizedBox(width: 6),
-            Text(
-              'Voice message',
-              style: TextStyle(
-                color: textColor,
-                fontSize: 14,
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-          ],
+        bubbleContent = VoiceNoteBubble(
+          source: message.audioUrl,
+          duration: message.duration,
+          color: textColor,
+          // Local copy shown while it uploads.
+          uploading: message.id.startsWith('local_voice_'),
         );
       case ChatMessageKind.text:
         bubbleContent = Text(
@@ -644,6 +638,12 @@ class _InputBarState extends ConsumerState<_InputBar> {
   bool _sent = false;
   Timer? _typingTimer;
 
+  // Voice notes
+  final _recorder = VoiceNoteRecorder();
+  bool _recording = false;
+  Duration _recorded = Duration.zero;
+  Timer? _recordTicker;
+
   @override
   void initState() {
     super.initState();
@@ -653,9 +653,126 @@ class _InputBarState extends ConsumerState<_InputBar> {
   @override
   void dispose() {
     _typingTimer?.cancel();
+    _recordTicker?.cancel();
+    if (_recording) _recorder.cancel();
+    _recorder.dispose();
     _clearTyping();
     _controller.dispose();
     super.dispose();
+  }
+
+  // ── Voice notes ──────────────────────────────────────────────────────────
+
+  bool _canSendLive() {
+    final user = ref.read(authSessionProvider);
+    final firestore = ref.read(firestoreServiceProvider);
+    return user != null && firestore.isAvailable && widget.peerId != null;
+  }
+
+  Future<void> _startVoice() async {
+    if (!_canSendLive()) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Voice notes need an internet connection.')));
+      return;
+    }
+    HapticFeedback.mediumImpact();
+    bool started;
+    try {
+      started = await _recorder.start();
+    } catch (e) {
+      log.e('[Voice] start failed', error: e);
+      started = false;
+    }
+    if (!mounted) return;
+    if (!started) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Allow microphone access in your phone settings to '
+              'send voice notes.')));
+      return;
+    }
+    setState(() {
+      _recording = true;
+      _recorded = Duration.zero;
+    });
+    _recordTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() => _recorded += const Duration(seconds: 1));
+      // Stop and send automatically at the limit.
+      if (_recorded >= maxVoiceNote) _sendVoice();
+    });
+  }
+
+  Future<void> _cancelVoice() async {
+    _recordTicker?.cancel();
+    setState(() => _recording = false);
+    await _recorder.cancel();
+  }
+
+  Future<void> _sendVoice() async {
+    if (!_recording) return;
+    _recordTicker?.cancel();
+    setState(() => _recording = false);
+    final note = await _recorder.stop();
+    if (note == null || !mounted) return;
+    HapticFeedback.lightImpact();
+
+    final user = ref.read(authSessionProvider);
+    final firestore = ref.read(firestoreServiceProvider);
+    if (user == null || widget.peerId == null) return;
+
+    // Show it in the chat straight away; it plays from the local file
+    // while it uploads.
+    final ts = DateTime.now();
+    final localId = 'local_voice_${ts.millisecondsSinceEpoch}';
+    ref.read(_localMessagesProvider(widget.threadId).notifier).update((s) => [
+          ...s,
+          ChatMessage(
+            id: localId,
+            threadId: widget.threadId,
+            fromMe: true,
+            text: '',
+            sentAt: ts,
+            kind: ChatMessageKind.voice,
+            audioUrl: note.path,
+            duration: note.duration,
+          ),
+        ]);
+    widget.onSent();
+
+    void removeLocal() {
+      if (!mounted) return;
+      ref
+          .read(_localMessagesProvider(widget.threadId).notifier)
+          .update((s) => s.where((m) => m.id != localId).toList());
+    }
+
+    try {
+      final url = await uploadVoiceNote(
+        threadId: widget.threadId,
+        messageId: firestore.newMessageId(widget.threadId),
+        filePath: note.path,
+      );
+      await firestore.sendChatMessage(
+        threadId: widget.threadId,
+        fromId: user.id,
+        fromName: user.name,
+        fromRole: user.role.name,
+        peerId: widget.peerId!,
+        peerName: widget.peerName ?? 'Unknown',
+        peerRole: widget.peerRole ?? '',
+        text: '',
+        audioUrl: url,
+        duration: note.duration,
+      );
+      removeLocal();
+    } catch (e) {
+      log.e('[Voice] send failed', error: e);
+      removeLocal();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Voice note not sent. ${friendlyError(e)}')));
+      }
+    }
   }
 
   void _onTextChanged() {
@@ -731,7 +848,8 @@ class _InputBarState extends ConsumerState<_InputBar> {
         await storageRef.putData(
             bytes, SettableMetadata(contentType: 'image/jpeg'));
       } else {
-        await storageRef.putFile(File(picked.path));
+        await storageRef.putFile(
+            File(picked.path), SettableMetadata(contentType: 'image/jpeg'));
       }
       final imageUrl = await storageRef.getDownloadURL();
       await firestore.sendChatMessage(
@@ -855,137 +973,159 @@ class _InputBarState extends ConsumerState<_InputBar> {
         top: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              // Attach icon
-              IconButton(
-                icon: Icon(
-                  Icons.attach_file_rounded,
-                  color: isDark ? AppColors.darkTextSecondary : AppColors.gray,
-                ),
-                tooltip: 'Send image',
-                onPressed: _pickAndSendImage,
-              ),
-
-              // Text field
-              Expanded(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 120),
-                  child: TextField(
-                    controller: _controller,
-                    maxLines: null,
-                    keyboardType: TextInputType.multiline,
-                    textCapitalization: TextCapitalization.sentences,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: isDark
-                          ? AppColors.darkTextPrimary
-                          : AppColors.charcoal,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: 'Type a message…',
-                      hintStyle: TextStyle(
-                        fontSize: 14,
+          child: _recording
+              ? RecordingBar(
+                  elapsed: _recorded,
+                  isDark: isDark,
+                  onCancel: _cancelVoice,
+                  onSend: _sendVoice,
+                )
+              : Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    // Attach icon
+                    IconButton(
+                      icon: Icon(
+                        Icons.attach_file_rounded,
                         color: isDark
                             ? AppColors.darkTextSecondary
                             : AppColors.gray,
                       ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide(
-                          color: isDark
-                              ? AppColors.darkBorder
-                              : AppColors.borderLight,
-                        ),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide(
-                          color: isDark
-                              ? AppColors.darkBorder
-                              : AppColors.borderLight,
-                        ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: const BorderSide(
-                          color: AppColors.deepGreen,
-                          width: 1.5,
-                        ),
-                      ),
-                      filled: true,
-                      fillColor: isDark
-                          ? AppColors.darkSurface
-                          : AppColors.surfaceLight,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 10,
-                      ),
+                      tooltip: 'Send image',
+                      onPressed: _pickAndSendImage,
                     ),
-                    onSubmitted: (_) => _send(),
-                  ),
-                ),
-              ),
 
-              const SizedBox(width: 8),
-
-              // Send button
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                child: _hasText
-                    ? GestureDetector(
-                        onTap: _send,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 250),
-                          key: const ValueKey('send'),
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: _sent
-                                ? AppColors.mintGreen
-                                : AppColors.deepGreen,
-                            shape: BoxShape.circle,
+                    // Text field
+                    Expanded(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 120),
+                        child: TextField(
+                          controller: _controller,
+                          maxLines: null,
+                          keyboardType: TextInputType.multiline,
+                          textCapitalization: TextCapitalization.sentences,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: isDark
+                                ? AppColors.darkTextPrimary
+                                : AppColors.charcoal,
                           ),
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 220),
-                            transitionBuilder: (child, anim) =>
-                                ScaleTransition(scale: anim, child: child),
-                            child: Icon(
-                              _sent ? Icons.check_rounded : Icons.send_rounded,
-                              key: ValueKey(_sent),
-                              color: Colors.white,
-                              size: 20,
+                          decoration: InputDecoration(
+                            hintText: 'Type a message…',
+                            hintStyle: TextStyle(
+                              fontSize: 14,
+                              color: isDark
+                                  ? AppColors.darkTextSecondary
+                                  : AppColors.gray,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(24),
+                              borderSide: BorderSide(
+                                color: isDark
+                                    ? AppColors.darkBorder
+                                    : AppColors.borderLight,
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(24),
+                              borderSide: BorderSide(
+                                color: isDark
+                                    ? AppColors.darkBorder
+                                    : AppColors.borderLight,
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(24),
+                              borderSide: const BorderSide(
+                                color: AppColors.deepGreen,
+                                width: 1.5,
+                              ),
+                            ),
+                            filled: true,
+                            fillColor: isDark
+                                ? AppColors.darkSurface
+                                : AppColors.surfaceLight,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
                             ),
                           ),
-                        ),
-                      )
-                    : Container(
-                        key: const ValueKey('mic'),
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: isDark
-                              ? AppColors.darkSurface
-                              : AppColors.surfaceLight,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: isDark
-                                ? AppColors.darkBorder
-                                : AppColors.borderLight,
-                          ),
-                        ),
-                        child: Icon(
-                          Icons.mic_none_rounded,
-                          color: isDark
-                              ? AppColors.darkTextSecondary
-                              : AppColors.gray,
-                          size: 20,
+                          onSubmitted: (_) => _send(),
                         ),
                       ),
-              ),
-            ],
-          ),
+                    ),
+
+                    const SizedBox(width: 8),
+
+                    // Send button
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      child: _hasText
+                          ? GestureDetector(
+                              onTap: _send,
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 250),
+                                key: const ValueKey('send'),
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: _sent
+                                      ? AppColors.mintGreen
+                                      : AppColors.deepGreen,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 220),
+                                  transitionBuilder: (child, anim) =>
+                                      ScaleTransition(
+                                          scale: anim, child: child),
+                                  child: Icon(
+                                    _sent
+                                        ? Icons.check_rounded
+                                        : Icons.send_rounded,
+                                    key: ValueKey(_sent),
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : Tooltip(
+                              key: const ValueKey('mic'),
+                              message: 'Record a voice note',
+                              child: Semantics(
+                                button: true,
+                                label: 'Record a voice note',
+                                child: GestureDetector(
+                                  onTap: _startVoice,
+                                  child: Container(
+                                    width: 44,
+                                    height: 44,
+                                    decoration: BoxDecoration(
+                                      color: isDark
+                                          ? AppColors.darkSurface
+                                          : AppColors.surfaceLight,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: isDark
+                                            ? AppColors.darkBorder
+                                            : AppColors.borderLight,
+                                      ),
+                                    ),
+                                    child: Icon(
+                                      Icons.mic_rounded,
+                                      color: isDark
+                                          ? AppColors.lightGreen
+                                          : AppColors.deepGreen,
+                                      size: 22,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                    ),
+                  ],
+                ),
         ),
       ),
     );
