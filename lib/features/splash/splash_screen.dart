@@ -36,17 +36,21 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       vsync: this,
       duration: const Duration(milliseconds: 600),
     );
-    Future<void>.delayed(
-        const Duration(milliseconds: 200), () => _dot2.repeat(reverse: true));
+    Future<void>.delayed(const Duration(milliseconds: 200), () {
+      if (mounted) _dot2.repeat(reverse: true);
+    });
 
     _dot3 = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
     );
-    Future<void>.delayed(
-        const Duration(milliseconds: 400), () => _dot3.repeat(reverse: true));
+    Future<void>.delayed(const Duration(milliseconds: 400), () {
+      if (mounted) _dot3.repeat(reverse: true);
+    });
 
-    Future<void>.delayed(const Duration(milliseconds: 2500), _routeNext);
+    // Start-up work is already finished before this screen mounts, so this
+    // is only a short brand moment, not a wait for loading.
+    Future<void>.delayed(const Duration(milliseconds: 800), _routeNext);
   }
 
   @override
@@ -58,6 +62,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   }
 
   Future<void> _routeNext() async {
+    if (!mounted) return;
+    // Wait for the saved sign-in to load (reading secure storage can take
+    // a second on a cold start); otherwise signed-in people land on Sign in.
+    await ref
+        .read(authSessionProvider.notifier)
+        .restored
+        .timeout(const Duration(seconds: 5), onTimeout: () {});
     if (!mounted) return;
     final prefs = await ref.read(sharedPreferencesProvider.future);
     final onboarded = prefs.getBool('onboarding_completed') ?? false;

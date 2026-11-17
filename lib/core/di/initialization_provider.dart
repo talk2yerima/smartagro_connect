@@ -92,7 +92,12 @@ final initializationProvider = FutureProvider<void>((ref) async {
   // Verify any Paystack transactions that completed while the app was closed.
   unawaited(ref.read(transactionRefQueueProvider).drainPendingRefs());
   // Register for push notifications (no-op when Firebase is not configured).
-  await PushMessagingService.instance.register();
+  // Not awaited: it shows a permission prompt and needs the network, so
+  // awaiting it held up launch, and an offline first start (getToken throws)
+  // left people stuck on the start-up error screen.
+  unawaited(PushMessagingService.instance.register().catchError(
+        (Object e) => debugPrint('[Push] registration skipped: $e'),
+      ));
 });
 
 /// `true` when the device is rooted (Android) or jailbroken (iOS).

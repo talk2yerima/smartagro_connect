@@ -423,7 +423,13 @@ class _EditListingSheetState extends State<_EditListingSheet> {
         'title': _titleCtrl.text.trim(),
         'priceNgn': int.parse(_priceCtrl.text.trim()),
         'quantityKg': int.parse(_qtyCtrl.text.trim()),
-        'availability': _availability.name,
+        // Stored spelling, as read by the app and the payments backend
+        // ('soldOut' was being saved and read back as in stock).
+        'availability': switch (_availability) {
+          ProductAvailability.inStock => 'in_stock',
+          ProductAvailability.limited => 'limited',
+          ProductAvailability.soldOut => 'sold_out',
+        },
         'description': widget.listing.description,
         'state': widget.listing.state,
         'city': widget.listing.city,

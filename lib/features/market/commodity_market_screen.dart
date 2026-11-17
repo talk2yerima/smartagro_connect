@@ -639,7 +639,7 @@ class _CommodityCard extends StatelessWidget {
     final c = commodity;
     final isUp = c.changePct >= 0;
     final trendColor = isUp ? AppColors.mintGreen : AppColors.errorRed;
-    final sparkData = mockSparklineFromChange(c.changePct);
+    final sparkData = trendFromChange(c.changePct);
     final catColor = _categoryColor(c.category);
     final catIcon = _categoryIcon(c.category);
 

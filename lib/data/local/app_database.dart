@@ -129,6 +129,29 @@ CREATE TABLE meta (
     await batch.commit(noResult: true);
   }
 
+  /// Replaces the whole product cache with [rows], so listings deleted on the
+  /// server (or old sample data) don't linger offline.
+  Future<void> replaceProducts(List<Map<String, dynamic>> rows) async {
+    final db = _db!;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    await db.transaction((txn) async {
+      final batch = txn.batch();
+      batch.delete('product_cache');
+      for (final r in rows) {
+        batch.insert(
+          'product_cache',
+          {'id': r['id'], 'payload': jsonEncode(r), 'updated_at': now},
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+      await batch.commit(noResult: true);
+    });
+  }
+
+  Future<void> deleteProduct(String id) async {
+    await _db!.delete('product_cache', where: 'id = ?', whereArgs: [id]);
+  }
+
   Future<List<Map<String, dynamic>>> readProducts({
     int? limit,
     int offset = 0,

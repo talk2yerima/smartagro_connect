@@ -818,6 +818,19 @@ class _InputBarState extends ConsumerState<_InputBar> {
           }
         } catch (e) {
           log.e('[Chat] sendChatMessage failed', error: e);
+          if (!mounted) return;
+          // Don't leave a bubble that looks delivered: take it back out and
+          // put the text back so the person can try again.
+          ref
+              .read(_localMessagesProvider(widget.threadId).notifier)
+              .update((s) => s.where((m) => m.id != localId).toList());
+          if (_controller.text.isEmpty) _controller.text = text;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Message not sent. Check your connection and '
+                  'tap send to try again.'),
+            ),
+          );
         }
       }();
     }

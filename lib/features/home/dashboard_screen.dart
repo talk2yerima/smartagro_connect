@@ -851,7 +851,7 @@ class _MarketWatch extends StatelessWidget {
                         ),
                       ),
                       SparklineChart(
-                        data: mockSparklineFromChange(c.changePct),
+                        data: trendFromChange(c.changePct),
                         color: sparkColor,
                         height: 36,
                         width: 72,

@@ -180,16 +180,9 @@ class _TrendsBody extends StatelessWidget {
                 .toList(),
             isDark: isDark,
           ).animate(delay: 300.ms).fadeIn().slideY(begin: 0.04),
-
-          const SizedBox(height: 20),
-
-          // [5] Market Insights
-          const SectionHeader(title: 'Market Insights'),
-          const SizedBox(height: 8),
-          const _MarketInsightsCard()
-              .animate(delay: 380.ms)
-              .fadeIn()
-              .slideY(begin: 0.04),
+          // The fixed "Market Insights" headlines were removed: they never
+          // changed and read as current news. Bring the section back once
+          // insights come from a real, dated source.
         ],
       ),
     );
@@ -422,7 +415,7 @@ class _CommodityTrendCard extends StatelessWidget {
     final up = c.changePct >= 0;
     final pctColor = up ? const Color(0xFF00C853) : const Color(0xFFC62828);
     final sparkColor = up ? const Color(0xFF00C853) : const Color(0xFFC62828);
-    final sparkData = mockSparklineFromChange(c.changePct);
+    final sparkData = trendFromChange(c.changePct);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -668,105 +661,6 @@ class _CategoryPerformanceCard extends StatelessWidget {
                       ],
                     );
                   },
-                ),
-              ],
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// [5] Market Insights Card
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _MarketInsightsCard extends StatelessWidget {
-  const _MarketInsightsCard();
-
-  static const _insights = [
-    (
-      icon: Icons.grain_rounded,
-      color: Color(0xFF2E7D32),
-      text:
-          'Maize prices rising due to seasonal demand ahead of planting season',
-    ),
-    (
-      icon: Icons.water_drop_rounded,
-      color: Color(0xFF0277BD),
-      text:
-          'Dry-season water scarcity in the north is tightening tomato supply',
-    ),
-    (
-      icon: Icons.local_shipping_rounded,
-      color: Color(0xFFFB8C00),
-      text:
-          'Improved Abuja-Kano corridor logistics reducing sorghum transport costs',
-    ),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: isDark
-          ? BoxDecoration(
-              color: const Color(0xFF1E1E1E),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF2E3C2E)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.22),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            )
-          : BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE2EAE0)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: _insights.asMap().entries.map((entry) {
-          final i = entry.key;
-          final insight = entry.value;
-          return Padding(
-            padding: EdgeInsets.only(bottom: i < _insights.length - 1 ? 14 : 0),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: insight.color.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(insight.icon, color: insight.color, size: 18),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    insight.text,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13,
-                      height: 1.45,
-                      color: AppColors.text(isDark),
-                    ),
-                  ),
                 ),
               ],
             ),

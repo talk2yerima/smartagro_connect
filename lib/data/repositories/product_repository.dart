@@ -51,7 +51,30 @@ class ProductRepository {
     }
   }
 
+  /// Fields a seller may change on an existing listing. The Firestore rules
+  /// reject any edit that touches `sellerId` or `verified`, so those (and
+  /// other fixed fields) are never sent.
+  static const editableFields = [
+    'title',
+    'priceNgn',
+    'quantityKg',
+    'availability',
+    'description',
+    'imageUrl',
+  ];
+
   Future<void> updateListing(String id, Map<String, dynamic> data) async {
+    if (_firestore.isAvailable) {
+      final fields = {
+        for (final key in editableFields)
+          if (data.containsKey(key)) key: data[key],
+      };
+      await _firestore.updateProduct(id, fields);
+      await _db.upsertProducts([
+        {...data, 'id': id}
+      ]);
+      return;
+    }
     try {
       await _remote.updateProduct(id, data);
       await _db.upsertProducts([data]);
@@ -65,6 +88,11 @@ class ProductRepository {
   }
 
   Future<void> deleteListing(String id) async {
+    if (_firestore.isAvailable) {
+      await _firestore.deleteProduct(id);
+      await _db.deleteProduct(id);
+      return;
+    }
     try {
       await _remote.deleteProduct(id);
     } on Failure catch (_) {
@@ -79,17 +107,18 @@ class ProductRepository {
 
   Future<List<ProductListing>> fetchProducts() async {
     // Firestore is the live source of truth when Firebase is configured.
+    // Real users only ever see real listings: an empty marketplace shows its
+    // empty state, never the bundled sample products.
     if (_firestore.isAvailable) {
-      final firestoreRows = await _firestore.fetchProducts();
-      if (firestoreRows.isNotEmpty) {
-        await _db.upsertProducts(firestoreRows);
-        return firestoreRows.map(productFromMap).toList();
+      try {
+        final rows = await _firestore.fetchProducts();
+        await _db.replaceProducts(rows);
+        return rows.map(productFromMap).toList();
+      } catch (_) {
+        // Offline with nothing in Firestore's own cache: last saved copy.
+        final cached = await _db.readProducts();
+        return cached.map(productFromMap).toList();
       }
-      // No real listings yet — show mock data so the UI is never blank.
-      final fixture = await _assets.loadJson(_asset);
-      final mockItems = (fixture['items'] as List).cast<Map<String, dynamic>>();
-      await _db.upsertProducts(mockItems);
-      return mockItems.map(productFromMap).toList();
     }
 
     // No Firebase — REST → SQLite cache → bundled fixture.

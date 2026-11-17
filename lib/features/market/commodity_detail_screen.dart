@@ -327,7 +327,7 @@ class _HeroPriceCard extends StatelessWidget {
           const SizedBox(height: 4),
 
           Text(
-            'Origin: ${_resolveOrigin(commodity)}',
+            'Category: ${commodity.category}',
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.60),
               fontSize: 12,
@@ -346,22 +346,6 @@ class _HeroPriceCard extends StatelessWidget {
         )
         .fadeIn(duration: 380.ms);
   }
-
-  String _resolveOrigin(Commodity c) {
-    // Commodity entity has no origin field — derive a plausible one from
-    // category so the UI is never blank.
-    const map = {
-      'Grains': 'Kano, Nigeria',
-      'Tubers': 'Benue, Nigeria',
-      'Vegetables': 'Plateau, Nigeria',
-      'Fruits': 'Ogun, Nigeria',
-      'Livestock': 'Sokoto, Nigeria',
-      'Poultry': 'Oyo, Nigeria',
-      'Fisheries': 'Lagos, Nigeria',
-      'Cash Crops': 'Ondo, Nigeria',
-    };
-    return map[c.category] ?? 'West Africa';
-  }
 }
 
 // ─── [2] Sparkline Chart Card ─────────────────────────────────────────────────
@@ -371,14 +355,18 @@ class _SparklineCard extends StatelessWidget {
 
   final Commodity commodity;
 
-  static const _dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isUp = commodity.changePct >= 0;
     final trendColor = isUp ? AppColors.mintGreen : AppColors.errorRed;
-    final sparkData = mockSparklineFromChange(commodity.changePct);
+    final sparkData =
+        trendFromChange(commodity.changePct, current: commodity.priceNgn);
+    final trendWord = commodity.changePct > 0
+        ? 'Rising'
+        : commodity.changePct < 0
+            ? 'Falling'
+            : 'Steady';
 
     return Container(
       decoration: _card(isDark),
@@ -403,7 +391,7 @@ class _SparklineCard extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               Text(
-                '7-Day Price Trend',
+                'Latest Price Move',
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
                       fontFamily: 'Poppins',
                       fontWeight: FontWeight.w700,
@@ -420,7 +408,7 @@ class _SparklineCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  isUp ? 'Uptrend' : 'Downtrend',
+                  trendWord,
                   style: TextStyle(
                     color: trendColor,
                     fontSize: 11,
@@ -450,15 +438,18 @@ class _SparklineCard extends StatelessWidget {
 
           const SizedBox(height: 8),
 
-          // ── X-axis day labels ──
+          // ── End-point labels: the two real prices behind the line ──
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: _dayLabels
+            children: [
+              'Previous ${formatNgn(sparkData.first.round())}',
+              'Now ${formatNgn(commodity.priceNgn)}',
+            ]
                 .map(
                   (d) => Text(
                     d,
                     style: TextStyle(
-                      fontSize: 10,
+                      fontSize: 12,
                       fontWeight: FontWeight.w500,
                       color:
                           isDark ? AppColors.darkTextSecondary : AppColors.gray,
@@ -496,23 +487,27 @@ class _MarketStatsGrid extends StatelessWidget {
         trend: null,
       ),
       _StatEntry(
-        label: '7-Day Change',
+        label: 'Latest Change',
         value: '${isUp ? '+' : ''}${commodity.changePct.toStringAsFixed(2)}%',
         icon: Icons.trending_up_rounded,
         color: isUp ? AppColors.mintGreen : AppColors.errorRed,
         trend: commodity.changePct,
       ),
-      const _StatEntry(
-        label: 'Volume',
-        value: '2,400',
+      // Real field in place of a fixed "2,400 MT" volume shown on every item.
+      _StatEntry(
+        label: 'Priced per',
+        value: commodity.unit,
         icon: Icons.inventory_2_outlined,
         color: AppColors.infoBlue,
-        unit: 'MT',
         trend: null,
       ),
       _StatEntry(
         label: 'Market Trend',
-        value: isUp ? 'Bullish' : 'Bearish',
+        value: commodity.changePct > 0
+            ? 'Rising'
+            : commodity.changePct < 0
+                ? 'Falling'
+                : 'Steady',
         icon: isUp ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
         color: isUp ? AppColors.mintGreen : AppColors.errorRed,
         trend: null,
@@ -553,7 +548,6 @@ class _MarketStatsGrid extends StatelessWidget {
               icon: s.icon,
               color: s.color,
               trend: s.trend,
-              unit: s.unit,
             ).animate(delay: (50 * i).ms).fadeIn().slideY(begin: 0.04);
           },
         ),
@@ -569,7 +563,6 @@ class _StatEntry {
     required this.icon,
     required this.color,
     required this.trend,
-    this.unit,
   });
 
   final String label;
@@ -577,7 +570,6 @@ class _StatEntry {
   final IconData icon;
   final Color color;
   final double? trend;
-  final String? unit;
 }
 
 // ─── [4] Details Card ────────────────────────────────────────────────────────
@@ -596,18 +588,13 @@ class _DetailsCard extends StatelessWidget {
           icon: Icons.category_outlined,
           label: 'Category',
           value: commodity.category),
-      _DetailRow(
-          icon: Icons.location_on_outlined,
-          label: 'Origin',
-          value: _originFor(commodity)),
+      // "Origin" (guessed from category) and "Last Updated" (fixed text,
+      // "Today, 09:30 AM") were removed: commodities store neither. Add them
+      // back when the price feed provides a source region and timestamp.
       _DetailRow(
           icon: Icons.straighten_outlined,
           label: 'Unit',
           value: commodity.unit),
-      const _DetailRow(
-          icon: Icons.update_rounded,
-          label: 'Last Updated',
-          value: 'Today, 09:30 AM'),
     ];
 
     return Container(
@@ -711,20 +698,6 @@ class _DetailsCard extends StatelessWidget {
           ),
       ],
     );
-  }
-
-  String _originFor(Commodity c) {
-    const map = {
-      'Grains': 'Kano, Nigeria',
-      'Tubers': 'Benue, Nigeria',
-      'Vegetables': 'Plateau, Nigeria',
-      'Fruits': 'Ogun, Nigeria',
-      'Livestock': 'Sokoto, Nigeria',
-      'Poultry': 'Oyo, Nigeria',
-      'Fisheries': 'Lagos, Nigeria',
-      'Cash Crops': 'Ondo, Nigeria',
-    };
-    return map[c.category] ?? 'West Africa';
   }
 }
 

@@ -136,4 +136,74 @@ void main() {
       verify(() => db.upsertProducts(any())).called(1);
     });
   });
+  // ── Firebase configured: Firestore is the source of truth ──────────────
+  group('with Firestore', () {
+    setUp(() {
+      when(() => firestore.isAvailable).thenReturn(true);
+      when(() => db.replaceProducts(any())).thenAnswer((_) async {});
+      when(() => db.deleteProduct(any())).thenAnswer((_) async {});
+      when(() => db.readProducts()).thenAnswer((_) async => List.from(_rows));
+    });
+
+    test('an empty marketplace stays empty (no sample products)', () async {
+      when(() => firestore.fetchProducts()).thenAnswer((_) async => []);
+
+      final result = await repo.fetchProducts();
+
+      expect(result, isEmpty);
+      verifyNever(() => assets.loadJson(any()));
+      verify(() => db.replaceProducts([])).called(1);
+    });
+
+    test('real listings replace the whole offline cache', () async {
+      when(() => firestore.fetchProducts())
+          .thenAnswer((_) async => List.from(_rows));
+
+      final result = await repo.fetchProducts();
+
+      expect(result.map((p) => p.id), ['p1', 'p2']);
+      verify(() => db.replaceProducts(any())).called(1);
+    });
+
+    test('offline falls back to the saved copy, not sample data', () async {
+      when(() => firestore.fetchProducts()).thenThrow(Exception('offline'));
+
+      final result = await repo.fetchProducts();
+
+      expect(result.length, 2);
+      verifyNever(() => assets.loadJson(any()));
+    });
+
+    test('edits go to Firestore with only seller-editable fields', () async {
+      when(() => firestore.updateProduct(any(), any()))
+          .thenAnswer((_) async {});
+
+      await repo.updateListing('p1', Map<String, dynamic>.from(_rows.first));
+
+      final sent = verify(() => firestore.updateProduct('p1', captureAny()))
+          .captured
+          .single as Map<String, dynamic>;
+      expect(sent.keys.toSet(), {
+        'title',
+        'priceNgn',
+        'quantityKg',
+        'availability',
+        'description',
+        'imageUrl',
+      });
+      expect(sent.containsKey('sellerId'), isFalse);
+      expect(sent.containsKey('verified'), isFalse);
+      verifyNever(() => remote.updateProduct(any(), any()));
+    });
+
+    test('deletes go to Firestore and leave the offline cache', () async {
+      when(() => firestore.deleteProduct(any())).thenAnswer((_) async {});
+
+      await repo.deleteListing('p1');
+
+      verify(() => firestore.deleteProduct('p1')).called(1);
+      verify(() => db.deleteProduct('p1')).called(1);
+      verifyNever(() => remote.deleteProduct(any()));
+    });
+  });
 }

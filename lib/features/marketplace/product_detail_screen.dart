@@ -390,12 +390,24 @@ class _ProductDetailViewState extends ConsumerState<_ProductDetailView> {
           child: _CircleIconButton(
             icon: Icons.share_rounded,
             isDark: isDark,
-            onTap: () {
+            onTap: () async {
               HapticFeedback.lightImpact();
+              // There's no public web link for listings yet, so share the
+              // details as text people can paste into WhatsApp or SMS.
+              final place = [p.city, p.state]
+                  .where((s) => s.trim().isNotEmpty)
+                  .join(', ');
+              final text = '${p.title}: ${formatNgn(p.priceNgn)} per kg, '
+                  '${p.quantityKg} kg available'
+                  '${place.isEmpty ? '' : ' in $place'}. '
+                  'Seller: ${p.sellerName}. Find it on SmartAgro Connect.';
+              await Clipboard.setData(ClipboardData(text: text));
+              if (!context.mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Share link copied'),
-                  duration: Duration(seconds: 2),
+                  content: Text('Listing details copied. Paste them into '
+                      'WhatsApp or SMS to share.'),
+                  duration: Duration(seconds: 3),
                 ),
               );
             },
@@ -416,7 +428,8 @@ class _ProductDetailViewState extends ConsumerState<_ProductDetailView> {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
-                    _bookmarked ? 'Removed from saved' : 'Saved to bookmarks',
+                    // _bookmarked already holds the new state here.
+                    _bookmarked ? 'Saved to bookmarks' : 'Removed from saved',
                   ),
                   duration: const Duration(seconds: 2),
                 ),

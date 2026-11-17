@@ -27,6 +27,28 @@ class FirestoreService {
 
   FirebaseFirestore get _db => FirebaseFirestore.instance;
 
+  /// How long to wait for the server to confirm a write. Firestore applies
+  /// writes to its local cache at once and keeps retrying in the background,
+  /// but the returned future only completes when the server answers, which
+  /// never happens while offline. After this delay the write is treated as
+  /// saved offline instead of leaving a spinner running forever.
+  static const writeConfirmTimeout = Duration(seconds: 8);
+
+  /// Awaits [write] for up to [writeConfirmTimeout]. A rejection that arrives
+  /// in time (e.g. permission denied) is rethrown; a write still pending after
+  /// that is left to sync on its own and any later failure is logged.
+  Future<void> _awaitWrite(Future<void> write, String label) async {
+    try {
+      await write.timeout(writeConfirmTimeout);
+    } on TimeoutException {
+      log.w('[Firestore] $label pending — saved offline, will sync');
+      unawaited(write.then<void>(
+        (_) => log.d('[Firestore] $label synced'),
+        onError: (Object e) => log.e('[Firestore] $label failed', error: e),
+      ));
+    }
+  }
+
   // ── User profiles ──────────────────────────────────────────────────────────
 
   Future<void> saveUserProfile(
@@ -200,11 +222,16 @@ class FirestoreService {
   Future<String?> addProduct(Map<String, dynamic> data) async {
     if (!isAvailable) return null;
     try {
-      final ref = await _db.collection('products').add({
-        ...data,
-        'createdAt': FieldValue.serverTimestamp(),
-        'status': 'active',
-      });
+      // doc() assigns the id locally, so the listing gets an id even offline.
+      final ref = _db.collection('products').doc();
+      await _awaitWrite(
+        ref.set({
+          ...data,
+          'createdAt': FieldValue.serverTimestamp(),
+          'status': 'active',
+        }),
+        'addProduct',
+      );
       log.d('[Firestore] addProduct → ${ref.id}');
       return ref.id;
     } catch (e) {
@@ -213,6 +240,27 @@ class FirestoreService {
     }
   }
 
+  /// Updates only [fields] on a listing. Callers must not include `sellerId`
+  /// or `verified`: the security rules reject edits to those.
+  Future<void> updateProduct(String id, Map<String, dynamic> fields) async {
+    await _awaitWrite(
+      _db.collection('products').doc(id).update({
+        ...fields,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }),
+      'updateProduct',
+    );
+  }
+
+  Future<void> deleteProduct(String id) async {
+    await _awaitWrite(
+      _db.collection('products').doc(id).delete(),
+      'deleteProduct',
+    );
+  }
+
+  /// Active listings, newest first. Throws when Firestore can't answer (and
+  /// has nothing cached), so callers can tell "no listings" from "offline".
   Future<List<Map<String, dynamic>>> fetchProducts() async {
     if (!isAvailable) return [];
     try {
@@ -233,7 +281,7 @@ class FirestoreService {
       }).toList();
     } catch (e) {
       log.e('[Firestore] fetchProducts failed', error: e);
-      return [];
+      rethrow;
     }
   }
 
@@ -347,12 +395,16 @@ class FirestoreService {
             'roles': {fromId: fromRole, peerId: peerRole},
             'lastMessage': imageUrl != null ? '📷 Image' : text,
             'updatedAt': FieldValue.serverTimestamp(),
-            'unreadCounts.$fromId': 0,
-            'unreadCounts.$peerId': FieldValue.increment(1),
+            // set() treats a dotted key like 'unreadCounts.uid' as a literal
+            // field name, so the counts must be a nested map (merged deeply).
+            'unreadCounts': {
+              fromId: 0,
+              peerId: FieldValue.increment(1),
+            },
           },
           SetOptions(merge: true));
 
-      await batch.commit();
+      await _awaitWrite(batch.commit(), 'sendChatMessage');
     } catch (e) {
       log.e('[Firestore] sendChatMessage failed', error: e);
       rethrow;

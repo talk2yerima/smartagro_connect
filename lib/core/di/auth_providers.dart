@@ -45,12 +45,22 @@ class AuthSessionNotifier extends StateNotifier<AppUser?> {
 
   final Ref _ref;
   StreamSubscription<fb.User?>? _firebaseSub;
+  final _restored = Completer<void>();
+
+  /// Completes once the saved sign-in has been read from secure storage.
+  /// Until then [state] is null even for a signed-in person, so anything
+  /// that routes on sign-in at start-up (the splash) must await this.
+  Future<void> get restored => _restored.future;
 
   Future<void> _init() async {
-    // Warm the in-memory cache from secure storage, then expose the user.
-    final repo = _ref.read(authRepositoryProvider);
-    await repo.initSession();
-    state = repo.currentSessionUser;
+    try {
+      // Warm the in-memory cache from secure storage, then expose the user.
+      final repo = _ref.read(authRepositoryProvider);
+      await repo.initSession();
+      if (mounted) state = repo.currentSessionUser;
+    } finally {
+      if (!_restored.isCompleted) _restored.complete();
+    }
 
     // If Firebase is ready, let its auth stream drive session state.
     // This means signing in/out on another device will update this device too.
