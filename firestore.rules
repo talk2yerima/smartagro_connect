@@ -1,0 +1,388 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function userRole() {
+      return userDoc().data.get('role', 'unknown');
+    }
+
+    function isAdmin() {
+      return isSignedIn() && userRole() == 'admin';
+    }
+
+    function isUserVerified() {
+      return userDoc().data.get('verified', false) == true;
+    }
+
+    // Fields of the request that differ from the stored document.
+    function changedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    // Roles a person may choose for themselves. "admin" is granted only by
+    // an existing admin (or the Firebase console), never self-assigned.
+    function isSelfServiceRole(role) {
+      return role in ['farmer', 'buyer', 'transporter'];
+    }
+
+    // Trust fields only admins / the backend may set on a user profile.
+    function protectedUserFields() {
+      // payoutReady is set only by the payouts backend; the rating totals
+      // only by the ratings backend (a seller must not inflate them).
+      return ['role', 'verified', 'banned', 'rating', 'ratingSum',
+              'ratingCount', 'ratingCounts', 'payoutReady'];
+    }
+
+    // ── User profiles ──────────────────────────────────────────────────────
+    match /users/{uid} {
+      // Any signed-in user can read profiles (needed for seller cards)
+      allow read: if isSignedIn();
+
+      // Owner creates their own profile with a self-service role and no
+      // trust flags pre-set.
+      allow create: if isOwner(uid) &&
+                       isSelfServiceRole(request.resource.data.get('role', 'farmer')) &&
+                       !request.resource.data.keys().hasAny(['verified', 'banned', 'rating',
+                                                             'ratingSum', 'ratingCount',
+                                                             'ratingCounts', 'payoutReady']);
+
+      // Owner may edit their own details but not role / verified / banned /
+      // rating. Admins may edit anything.
+      allow update: if isAdmin() ||
+                       (isOwner(uid) && !changedKeys().hasAny(protectedUserFields()));
+      allow delete: if isAdmin();
+
+      // Notifications: owner + admin only
+      match /notifications/{notifId} {
+        allow read, write: if isOwner(uid) || isAdmin();
+      }
+    }
+
+    // ── Product listings ───────────────────────────────────────────────────
+    function validListingNumbers(data) {
+      return data.priceNgn is int && data.priceNgn > 0 &&
+             data.quantityKg is int && data.quantityKg > 0;
+    }
+
+    match /products/{productId} {
+      allow read: if isSignedIn();
+
+      // Seller creates their own listing. The "verified" badge can only be
+      // claimed by a verified seller, and prices must be positive integers
+      // (the payments backend charges from these fields).
+      allow create: if isSignedIn() &&
+                       request.resource.data.sellerId == request.auth.uid &&
+                       validListingNumbers(request.resource.data) &&
+                       (request.resource.data.get('verified', false) == false ||
+                        isUserVerified()) &&
+                       request.resource.data.get('availability', 'in_stock') != 'sold_out';
+
+      // Seller edits their own listing but cannot hand it to someone else or
+      // grant themselves the verified badge. Admins may edit anything.
+      allow update: if isAdmin() ||
+                       (isSignedIn() &&
+                        resource.data.sellerId == request.auth.uid &&
+                        !changedKeys().hasAny(['sellerId', 'verified']) &&
+                        validListingNumbers(request.resource.data));
+
+      allow delete: if isSignedIn() &&
+                       (resource.data.sellerId == request.auth.uid || isAdmin());
+    }
+
+    // ── Payments & orders (written ONLY by the Cloud Functions backend) ────
+    // The Admin SDK bypasses these rules; app clients can only read.
+    match /payments/{reference} {
+      allow read: if isSignedIn() &&
+                     (resource.data.buyerId == request.auth.uid ||
+                      resource.data.sellerId == request.auth.uid ||
+                      isAdmin());
+      allow write: if false;
+    }
+
+    // Seller bank details (masked) and Paystack subaccount code. Written only
+    // by the payouts backend; the seller and admins can read them.
+    match /payoutAccounts/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow write: if false;
+    }
+
+    match /orders/{orderId} {
+      allow read: if isSignedIn() &&
+                     (resource.data.buyerId == request.auth.uid ||
+                      resource.data.sellerId == request.auth.uid ||
+                      isAdmin());
+      // Orders are created only by the payments backend and never deleted.
+      allow create, delete: if false;
+
+      // Delivery tracking: each person takes only their own step, in order,
+      // and nothing about the money can change.
+      allow update: if isSignedIn() &&
+                       (sellerDispatches() || buyerConfirmsReceipt() || buyerRates());
+
+      // Seller: paid → dispatched.
+      function sellerDispatches() {
+        return resource.data.sellerId == request.auth.uid &&
+               resource.data.status == 'paid' &&
+               request.resource.data.status == 'dispatched' &&
+               changedKeys().hasOnly(['status', 'dispatchedAt']) &&
+               request.resource.data.dispatchedAt == request.time;
+      }
+
+      // Buyer: paid or dispatched → received (they may get it before the
+      // seller remembers to tap "dispatched").
+      function buyerConfirmsReceipt() {
+        return resource.data.buyerId == request.auth.uid &&
+               resource.data.status in ['paid', 'dispatched'] &&
+               request.resource.data.status == 'received' &&
+               changedKeys().hasOnly(['status', 'receivedAt']) &&
+               request.resource.data.receivedAt == request.time;
+      }
+
+      // Buyer: one rating (1-5) and optional short review, after receipt.
+      function buyerRates() {
+        return resource.data.buyerId == request.auth.uid &&
+               resource.data.status == 'received' &&
+               !('rating' in resource.data) &&
+               changedKeys().hasOnly(['rating', 'review', 'ratedAt']) &&
+               request.resource.data.rating is int &&
+               request.resource.data.rating >= 1 &&
+               request.resource.data.rating <= 5 &&
+               (!('review' in request.resource.data) ||
+                (request.resource.data.review is string &&
+                 request.resource.data.review.size() <= 500)) &&
+               request.resource.data.ratedAt == request.time;
+      }
+    }
+
+    // ── Deliveries (haulage jobs) ──────────────────────────────────────────
+    // One job per order, stored under the order's reference. The buyer or
+    // seller posts it; any transporter can see open jobs and accept one;
+    // only the accepted transporter moves it along and shares their live
+    // location, which only the buyer, the seller and admins can see.
+    function validPlace(p) {
+      return p is map && p.keys().hasOnly(['label', 'state', 'lat', 'lng']) &&
+             p.label is string && p.label.size() > 0 && p.label.size() <= 200 &&
+             p.get('state', '') is string && p.get('state', '').size() <= 60 &&
+             p.lat is number && p.lat >= -90 && p.lat <= 90 &&
+             p.lng is number && p.lng >= -180 && p.lng <= 180;
+    }
+
+    function validJob(d) {
+      return d.keys().hasOnly(['orderId', 'description', 'weightKg', 'requesterId',
+                               'sellerId', 'buyerId', 'pickup', 'dropoff',
+                               'distanceKm', 'offerNgn', 'notes', 'status',
+                               'createdAt']) &&
+             d.description is string && d.description.size() <= 200 &&
+             d.weightKg is int && d.weightKg > 0 && d.weightKg <= 100000 &&
+             d.offerNgn is int && d.offerNgn >= 0 && d.offerNgn <= 100000000 &&
+             d.distanceKm is number && d.distanceKm >= 0 && d.distanceKm <= 5000 &&
+             (!('notes' in d) || (d.notes is string && d.notes.size() <= 500)) &&
+             validPlace(d.pickup) && validPlace(d.dropoff) &&
+             d.status == 'open' &&
+             d.requesterId == request.auth.uid &&
+             d.createdAt == request.time;
+    }
+
+    function validDriverLocation(l) {
+      return l is map && l.keys().hasOnly(['lat', 'lng', 'speedKmh', 'updatedAt']) &&
+             l.lat is number && l.lat >= -90 && l.lat <= 90 &&
+             l.lng is number && l.lng >= -180 && l.lng <= 180 &&
+             (!('speedKmh' in l) || l.speedKmh is number) &&
+             l.updatedAt == request.time;
+    }
+
+    match /haulageJobs/{orderId} {
+      function isJobParty() {
+        return request.auth.uid in [resource.data.buyerId, resource.data.sellerId];
+      }
+      function isJobTransporter() {
+        return resource.data.get('transporterId', null) == request.auth.uid;
+      }
+
+      // A missing job reads as "no delivery yet" for the order screen.
+      allow read: if isSignedIn() &&
+                     (resource == null || isJobParty() || isJobTransporter() ||
+                      (resource.data.status == 'open' && userRole() == 'transporter') ||
+                      isAdmin());
+
+      // The buyer or seller of a paid order asks for transport.
+      allow create: if isSignedIn() && postsForOwnOrder();
+
+      allow update: if isSignedIn() &&
+                       (transporterAccepts() || transporterPicksUp() ||
+                        transporterDelivers() || transporterSharesLocation() ||
+                        transporterHandsBack() || partyCancels() || partyReposts());
+      allow delete: if false;
+
+      function postsForOwnOrder() {
+        let order = get(/databases/$(database)/documents/orders/$(orderId)).data;
+        let d = request.resource.data;
+        return order.status in ['paid', 'dispatched'] &&
+               request.auth.uid in [order.buyerId, order.sellerId] &&
+               d.orderId == orderId &&
+               d.buyerId == order.buyerId && d.sellerId == order.sellerId &&
+               validJob(d);
+      }
+
+      function transporterAccepts() {
+        return resource.data.status == 'open' &&
+               userRole() == 'transporter' &&
+               !isJobParty() &&
+               request.resource.data.status == 'accepted' &&
+               request.resource.data.transporterId == request.auth.uid &&
+               request.resource.data.transporterName is string &&
+               request.resource.data.transporterName.size() <= 100 &&
+               request.resource.data.acceptedAt == request.time &&
+               changedKeys().hasOnly(['status', 'transporterId', 'transporterName', 'acceptedAt']);
+      }
+
+      function transporterPicksUp() {
+        return isJobTransporter() &&
+               resource.data.status == 'accepted' &&
+               request.resource.data.status == 'picked_up' &&
+               request.resource.data.pickedUpAt == request.time &&
+               changedKeys().hasOnly(['status', 'pickedUpAt', 'driverLocation']) &&
+               (!('driverLocation' in changedKeys()) ||
+                validDriverLocation(request.resource.data.driverLocation));
+      }
+
+      function transporterDelivers() {
+        return isJobTransporter() &&
+               resource.data.status == 'picked_up' &&
+               request.resource.data.status == 'delivered' &&
+               request.resource.data.deliveredAt == request.time &&
+               changedKeys().hasOnly(['status', 'deliveredAt', 'driverLocation']) &&
+               (!('driverLocation' in changedKeys()) ||
+                validDriverLocation(request.resource.data.driverLocation));
+      }
+
+      function transporterSharesLocation() {
+        return isJobTransporter() &&
+               resource.data.status in ['accepted', 'picked_up'] &&
+               changedKeys().hasOnly(['driverLocation']) &&
+               validDriverLocation(request.resource.data.driverLocation);
+      }
+
+      // Before pickup, the transporter can give the job back to the board.
+      function transporterHandsBack() {
+        return isJobTransporter() &&
+               resource.data.status == 'accepted' &&
+               request.resource.data.status == 'open' &&
+               !('transporterId' in request.resource.data) &&
+               !('transporterName' in request.resource.data) &&
+               !('acceptedAt' in request.resource.data) &&
+               !('driverLocation' in request.resource.data) &&
+               changedKeys().hasOnly(['status', 'transporterId', 'transporterName',
+                                      'acceptedAt', 'driverLocation']);
+      }
+
+      // Buyer or seller calls it off before the produce is collected.
+      function partyCancels() {
+        return isJobParty() &&
+               resource.data.status in ['open', 'accepted'] &&
+               request.resource.data.status == 'cancelled' &&
+               request.resource.data.cancelledAt == request.time &&
+               changedKeys().hasOnly(['status', 'cancelledAt']);
+      }
+
+      // ...and may post it again later, as a fresh open job.
+      function partyReposts() {
+        let d = request.resource.data;
+        return isJobParty() &&
+               resource.data.status == 'cancelled' &&
+               d.orderId == resource.data.orderId &&
+               d.buyerId == resource.data.buyerId &&
+               d.sellerId == resource.data.sellerId &&
+               validJob(d);
+      }
+    }
+
+    // ── Public reviews (written only by the ratings backend) ───────────────
+    match /reviews/{orderRef} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    // ── Chat threads ───────────────────────────────────────────────────────
+    match /chats/{threadId} {
+      // Read/update: must be an existing participant
+      allow read:   if isSignedIn() &&
+                       request.auth.uid in resource.data.participants;
+      // Participants may update thread metadata (last message, unread
+      // counts) but cannot add or remove people.
+      allow update: if isSignedIn() &&
+                       request.auth.uid in resource.data.participants &&
+                       !changedKeys().hasAny(['participants']);
+      // Create: requester must list themselves as a participant
+      allow create: if isSignedIn() &&
+                       request.auth.uid in request.resource.data.participants;
+      allow delete: if false;
+
+      // Messages subcollection
+      // Thread ID is sortedUID1 + '_' + sortedUID2.
+      // Firebase Auth UIDs are alphanumeric (no underscores), so this is safe.
+      match /messages/{msgId} {
+        function isThreadParticipant() {
+          return threadId.matches(request.auth.uid + '_.*') ||
+                 threadId.matches('.*_' + request.auth.uid);
+        }
+
+        allow read: if isSignedIn() && isThreadParticipant();
+        // fromId must equal the sender's UID
+        allow create: if isSignedIn() &&
+                         isThreadParticipant() &&
+                         request.resource.data.fromId == request.auth.uid;
+        // Messages are immutable once sent
+        allow update, delete: if false;
+      }
+    }
+
+    // ── Price alerts ───────────────────────────────────────────────────────
+    // Each person creates, sees and deletes only their own alerts. Only the
+    // backend switches an alert off once it fires (no client updates).
+    match /priceAlerts/{alertId} {
+      allow read, delete: if isSignedIn() &&
+                             resource.data.uid == request.auth.uid;
+      allow create: if isSignedIn() &&
+                       request.resource.data.uid == request.auth.uid &&
+                       request.resource.data.keys().hasOnly([
+                         'uid', 'commodityId', 'commodityName', 'unit',
+                         'targetNgn', 'direction', 'active', 'createdAt']) &&
+                       request.resource.data.commodityId is string &&
+                       request.resource.data.targetNgn is int &&
+                       request.resource.data.targetNgn > 0 &&
+                       request.resource.data.targetNgn <= 100000000 &&
+                       request.resource.data.direction in ['above', 'below'] &&
+                       request.resource.data.active == true &&
+                       request.resource.data.createdAt == request.time;
+      allow update: if false;
+    }
+
+    // ── Commodity reference data (admin-managed) ───────────────────────────
+    match /commodities/{doc} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ── Content reports / moderation queue ────────────────────────────────
+    match /reports/{reportId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn() &&
+                       request.resource.data.get('reporterId', request.auth.uid) == request.auth.uid;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+  }
+}

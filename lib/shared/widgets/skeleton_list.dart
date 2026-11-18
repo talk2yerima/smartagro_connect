@@ -1,6 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
 
+import '../../core/constants/app_colors.dart';
+
+/// Shimmer colours that suit the current theme. The old fixed light grey
+/// flashed white blocks on dark screens.
+Color skeletonBase(bool isDark) =>
+    isDark ? AppColors.cardDark : Colors.grey.shade200;
+Color skeletonHighlight(bool isDark) =>
+    isDark ? AppColors.darkBorder : Colors.grey.shade50;
+
 /// A single rounded shimmer block — use for inline placeholders.
 class SkeletonBox extends StatelessWidget {
   const SkeletonBox({
@@ -16,9 +25,10 @@ class SkeletonBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Shimmer.fromColors(
-      baseColor: Colors.grey.shade200,
-      highlightColor: Colors.grey.shade50,
+      baseColor: skeletonBase(isDark),
+      highlightColor: skeletonHighlight(isDark),
       child: Container(
         width: width,
         height: height,
@@ -53,9 +63,10 @@ class SkeletonList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Shimmer.fromColors(
-      baseColor: Colors.grey.shade200,
-      highlightColor: Colors.grey.shade50,
+      baseColor: skeletonBase(isDark),
+      highlightColor: skeletonHighlight(isDark),
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         physics: const NeverScrollableScrollPhysics(),

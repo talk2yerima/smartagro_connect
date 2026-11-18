@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -7,24 +6,31 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/di/auth_providers.dart';
+import '../../core/di/firestore_providers.dart';
+import '../../core/di/payment_providers.dart';
 import '../../core/di/repositories_provider.dart';
+import '../../core/errors/friendly_error.dart';
 import '../../core/utils/money_format.dart';
 import '../../domain/entities/product_listing.dart';
 import '../../shared/widgets/app_avatar.dart';
 import '../../shared/widgets/gradient_button.dart';
+import '../../shared/widgets/produce_image.dart';
 import '../../shared/widgets/section_header.dart';
 import '../../shared/widgets/skeleton_list.dart';
 import '../../shared/widgets/status_badge.dart';
+import '../payment/payment_sheet.dart';
+import 'seller_profile_screen.dart' show showPhotoViewer;
 
 // ---------------------------------------------------------------------------
 // Local helpers
 // ---------------------------------------------------------------------------
 
 BoxDecoration _card(bool isDark) => BoxDecoration(
-      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      color: isDark ? AppColors.cardDark : Colors.white,
       borderRadius: BorderRadius.circular(12),
       border: Border.all(
-        color: isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0),
+        color: isDark ? AppColors.darkBorder : AppColors.borderLight,
       ),
       boxShadow: [
         BoxShadow(
@@ -71,7 +77,7 @@ class ProductDetailScreen extends ConsumerWidget {
         ),
         body: Center(
           child: Text(
-            'Failed to load product.\n$e',
+            'Could not load this product.\n${friendlyError(e)}',
             textAlign: TextAlign.center,
           ),
         ),
@@ -110,7 +116,7 @@ class ProductDetailScreen extends ConsumerWidget {
 // _ProductDetailView
 // ---------------------------------------------------------------------------
 
-class _ProductDetailView extends StatefulWidget {
+class _ProductDetailView extends ConsumerStatefulWidget {
   const _ProductDetailView({
     required this.product,
     required this.similar,
@@ -120,11 +126,150 @@ class _ProductDetailView extends StatefulWidget {
   final List<ProductListing> similar;
 
   @override
-  State<_ProductDetailView> createState() => _ProductDetailViewState();
+  ConsumerState<_ProductDetailView> createState() => _ProductDetailViewState();
 }
 
-class _ProductDetailViewState extends State<_ProductDetailView> {
+class _ProductDetailViewState extends ConsumerState<_ProductDetailView> {
   bool _bookmarked = false;
+
+  Future<void> _showReportSheet(BuildContext context, ProductListing p) async {
+    final user = ref.read(authSessionProvider);
+    if (user == null) return;
+
+    String? selected;
+    const reasons = [
+      'Spam or misleading',
+      'Wrong price / quantity',
+      'Fake listing',
+      'Inappropriate content',
+    ];
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return StatefulBuilder(
+          builder: (ctx, setLocal) => Container(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              20,
+              20,
+              20 + MediaQuery.of(ctx).viewInsets.bottom,
+            ),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.cardDark : Colors.white,
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade400,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Report Listing',
+                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Select a reason for reporting this listing.',
+                  style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                        color: AppColors.gray,
+                      ),
+                ),
+                const SizedBox(height: 12),
+                RadioGroup<String>(
+                  groupValue: selected,
+                  onChanged: (v) => setLocal(() => selected = v),
+                  child: Column(
+                    children: reasons
+                        .map((r) => RadioListTile<String>(
+                              value: r,
+                              title: Text(
+                                r,
+                                style: Theme.of(ctx).textTheme.bodyMedium,
+                              ),
+                              activeColor: AppColors.deepGreen,
+                              dense: true,
+                            ))
+                        .toList(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.deepGreen,
+                        ),
+                        onPressed: selected == null
+                            ? null
+                            : () async {
+                                Navigator.pop(ctx);
+                                try {
+                                  await ref
+                                      .read(firestoreServiceProvider)
+                                      .submitReport(
+                                        productId: p.id,
+                                        productTitle: p.title,
+                                        reportedBy: user.id,
+                                        reason: selected!,
+                                      );
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                            'Report submitted. Thank you.'),
+                                        duration: Duration(seconds: 3),
+                                      ),
+                                    );
+                                  }
+                                } catch (_) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                            'Failed to submit report. Try again.'),
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                        child: const Text('Submit'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -132,8 +277,7 @@ class _ProductDetailViewState extends State<_ProductDetailView> {
     final p = widget.product;
 
     return Scaffold(
-      backgroundColor:
-          isDark ? AppColors.darkBg : AppColors.softWhite,
+      backgroundColor: isDark ? AppColors.darkBg : AppColors.softWhite,
       extendBodyBehindAppBar: true,
       body: Stack(
         children: [
@@ -160,7 +304,10 @@ class _ProductDetailViewState extends State<_ProductDetailView> {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: _SellerCard(product: p, isDark: isDark),
-                    ).animate(delay: 50.ms).fadeIn(duration: 300.ms).slideY(begin: 0.04),
+                    )
+                        .animate(delay: 50.ms)
+                        .fadeIn(duration: 300.ms)
+                        .slideY(begin: 0.04),
 
                     const SizedBox(height: 12),
 
@@ -168,7 +315,10 @@ class _ProductDetailViewState extends State<_ProductDetailView> {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: _DetailsCard(product: p, isDark: isDark),
-                    ).animate(delay: 100.ms).fadeIn(duration: 300.ms).slideY(begin: 0.04),
+                    )
+                        .animate(delay: 100.ms)
+                        .fadeIn(duration: 300.ms)
+                        .slideY(begin: 0.04),
 
                     const SizedBox(height: 12),
 
@@ -178,7 +328,10 @@ class _ProductDetailViewState extends State<_ProductDetailView> {
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: _DescriptionCard(
                             description: p.description, isDark: isDark),
-                      ).animate(delay: 150.ms).fadeIn(duration: 300.ms).slideY(begin: 0.04),
+                      )
+                          .animate(delay: 150.ms)
+                          .fadeIn(duration: 300.ms)
+                          .slideY(begin: 0.04),
                       const SizedBox(height: 12),
                     ],
 
@@ -195,8 +348,8 @@ class _ProductDetailViewState extends State<_ProductDetailView> {
                       const SizedBox(height: 12),
                     ],
 
-                    // Bottom padding to clear sticky bar
-                    const SizedBox(height: 96),
+                    // Room for the sticky bar (with its quantity picker).
+                    const SizedBox(height: 200),
                   ],
                 ),
               ),
@@ -225,12 +378,12 @@ class _ProductDetailViewState extends State<_ProductDetailView> {
       pinned: true,
       elevation: 0,
       scrolledUnderElevation: 0.5,
-      backgroundColor:
-          isDark ? const Color(0xFF121212) : Colors.white,
+      backgroundColor: isDark ? AppColors.darkBg : Colors.white,
       leading: Padding(
         padding: const EdgeInsets.all(8),
         child: _CircleIconButton(
           icon: Icons.arrow_back_rounded,
+          label: 'Back',
           isDark: isDark,
           onTap: () => context.pop(),
         ),
@@ -240,21 +393,35 @@ class _ProductDetailViewState extends State<_ProductDetailView> {
           padding: const EdgeInsets.only(right: 4),
           child: _CircleIconButton(
             icon: Icons.share_rounded,
+            label: 'Share listing',
             isDark: isDark,
-            onTap: () {
+            onTap: () async {
               HapticFeedback.lightImpact();
+              // There's no public web link for listings yet, so share the
+              // details as text people can paste into WhatsApp or SMS.
+              final place = [p.city, p.state]
+                  .where((s) => s.trim().isNotEmpty)
+                  .join(', ');
+              final text = '${p.title}: ${formatNgn(p.priceNgn)} per kg, '
+                  '${p.quantityKg} kg available'
+                  '${place.isEmpty ? '' : ' in $place'}. '
+                  'Seller: ${p.sellerName}. Find it on SmartAgro Connect.';
+              await Clipboard.setData(ClipboardData(text: text));
+              if (!context.mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Share link copied'),
-                  duration: Duration(seconds: 2),
+                  content: Text('Listing details copied. Paste them into '
+                      'WhatsApp or SMS to share.'),
+                  duration: Duration(seconds: 3),
                 ),
               );
             },
           ),
         ),
         Padding(
-          padding: const EdgeInsets.only(right: 8),
+          padding: const EdgeInsets.only(right: 4),
           child: _CircleIconButton(
+            label: _bookmarked ? 'Remove from saved' : 'Save listing',
             icon: _bookmarked
                 ? Icons.bookmark_rounded
                 : Icons.bookmark_border_rounded,
@@ -267,11 +434,24 @@ class _ProductDetailViewState extends State<_ProductDetailView> {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
-                    _bookmarked ? 'Removed from saved' : 'Saved to bookmarks',
+                    // _bookmarked already holds the new state here.
+                    _bookmarked ? 'Saved to bookmarks' : 'Removed from saved',
                   ),
                   duration: const Duration(seconds: 2),
                 ),
               );
+            },
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: _CircleIconButton(
+            icon: Icons.flag_outlined,
+            label: 'Report listing',
+            isDark: isDark,
+            onTap: () {
+              HapticFeedback.lightImpact();
+              _showReportSheet(context, p);
             },
           ),
         ),
@@ -281,53 +461,28 @@ class _ProductDetailViewState extends State<_ProductDetailView> {
         background: Stack(
           fit: StackFit.expand,
           children: [
-            Hero(
-              tag: 'product-image-${p.id}',
-              child: CachedNetworkImage(
-                imageUrl: p.imageUrl,
-                fit: BoxFit.cover,
-                placeholder: (_, __) => Container(
-                  color: isDark
-                      ? AppColors.cardDark
-                      : AppColors.surfaceLight,
-                  child: const Center(
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: AppColors.deepGreen,
+            _PhotoGallery(product: p),
+            // Bottom shading is for photos only: over the plain no-photo
+            // placeholder it made a muddy grey band.
+            if (hasRealPhoto(p.imageUrl))
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: 120,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        Colors.black.withValues(alpha: 0.65),
+                      ],
                     ),
                   ),
                 ),
-                errorWidget: (_, __, ___) => Container(
-                  color: isDark
-                      ? AppColors.cardDark
-                      : AppColors.surfaceLight,
-                  child: const Icon(
-                    Icons.image_not_supported_outlined,
-                    size: 48,
-                    color: AppColors.gray,
-                  ),
-                ),
               ),
-            ),
-            // Bottom gradient overlay
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              height: 120,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      Colors.black.withValues(alpha: 0.65),
-                    ],
-                  ),
-                ),
-              ),
-            ),
           ],
         ),
       ),
@@ -342,6 +497,7 @@ class _ProductDetailViewState extends State<_ProductDetailView> {
 class _CircleIconButton extends StatelessWidget {
   const _CircleIconButton({
     required this.icon,
+    required this.label,
     required this.isDark,
     required this.onTap,
     this.activeColor,
@@ -349,6 +505,9 @@ class _CircleIconButton extends StatelessWidget {
   });
 
   final IconData icon;
+
+  /// Spoken by screen readers and shown on long-press.
+  final String label;
   final bool isDark;
   final VoidCallback onTap;
   final Color? activeColor;
@@ -356,23 +515,40 @@ class _CircleIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Solid enough to stay visible over busy product photos.
     final bgColor = isDark
-        ? Colors.white.withValues(alpha: 0.12)
-        : Colors.black.withValues(alpha: 0.06);
+        ? Colors.black.withValues(alpha: 0.45)
+        : Colors.white.withValues(alpha: 0.88);
     final iconColor = isActive && activeColor != null
         ? activeColor!
         : (isDark ? Colors.white : AppColors.charcoal);
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: bgColor,
-          shape: BoxShape.circle,
+    // 36 px circle drawn inside a 48 px touch area (the minimum
+    // comfortable target); the old 36 px GestureDetector was easy to miss.
+    return Tooltip(
+      message: label,
+      child: Semantics(
+        button: true,
+        label: label,
+        child: InkResponse(
+          onTap: onTap,
+          radius: 24,
+          child: SizedBox(
+            width: 48,
+            height: 48,
+            child: Center(
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: bgColor,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 20, color: iconColor),
+              ),
+            ),
+          ),
         ),
-        child: Icon(icon, size: 20, color: iconColor),
       ),
     );
   }
@@ -407,7 +583,7 @@ class _PriceHeroSection extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  '${formatNgn(product.priceNgn)} / kg',
+                  '${formatNgn(product.priceNgn)} per kg',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
@@ -482,6 +658,8 @@ class _PriceHeroSection extends StatelessWidget {
         return AppColors.freshGreen;
       case ProductAvailability.limited:
         return AppColors.warmOrange;
+      case ProductAvailability.preOrder:
+        return AppColors.infoBlue;
       case ProductAvailability.soldOut:
         return AppColors.errorRed;
     }
@@ -493,6 +671,8 @@ class _PriceHeroSection extends StatelessWidget {
         return 'In Stock';
       case ProductAvailability.limited:
         return 'Limited';
+      case ProductAvailability.preOrder:
+        return 'Pre-order';
       case ProductAvailability.soldOut:
         return 'Sold Out';
     }
@@ -504,6 +684,8 @@ class _PriceHeroSection extends StatelessWidget {
         return Icons.check_circle_outline_rounded;
       case ProductAvailability.limited:
         return Icons.hourglass_bottom_rounded;
+      case ProductAvailability.preOrder:
+        return Icons.event_available_rounded;
       case ProductAvailability.soldOut:
         return Icons.remove_circle_outline_rounded;
     }
@@ -579,14 +761,14 @@ class _InfoChip extends StatelessWidget {
 // [2] _SellerCard
 // ---------------------------------------------------------------------------
 
-class _SellerCard extends StatelessWidget {
+class _SellerCard extends ConsumerWidget {
   const _SellerCard({required this.product, required this.isDark});
 
   final ProductListing product;
   final bool isDark;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final textColor = AppColors.text(isDark);
     final subTextColor = AppColors.subText(isDark);
 
@@ -663,11 +845,13 @@ class _SellerCard extends StatelessWidget {
               Expanded(
                 child: FilledButton.icon(
                   onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Opening chat with seller...'),
-                        duration: Duration(seconds: 2),
-                      ),
+                    final myUid = ref.read(authSessionProvider)?.id ?? '';
+                    final ids = [myUid, product.sellerId]..sort();
+                    final threadId = ids.join('_');
+                    context.push(
+                      '/chat/$threadId'
+                      '?name=${Uri.encodeComponent(product.sellerName)}'
+                      '&peerId=${product.sellerId}',
                     );
                   },
                   icon: const Icon(Icons.chat_bubble_rounded, size: 16),
@@ -689,14 +873,7 @@ class _SellerCard extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Viewing seller profile...'),
-                        duration: Duration(seconds: 2),
-                      ),
-                    );
-                  },
+                  onPressed: () => context.push('/seller/${product.sellerId}'),
                   icon: const Icon(Icons.person_outline_rounded, size: 16),
                   label: const Text('View Profile'),
                   style: OutlinedButton.styleFrom(
@@ -835,9 +1012,8 @@ class _DetailsCard extends StatelessWidget {
                       : AppColors.softWhite,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: isDark
-                        ? const Color(0xFF2E3C2E)
-                        : AppColors.borderLight,
+                    color:
+                        isDark ? AppColors.darkBorder : AppColors.borderLight,
                   ),
                 ),
                 child: Row(
@@ -853,21 +1029,25 @@ class _DetailsCard extends StatelessWidget {
                             d.label,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style:
-                                Theme.of(context).textTheme.labelSmall?.copyWith(
-                                      color: subTextColor,
-                                      fontSize: 10,
-                                    ),
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelSmall
+                                ?.copyWith(
+                                  color: subTextColor,
+                                  fontSize: 10,
+                                ),
                           ),
                           Text(
                             d.value,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style:
-                                Theme.of(context).textTheme.labelMedium?.copyWith(
-                                      color: textColor,
-                                      fontWeight: FontWeight.w700,
-                                    ),
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelMedium
+                                ?.copyWith(
+                                  color: textColor,
+                                  fontWeight: FontWeight.w700,
+                                ),
                           ),
                         ],
                       ),
@@ -1007,8 +1187,7 @@ class _SimilarCard extends StatelessWidget {
     final subTextColor = AppColors.subText(isDark);
 
     return GestureDetector(
-      onTap: () =>
-          context.push('/marketplace/product/${product.id}'),
+      onTap: () => context.push('/marketplace/product/${product.id}'),
       child: Container(
         width: 148,
         margin: const EdgeInsets.only(right: 12),
@@ -1020,30 +1199,11 @@ class _SimilarCard extends StatelessWidget {
             ClipRRect(
               borderRadius:
                   const BorderRadius.vertical(top: Radius.circular(12)),
-              child: CachedNetworkImage(
-                imageUrl: product.imageUrl,
+              child: ProduceImage(
+                url: product.imageUrl,
                 width: 148,
                 height: 90,
                 fit: BoxFit.cover,
-                placeholder: (_, __) => Container(
-                  width: 148,
-                  height: 90,
-                  color: isDark
-                      ? AppColors.cardDark
-                      : AppColors.surfaceLight,
-                ),
-                errorWidget: (_, __, ___) => Container(
-                  width: 148,
-                  height: 90,
-                  color: isDark
-                      ? AppColors.cardDark
-                      : AppColors.surfaceLight,
-                  child: const Icon(
-                    Icons.image_not_supported_outlined,
-                    color: AppColors.gray,
-                    size: 28,
-                  ),
-                ),
               ),
             ),
 
@@ -1096,31 +1256,135 @@ class _SimilarCard extends StatelessWidget {
 // Bottom sticky bar
 // ---------------------------------------------------------------------------
 
-class _BottomBar extends StatelessWidget {
+class _BottomBar extends ConsumerStatefulWidget {
   const _BottomBar({required this.product, required this.isDark});
 
   final ProductListing product;
   final bool isDark;
 
   @override
+  ConsumerState<_BottomBar> createState() => _BottomBarState();
+}
+
+/// Sticky bar: the buyer chooses how many kg to buy (not the whole lot),
+/// sees the total, and pays for exactly that.
+class _BottomBarState extends ConsumerState<_BottomBar> {
+  late int _qty;
+  late final TextEditingController _qtyCtrl;
+
+  int get _available => widget.product.quantityKg;
+
+  @override
+  void initState() {
+    super.initState();
+    // Start small: 10 kg, or everything if there's less than that.
+    _qty = _available < 10 ? _available : 10;
+    if (_qty < 1) _qty = 1;
+    _qtyCtrl = TextEditingController(text: '$_qty');
+  }
+
+  @override
+  void dispose() {
+    _qtyCtrl.dispose();
+    super.dispose();
+  }
+
+  void _setQty(int value) {
+    final v = value.clamp(1, _available < 1 ? 1 : _available);
+    setState(() => _qty = v);
+    if (_qtyCtrl.text != '$v') {
+      _qtyCtrl.value = TextEditingValue(
+        text: '$v',
+        selection: TextSelection.collapsed(offset: '$v'.length),
+      );
+    }
+  }
+
+  bool get _qtyValid {
+    final typed = int.tryParse(_qtyCtrl.text);
+    return typed != null && typed >= 1 && typed <= _available;
+  }
+
+  Future<void> _buy() async {
+    final product = widget.product;
+    HapticFeedback.mediumImpact();
+    final result = await PaymentSheet.show(
+      context,
+      productId: product.id,
+      quantityKg: _qty,
+      amountNgn: (product.priceNgn * _qty).toDouble(),
+      description: '$_qty kg of ${product.title}',
+    );
+    if (!mounted) return;
+    if (result == PaymentResult.success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Payment successful! See it under Orders.'),
+          backgroundColor: AppColors.deepGreen,
+          duration: Duration(seconds: 4),
+        ),
+      );
+    } else if (result == PaymentResult.failed) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Payment was not completed. Try again.'),
+          backgroundColor: AppColors.errorRed,
+        ),
+      );
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final subTextColor = AppColors.subText(isDark);
-    final isSoldOut = product.availability == ProductAvailability.soldOut;
+    final product = widget.product;
+    final isDark = widget.isDark;
+    final user = ref.watch(authSessionProvider);
+    final sub = AppColors.subText(isDark);
+    final isSoldOut =
+        product.availability == ProductAvailability.soldOut || _available < 1;
+    final isOwnListing = user?.id == product.sellerId;
+    // Sales are paid straight to the seller's bank, so a seller with no
+    // bank account on file can't be paid yet (the server refuses too).
+    final sellerCanBePaid = isOwnListing
+        ? true
+        : ref.watch(sellerCanBePaidProvider(product.sellerId)).valueOrNull ??
+            true;
+    final canBuy = !isOwnListing && !isSoldOut && sellerCanBePaid;
+    final accent = isDark ? AppColors.lightGreen : AppColors.deepGreen;
+
+    final Widget action;
+    if (isOwnListing) {
+      action = OutlinedButton.icon(
+        onPressed: null,
+        icon: const Icon(Icons.storefront_rounded, size: 18),
+        label: const Text('Your Listing'),
+      );
+    } else if (isSoldOut) {
+      action = const PrimaryGradientButton(label: 'Sold Out', onPressed: null);
+    } else if (!sellerCanBePaid) {
+      action = Text(
+        "This seller can't receive payments yet. Contact them to arrange "
+        'the sale.',
+        style: TextStyle(color: sub, fontSize: 13),
+      );
+    } else {
+      action = PrimaryGradientButton(
+        label: 'Buy $_qty kg',
+        onPressed: _qtyValid ? _buy : null,
+      );
+    }
+
+    // Quick choices: a few round amounts below what's on sale, plus "All".
+    final quick = [10, 25, 50, 100].where((q) => q < _available).toList();
 
     return Container(
       padding: EdgeInsets.fromLTRB(
-        16,
-        12,
-        16,
-        12 + MediaQuery.of(context).padding.bottom,
-      ),
+          16, 12, 16, 12 + MediaQuery.of(context).padding.bottom),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF121212) : Colors.white,
+        color: isDark ? AppColors.darkBg : Colors.white,
         border: Border(
           top: BorderSide(
-            color: isDark ? const Color(0xFF2E3C2E) : AppColors.borderLight,
-            width: 1,
-          ),
+              color: isDark ? AppColors.darkBorder : AppColors.borderLight),
         ),
         boxShadow: [
           BoxShadow(
@@ -1130,54 +1394,188 @@ class _BottomBar extends StatelessWidget {
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Price column
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Price per kg',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: subTextColor,
+          if (canBuy) ...[
+            Row(
+              children: [
+                const Text('How much?',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+                const Spacer(),
+                IconButton.filledTonal(
+                  tooltip: 'Less',
+                  onPressed: _qty > 1 ? () => _setQty(_qty - 1) : null,
+                  icon: const Icon(Icons.remove_rounded),
+                ),
+                SizedBox(
+                  width: 64,
+                  child: TextField(
+                    controller: _qtyCtrl,
+                    textAlign: TextAlign.center,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.w700),
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(vertical: 8),
                     ),
-              ),
-              Text(
-                formatNgn(product.priceNgn),
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontFamily: 'Poppins',
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.deepGreen,
-                    ),
-              ),
-            ],
-          ),
-
-          const SizedBox(width: 16),
-
-          // Make Offer button
-          Expanded(
-            child: PrimaryGradientButton(
-              label: isSoldOut ? 'Sold Out' : 'Make Offer',
-              onPressed: isSoldOut
-                  ? null
-                  : () {
-                      HapticFeedback.mediumImpact();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Sending offer for ${product.title}...',
-                          ),
-                          duration: const Duration(seconds: 2),
-                        ),
-                      );
+                    onChanged: (v) {
+                      final n = int.tryParse(v);
+                      if (n != null && n >= 1 && n <= _available) {
+                        setState(() => _qty = n);
+                      } else {
+                        setState(() {}); // refresh the Buy button state
+                      }
                     },
-              icon: isSoldOut ? null : Icons.handshake_rounded,
+                    onSubmitted: (v) => _setQty(int.tryParse(v) ?? _qty),
+                  ),
+                ),
+                IconButton.filledTonal(
+                  tooltip: 'More',
+                  onPressed: _qty < _available ? () => _setQty(_qty + 1) : null,
+                  icon: const Icon(Icons.add_rounded),
+                ),
+                const SizedBox(width: 4),
+                const Text('kg'),
+              ],
             ),
+            Row(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        for (final q in quick)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: ChoiceChip(
+                              label: Text('$q kg'),
+                              selected: _qty == q,
+                              onSelected: (_) => _setQty(q),
+                            ),
+                          ),
+                        ChoiceChip(
+                          label: Text('All $_available kg'),
+                          selected: _qty == _available,
+                          onSelected: (_) => _setQty(_available),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (!_qtyValid)
+              Text('Choose between 1 and $_available kg.',
+                  style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                      fontSize: 12)),
+            const SizedBox(height: 8),
+          ],
+          Row(
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    canBuy ? 'Total for $_qty kg' : '$_available kg available',
+                    style: Theme.of(context)
+                        .textTheme
+                        .labelSmall
+                        ?.copyWith(color: sub),
+                  ),
+                  Text(
+                    formatNgn(product.priceNgn * (canBuy ? _qty : 1)),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontFamily: 'Poppins',
+                          fontWeight: FontWeight.w800,
+                          color: accent,
+                        ),
+                  ),
+                  Text(
+                    canBuy ? '${formatNgn(product.priceNgn)} per kg' : 'per kg',
+                    style: Theme.of(context)
+                        .textTheme
+                        .labelSmall
+                        ?.copyWith(color: sub),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 16),
+              Expanded(child: action),
+            ],
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The listing's photos: swipe through them, tap to view full screen.
+class _PhotoGallery extends StatefulWidget {
+  const _PhotoGallery({required this.product});
+
+  final ProductListing product;
+
+  @override
+  State<_PhotoGallery> createState() => _PhotoGalleryState();
+}
+
+class _PhotoGalleryState extends State<_PhotoGallery> {
+  int _page = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = widget.product;
+    final photos = p.photos;
+    if (photos.length <= 1) {
+      return Hero(
+        tag: 'product-image-${p.id}',
+        child: GestureDetector(
+          onTap:
+              photos.isEmpty ? null : () => showPhotoViewer(context, photos, 0),
+          child: ProduceImage(url: p.imageUrl, fit: BoxFit.cover),
+        ),
+      );
+    }
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        PageView.builder(
+          itemCount: photos.length,
+          onPageChanged: (i) => setState(() => _page = i),
+          itemBuilder: (_, i) {
+            final image = GestureDetector(
+              onTap: () => showPhotoViewer(context, photos, i),
+              child: ProduceImage(url: photos[i], fit: BoxFit.cover),
+            );
+            return i == 0
+                ? Hero(tag: 'product-image-${p.id}', child: image)
+                : image;
+          },
+        ),
+        Positioned(
+          right: 12,
+          bottom: 14,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.black54,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text('${_page + 1} / ${photos.length}',
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600)),
+          ),
+        ),
+      ],
     );
   }
 }

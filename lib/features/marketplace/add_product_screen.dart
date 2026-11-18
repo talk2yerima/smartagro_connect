@@ -4,14 +4,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/constants/nigerian_states.dart';
 import '../../core/di/auth_providers.dart';
+import '../../core/di/haulage_providers.dart';
 import '../../core/di/repositories_provider.dart';
 import '../../core/di/upload_providers.dart';
+import '../../core/services/app_lock.dart';
+import '../../core/utils/money_format.dart';
+import '../../data/services/location_service.dart';
 import '../../shared/widgets/gradient_button.dart';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -24,55 +28,30 @@ const _kCategories = [
   'Oilseeds',
 ];
 
-const _kNigerianStates = [
-  'Abia',
-  'Adamawa',
-  'Akwa Ibom',
-  'Anambra',
-  'Bauchi',
-  'Bayelsa',
-  'Benue',
-  'Borno',
-  'Cross River',
-  'Delta',
-  'Ebonyi',
-  'Edo',
-  'Ekiti',
-  'Enugu',
-  'FCT — Abuja',
-  'Gombe',
-  'Imo',
-  'Jigawa',
-  'Kaduna',
-  'Kano',
-  'Katsina',
-  'Kebbi',
-  'Kogi',
-  'Kwara',
-  'Lagos',
-  'Nasarawa',
-  'Niger',
-  'Ogun',
-  'Ondo',
-  'Osun',
-  'Oyo',
-  'Plateau',
-  'Rivers',
-  'Sokoto',
-  'Taraba',
-  'Yobe',
-  'Zamfara',
-];
-
+// Pre-order is a real state now: read back as ProductAvailability.preOrder
+// and shown as "Pre-order" (still growing, delivered at harvest).
 enum _Availability { inStock, limited, preOrder }
+
+/// One extra listing photo (after the cover) and its upload.
+class _ExtraPhoto {
+  _ExtraPhoto(this.path);
+
+  final String path;
+  String? url;
+  double progress = 0;
+  bool failed = false;
+}
+
+/// Cover photo plus this many more.
+const _maxExtraPhotos = 4;
 
 // ─── Card decoration helper ───────────────────────────────────────────────────
 
 BoxDecoration _card(bool isDark) => BoxDecoration(
-      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      color: isDark ? AppColors.cardDark : Colors.white,
       borderRadius: BorderRadius.circular(12),
       border: Border.all(
-        color: isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0),
+        color: isDark ? AppColors.darkBorder : AppColors.borderLight,
       ),
       boxShadow: [
         BoxShadow(
@@ -109,6 +88,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
   String? _selectedCategory;
   String? _selectedState;
   _Availability _availability = _Availability.inStock;
+  final _extraPhotos = <_ExtraPhoto>[];
   bool _busy = false;
   bool _locating = false;
 
@@ -128,7 +108,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      backgroundColor: isDark ? AppColors.cardDark : Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -196,9 +176,11 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
 
   Future<void> _pickImage(ImageSource source) async {
     try {
+      // Camera/gallery/permission screens are an expected trip: no re-lock.
+      ref.read(appLockProvider.notifier).allowNextReturn();
       final picker = ImagePicker();
-      final file =
-          await picker.pickImage(source: source, imageQuality: 80, maxWidth: 1200);
+      final file = await picker.pickImage(
+          source: source, imageQuality: 80, maxWidth: 1200);
       if (file != null) {
         setState(() {
           _imagePath = file.path;
@@ -225,55 +207,91 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
         .read(imageUploadServiceProvider)
         .uploadProductImage(
           filePath: path,
-          productId: 'listing-${path.hashCode.abs()}',
+          // Unique per pick, filed under the seller (was product_images/anon).
+          productId: 'listing-${DateTime.now().millisecondsSinceEpoch}',
+          userId: ref.read(authSessionProvider)?.id,
           onProgress: (p) {
             if (mounted) setState(() => _uploadProgress = p);
           },
         )
         .then((url) {
-          if (mounted) {
-            setState(() {
-              _uploadedImageUrl = url;
-              _uploadProgress = null;
-            });
-          }
-        })
-        .catchError((_) {
-          if (mounted) {
-            setState(() => _uploadProgress = null);
-            _showSnack('Image upload failed. Please try again.');
-          }
+      if (mounted) {
+        setState(() {
+          _uploadedImageUrl = url;
+          _uploadProgress = null;
         });
+      }
+    }).catchError((_) {
+      if (mounted) {
+        setState(() => _uploadProgress = null);
+        _showSnack('Image upload failed. Please try again.');
+      }
+    });
+  }
+
+  // ─── Extra photos ─────────────────────────────────────────────────────────
+
+  Future<void> _addExtraPhotos() async {
+    ref.read(appLockProvider.notifier).allowNextReturn();
+    final room = _maxExtraPhotos - _extraPhotos.length;
+    if (room <= 0) return;
+    try {
+      final files = await ImagePicker()
+          .pickMultiImage(imageQuality: 80, maxWidth: 1200, limit: room);
+      for (final f in files.take(room)) {
+        final photo = _ExtraPhoto(f.path);
+        setState(() => _extraPhotos.add(photo));
+        _uploadExtra(photo);
+      }
+    } catch (_) {
+      _showSnack('Could not open your photos.');
+    }
+  }
+
+  void _uploadExtra(_ExtraPhoto photo) {
+    ref
+        .read(imageUploadServiceProvider)
+        .uploadProductImage(
+          filePath: photo.path,
+          productId: 'listing-${DateTime.now().microsecondsSinceEpoch}',
+          userId: ref.read(authSessionProvider)?.id,
+          onProgress: (p) {
+            if (mounted) setState(() => photo.progress = p);
+          },
+        )
+        .then((url) {
+      if (mounted) setState(() => photo.url = url);
+    }).catchError((_) {
+      if (mounted) setState(() => photo.failed = true);
+    });
   }
 
   // ─── GPS ──────────────────────────────────────────────────────────────────
 
   Future<void> _useGps() async {
     setState(() => _locating = true);
+    final location = ref.read(locationServiceProvider);
     try {
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        _showSnack('Location services are disabled.');
+      final here = await location.current(
+          beforeSystemPrompt: () =>
+              ref.read(appLockProvider.notifier).allowNextReturn());
+      final place = await location.describe(here);
+      if (!mounted) return;
+      if (place == null) {
+        _showSnack('Found you, but not the place name. Choose the state and '
+            'type the town.');
         return;
       }
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          _showSnack('Location permission denied.');
-          return;
-        }
-      }
-      if (permission == LocationPermission.deniedForever) {
-        _showSnack('Location permission permanently denied. Enable in settings.');
-        return;
-      }
-      await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium),
-      );
-      // In production: reverse-geocode to fill state/city fields.
-      _showSnack('GPS location detected. Fill city manually for accuracy.',
+      setState(() {
+        if (place.state.isNotEmpty) _selectedState = place.state;
+        // The town: the last part of "Street, Area, Town".
+        final town = place.label.split(', ').last.trim();
+        if (town.isNotEmpty) _cityCtrl.text = town;
+      });
+      _showSnack('Location filled in. Check it before you post.',
           success: true);
+    } on LocationProblem catch (p) {
+      _showSnack(p.message);
     } catch (e) {
       _showSnack('Could not get location. Try again.');
     } finally {
@@ -286,6 +304,10 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
   Future<void> _submit() async {
     FocusScope.of(context).unfocus();
     if (!_formKey.currentState!.validate()) return;
+    if (_extraPhotos.any((x) => x.url == null && !x.failed)) {
+      _showSnack('Please wait for the photos to finish uploading.');
+      return;
+    }
     if (_uploadProgress != null) {
       _showSnack('Please wait for the image to finish uploading.');
       return;
@@ -309,11 +331,17 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
         'verified': session?.verified ?? false,
         'availability': switch (_availability) {
           _Availability.limited => 'limited',
-          _Availability.preOrder => 'pre_order',
           _Availability.inStock => 'in_stock',
+          _Availability.preOrder => 'pre_order',
         },
-        'imageUrl': _uploadedImageUrl ??
-            'https://picsum.photos/seed/${_titleCtrl.text.hashCode}/400/300',
+        // No photo means no photo: listings used to get a random stock
+        // picture (picsum), which looked like the real produce.
+        'imageUrl': _uploadedImageUrl ?? '',
+        'imageUrls': [
+          if (_uploadedImageUrl != null) _uploadedImageUrl!,
+          for (final x in _extraPhotos)
+            if (x.url != null) x.url!,
+        ],
         'lat': 0.0,
         'lng': 0.0,
       };
@@ -336,7 +364,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
               ),
             ],
           ),
-          backgroundColor: const Color(0xFF1B5E20),
+          backgroundColor: AppColors.deepGreen,
           behavior: SnackBarBehavior.floating,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -451,6 +479,51 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                   ],
                 ),
               ],
+              // More photos (buyers trust listings they can see well).
+              if (_imagePath != null) ...[
+                const SizedBox(height: 10),
+                SizedBox(
+                  height: 76,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: [
+                      for (final x in _extraPhotos)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: _ExtraThumb(
+                            photo: x,
+                            onRemove: () =>
+                                setState(() => _extraPhotos.remove(x)),
+                          ),
+                        ),
+                      if (_extraPhotos.length < _maxExtraPhotos)
+                        InkWell(
+                          borderRadius: BorderRadius.circular(10),
+                          onTap: _addExtraPhotos,
+                          child: Container(
+                            width: 76,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: AppColors.emerald),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.add_photo_alternate_outlined,
+                                    color: AppColors.emerald),
+                                Text(
+                                    'More (${_maxExtraPhotos - _extraPhotos.length})',
+                                    style: const TextStyle(
+                                        fontSize: 11,
+                                        color: AppColors.emerald)),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
 
               const SizedBox(height: 20),
 
@@ -476,10 +549,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                       hint: 'e.g. Fresh White Maize — Kano 2024',
                       isDark: isDark,
                       maxLength: 80,
-                      validator: (v) =>
-                          (v == null || v.trim().length < 4)
-                              ? 'Enter a descriptive title (min 4 chars)'
-                              : null,
+                      validator: (v) => (v == null || v.trim().length < 4)
+                          ? 'Enter a descriptive title (min 4 chars)'
+                          : null,
                     ),
                     const SizedBox(height: 14),
                     _buildCategoryDropdown(isDark, textPrimary, textSub),
@@ -490,17 +562,13 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                       hint: 'Describe quality, harvest date, storage…',
                       isDark: isDark,
                       maxLines: 3,
-                      validator: (v) =>
-                          (v == null || v.trim().length < 10)
-                              ? 'Add a description (min 10 chars)'
-                              : null,
+                      validator: (v) => (v == null || v.trim().length < 10)
+                          ? 'Add a description (min 10 chars)'
+                          : null,
                     ),
                   ],
                 ),
-              )
-                  .animate(delay: 80.ms)
-                  .fadeIn()
-                  .slideY(begin: 0.04),
+              ).animate(delay: 80.ms).fadeIn().slideY(begin: 0.04),
 
               const SizedBox(height: 20),
 
@@ -525,23 +593,24 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                         Expanded(
                           child: _buildTextFormField(
                             controller: _priceCtrl,
-                            label: 'Price (NGN)',
-                            hint: '0.00',
+                            // Per kg: buyers pay price x quantity. Whole naira
+                            // only (decimals passed validation, then crashed
+                            // the save, and the rules reject them anyway).
+                            label: 'Price per kg',
+                            hint: '0',
                             isDark: isDark,
                             prefixText: '₦ ',
-                            keyboardType:
-                                const TextInputType.numberWithOptions(decimal: true),
+                            keyboardType: TextInputType.number,
                             inputFormatters: [
-                              FilteringTextInputFormatter.allow(
-                                  RegExp(r'[\d.]'))
+                              FilteringTextInputFormatter.digitsOnly
                             ],
                             validator: (v) {
                               if (v == null || v.trim().isEmpty) {
-                                return 'Enter price';
+                                return 'Enter the price per kg';
                               }
-                              final parsed = double.tryParse(v.trim());
+                              final parsed = int.tryParse(v.trim());
                               if (parsed == null || parsed <= 0) {
-                                return 'Enter a valid price';
+                                return 'Enter a whole naira amount';
                               }
                               return null;
                             },
@@ -573,6 +642,39 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                         ),
                       ],
                     ),
+                    // Live total, so sellers see what a buyer will pay.
+                    ListenableBuilder(
+                      listenable: Listenable.merge([_priceCtrl, _qtyCtrl]),
+                      builder: (context, _) {
+                        final price = int.tryParse(_priceCtrl.text.trim());
+                        final qty = int.tryParse(_qtyCtrl.text.trim());
+                        if (price == null || qty == null || qty <= 0) {
+                          return const SizedBox.shrink();
+                        }
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: Row(
+                            children: [
+                              Icon(Icons.info_outline_rounded,
+                                  size: 16, color: AppColors.subText(isDark)),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'Buyers choose how many kg to buy. '
+                                  'All $qty kg sells for '
+                                  '${formatNgn(price * qty)}.',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.text(isDark),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
                     const SizedBox(height: 16),
                     _AvailabilitySegment(
                       selected: _availability,
@@ -581,10 +683,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                     ),
                   ],
                 ),
-              )
-                  .animate(delay: 140.ms)
-                  .fadeIn()
-                  .slideY(begin: 0.04),
+              ).animate(delay: 140.ms).fadeIn().slideY(begin: 0.04),
 
               const SizedBox(height: 20),
 
@@ -611,8 +710,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                       label: 'City / LGA',
                       hint: 'e.g. Ikeja, Nassarawa, Ungwa Rimi',
                       isDark: isDark,
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'Enter city or LGA' : null,
+                      validator: (v) => (v == null || v.trim().isEmpty)
+                          ? 'Enter city or LGA'
+                          : null,
                     ),
                     const SizedBox(height: 14),
                     SizedBox(
@@ -648,10 +748,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                     ),
                   ],
                 ),
-              )
-                  .animate(delay: 200.ms)
-                  .fadeIn()
-                  .slideY(begin: 0.04),
+              ).animate(delay: 200.ms).fadeIn().slideY(begin: 0.04),
 
               const SizedBox(height: 28),
 
@@ -674,13 +771,13 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Icon(
-                    Icons.access_time_rounded,
+                    Icons.bolt_rounded,
                     size: 13,
                     color: AppColors.gray,
                   ),
                   const SizedBox(width: 5),
                   Text(
-                    'Your listing will be reviewed within 2 hours',
+                    'Goes live straight away. Edit it any time.',
                     style: GoogleFonts.poppins(
                       fontSize: 12,
                       color: AppColors.gray,
@@ -714,10 +811,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
     List<TextInputFormatter>? inputFormatters,
     String? Function(String?)? validator,
   }) {
-    final borderColor =
-        isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0);
+    final borderColor = isDark ? AppColors.darkBorder : AppColors.borderLight;
     final focusColor = AppColors.deepGreen;
-    final fillColor = isDark ? const Color(0xFF121212) : AppColors.surfaceLight;
+    final fillColor = isDark ? AppColors.darkBg : AppColors.surfaceLight;
     final textColor = AppColors.text(isDark);
     final hintColor = AppColors.subText(isDark);
 
@@ -732,8 +828,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
         labelText: label,
         hintText: hint,
         hintStyle: GoogleFonts.poppins(fontSize: 13, color: hintColor),
-        labelStyle:
-            GoogleFonts.poppins(fontSize: 13, color: hintColor),
+        labelStyle: GoogleFonts.poppins(fontSize: 13, color: hintColor),
         prefixText: prefixText,
         suffixText: suffixText,
         filled: true,
@@ -755,24 +850,20 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide:
-              const BorderSide(color: AppColors.errorRed, width: 1.4),
+          borderSide: const BorderSide(color: AppColors.errorRed, width: 1.4),
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide:
-              const BorderSide(color: AppColors.errorRed, width: 1.8),
+          borderSide: const BorderSide(color: AppColors.errorRed, width: 1.8),
         ),
       ),
       validator: validator,
     );
   }
 
-  Widget _buildCategoryDropdown(
-      bool isDark, Color textPrimary, Color textSub) {
-    final borderColor =
-        isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0);
-    final fillColor = isDark ? const Color(0xFF121212) : AppColors.surfaceLight;
+  Widget _buildCategoryDropdown(bool isDark, Color textPrimary, Color textSub) {
+    final borderColor = isDark ? AppColors.darkBorder : AppColors.borderLight;
+    final fillColor = isDark ? AppColors.darkBg : AppColors.surfaceLight;
 
     return DropdownButtonFormField<String>(
       initialValue: _selectedCategory,
@@ -785,20 +876,17 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                 value: c,
                 child: Text(
                   c,
-                  style: GoogleFonts.poppins(
-                      fontSize: 14, color: textPrimary),
+                  style: GoogleFonts.poppins(fontSize: 14, color: textPrimary),
                 ),
               ))
           .toList(),
       onChanged: (v) => setState(() => _selectedCategory = v),
-      validator: (v) =>
-          v == null ? 'Please select a category' : null,
+      validator: (v) => v == null ? 'Please select a category' : null,
       style: GoogleFonts.poppins(fontSize: 14, color: textPrimary),
-      dropdownColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      dropdownColor: isDark ? AppColors.cardDark : Colors.white,
       decoration: InputDecoration(
         labelText: 'Category',
-        labelStyle:
-            GoogleFonts.poppins(fontSize: 13, color: textSub),
+        labelStyle: GoogleFonts.poppins(fontSize: 13, color: textSub),
         filled: true,
         fillColor: fillColor,
         contentPadding:
@@ -813,50 +901,46 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide:
-              const BorderSide(color: AppColors.deepGreen, width: 1.8),
+          borderSide: const BorderSide(color: AppColors.deepGreen, width: 1.8),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide:
-              const BorderSide(color: AppColors.errorRed, width: 1.4),
+          borderSide: const BorderSide(color: AppColors.errorRed, width: 1.4),
         ),
       ),
-      icon: const Icon(Icons.keyboard_arrow_down_rounded,
-          color: AppColors.gray),
+      icon:
+          const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.gray),
     );
   }
 
-  Widget _buildStateDropdown(
-      bool isDark, Color textPrimary, Color textSub) {
-    final borderColor =
-        isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0);
-    final fillColor = isDark ? const Color(0xFF121212) : AppColors.surfaceLight;
+  Widget _buildStateDropdown(bool isDark, Color textPrimary, Color textSub) {
+    final borderColor = isDark ? AppColors.darkBorder : AppColors.borderLight;
+    final fillColor = isDark ? AppColors.darkBg : AppColors.surfaceLight;
 
     return DropdownButtonFormField<String>(
+      // Re-created when "Use GPS" fills in the state.
+      key: ValueKey(_selectedState),
       initialValue: _selectedState,
       hint: Text(
         'Select state',
         style: GoogleFonts.poppins(fontSize: 13, color: textSub),
       ),
-      items: _kNigerianStates
+      items: kNigerianStates
           .map((s) => DropdownMenuItem(
                 value: s,
                 child: Text(
                   s,
-                  style: GoogleFonts.poppins(
-                      fontSize: 14, color: textPrimary),
+                  style: GoogleFonts.poppins(fontSize: 14, color: textPrimary),
                 ),
               ))
           .toList(),
       onChanged: (v) => setState(() => _selectedState = v),
       validator: (v) => v == null ? 'Please select a state' : null,
       style: GoogleFonts.poppins(fontSize: 14, color: textPrimary),
-      dropdownColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      dropdownColor: isDark ? AppColors.cardDark : Colors.white,
       decoration: InputDecoration(
         labelText: 'State',
-        labelStyle:
-            GoogleFonts.poppins(fontSize: 13, color: textSub),
+        labelStyle: GoogleFonts.poppins(fontSize: 13, color: textSub),
         filled: true,
         fillColor: fillColor,
         contentPadding:
@@ -871,17 +955,15 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide:
-              const BorderSide(color: AppColors.deepGreen, width: 1.8),
+          borderSide: const BorderSide(color: AppColors.deepGreen, width: 1.8),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide:
-              const BorderSide(color: AppColors.errorRed, width: 1.4),
+          borderSide: const BorderSide(color: AppColors.errorRed, width: 1.4),
         ),
       ),
-      icon: const Icon(Icons.keyboard_arrow_down_rounded,
-          color: AppColors.gray),
+      icon:
+          const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.gray),
     );
   }
 }
@@ -1071,15 +1153,12 @@ class _AvailabilitySegment extends StatelessWidget {
             selectedBackgroundColor: AppColors.deepGreen,
             selectedForegroundColor: Colors.white,
             foregroundColor: AppColors.subText(isDark),
-            backgroundColor:
-                isDark ? const Color(0xFF121212) : AppColors.surfaceLight,
+            backgroundColor: isDark ? AppColors.darkBg : AppColors.surfaceLight,
             side: BorderSide(
-              color: isDark
-                  ? const Color(0xFF2E3C2E)
-                  : const Color(0xFFE2EAE0),
+              color: isDark ? AppColors.darkBorder : AppColors.borderLight,
             ),
-            textStyle: GoogleFonts.poppins(
-                fontSize: 12, fontWeight: FontWeight.w500),
+            textStyle:
+                GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w500),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
             ),
@@ -1101,7 +1180,7 @@ class _AvailabilitySegment extends StatelessWidget {
             ButtonSegment(
               value: _Availability.preOrder,
               label: Text('Pre-order'),
-              icon: Icon(Icons.schedule_outlined, size: 15),
+              icon: Icon(Icons.event_available_rounded, size: 15),
             ),
           ],
         ),
@@ -1140,6 +1219,56 @@ class _SectionLabel extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
         ),
       ],
+    );
+  }
+}
+
+class _ExtraThumb extends StatelessWidget {
+  const _ExtraThumb({required this.photo, required this.onRemove});
+
+  final _ExtraPhoto photo;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 76,
+      height: 76,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Image.file(File(photo.path), fit: BoxFit.cover),
+          ),
+          if (photo.url == null)
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.black45,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              alignment: Alignment.center,
+              child: photo.failed
+                  ? const Icon(Icons.error_outline, color: Colors.white)
+                  : CircularProgressIndicator(
+                      value: photo.progress > 0 ? photo.progress : null,
+                      strokeWidth: 3,
+                      color: Colors.white),
+            ),
+          Positioned(
+            right: 0,
+            top: 0,
+            child: GestureDetector(
+              onTap: onRemove,
+              child: const CircleAvatar(
+                radius: 11,
+                backgroundColor: Colors.black54,
+                child: Icon(Icons.close, size: 14, color: Colors.white),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

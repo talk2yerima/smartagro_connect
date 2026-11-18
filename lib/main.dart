@@ -5,9 +5,12 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'app.dart';
+import 'core/utils/app_logger.dart';
 import 'firebase_options.dart';
 
 void main() {
@@ -19,6 +22,10 @@ void main() {
 
 Future<void> _boot() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Fonts ship inside the app (assets/fonts). Never fetch them at runtime:
+  // that cost mobile data and made text jump when the font arrived.
+  GoogleFonts.config.allowRuntimeFetching = false;
+  LicenseRegistry.addLicense(_fontLicenses);
   await _tryInitFirebase();
   _setupCrashlytics();
 
@@ -30,13 +37,25 @@ Future<void> _boot() async {
   );
 }
 
+/// The bundled fonts are under the SIL Open Font License, which asks that
+/// the licence travels with them; it shows in Settings → licences.
+Stream<LicenseEntry> _fontLicenses() async* {
+  for (final (family, file) in [
+    ('Poppins', 'assets/fonts/OFL-Poppins.txt'),
+    ('Inter', 'assets/fonts/OFL-Inter.txt'),
+  ]) {
+    final text = await rootBundle.loadString(file);
+    yield LicenseEntryWithLineBreaks([family], text);
+  }
+}
+
 // ── Zone-level uncaught error handler ─────────────────────────────────────────
 
 void _onZoneError(Object error, StackTrace stack) {
   if (_firebaseConfigured() && _crashlyticsSupported()) {
     FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
   } else {
-    debugPrint('[SmartAgro] Unhandled zone error: $error\n$stack');
+    log.e('[SmartAgro] Unhandled zone error', error: error, stackTrace: stack);
   }
 }
 
@@ -83,9 +102,7 @@ Future<void> _tryInitFirebase() async {
   } catch (_) {
     // Firebase not configured or platform unsupported (e.g. Windows dev).
     // The app continues in demo mode — auth stubs remain active.
-    debugPrint(
-      '[SmartAgro] Firebase not initialised — running in demo mode. '
-      'Run `flutterfire configure` to activate real auth.',
-    );
+    log.w('[SmartAgro] Firebase not initialised — running in demo mode. '
+        'Run `flutterfire configure` to activate real auth.');
   }
 }

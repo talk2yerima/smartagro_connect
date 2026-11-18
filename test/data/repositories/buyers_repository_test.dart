@@ -7,12 +7,22 @@ class MockAssets extends Mock implements AssetBundleDataSource {}
 
 const _rows = [
   {
-    'id': 'b1', 'name': 'Ade Traders', 'type': 'Wholesaler',
-    'state': 'Lagos', 'distanceKm': 8, 'rating': 4.3, 'verified': true,
+    'id': 'b1',
+    'name': 'Ade Traders',
+    'type': 'Wholesaler',
+    'state': 'Lagos',
+    'distanceKm': 8,
+    'rating': 4.3,
+    'verified': true,
   },
   {
-    'id': 'b2', 'name': 'Kola Mill', 'type': 'Processor',
-    'state': 'Ogun', 'distanceKm': 22, 'rating': 3.9, 'verified': false,
+    'id': 'b2',
+    'name': 'Kola Mill',
+    'type': 'Processor',
+    'state': 'Ogun',
+    'distanceKm': 22,
+    'rating': 3.9,
+    'verified': false,
   },
 ];
 

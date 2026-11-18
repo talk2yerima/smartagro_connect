@@ -1,17 +1,18 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
-/// Generates 10 plausible price points given a percentage change.
-List<double> mockSparklineFromChange(double changePct) {
-  final step = changePct / 10;
-  var v = 100.0;
-  final result = <double>[];
-  for (var i = 0; i < 10; i++) {
-    v += step + (i.isEven ? 1.2 : -0.7);
-    result.add(v);
-  }
-  return result;
+/// The price before the last reported change, derived from [current] and
+/// [changePct]. Returns [current] when the change can't be undone (−100%).
+double previousPrice(num current, double changePct) {
+  final factor = 1 + changePct / 100;
+  return factor <= 0 ? current.toDouble() : current / factor;
 }
+
+/// The two real points behind a reported change: previous price, then the
+/// current one. No price history is stored yet, so charts show this actual
+/// step instead of an invented multi-day series.
+List<double> trendFromChange(double changePct, {num current = 100}) =>
+    [previousPrice(current, changePct), current.toDouble()];
 
 /// A mini sparkline (line chart) widget drawn with [CustomPaint].
 ///

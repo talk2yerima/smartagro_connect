@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/di/repositories_provider.dart';
+import '../../core/errors/friendly_error.dart';
 import '../../core/utils/money_format.dart';
 import '../../domain/entities/commodity.dart';
 import '../../shared/widgets/section_header.dart';
@@ -53,7 +54,7 @@ class MarketTrendsScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  '$e',
+                  friendlyError(e),
                   textAlign: TextAlign.center,
                   style: TextStyle(color: AppColors.subText(isDark)),
                 ),
@@ -104,7 +105,8 @@ class _TrendsBody extends StatelessWidget {
         : commodities.fold<double>(0, (s, c) => s + c.changePct) /
             commodities.length;
 
-    final sorted = [...commodities]..sort((a, b) => b.changePct.compareTo(a.changePct));
+    final sorted = [...commodities]
+      ..sort((a, b) => b.changePct.compareTo(a.changePct));
     final topGainers = sorted.take(3).toList();
     final topLosers = sorted.reversed.take(3).toList();
 
@@ -150,10 +152,7 @@ class _TrendsBody extends StatelessWidget {
               commodity: c,
               isGainer: true,
               isDark: isDark,
-            )
-                .animate(delay: (80 + 50 * i).ms)
-                .fadeIn()
-                .slideY(begin: 0.04);
+            ).animate(delay: (80 + 50 * i).ms).fadeIn().slideY(begin: 0.04);
           }),
 
           const SizedBox(height: 20),
@@ -168,10 +167,7 @@ class _TrendsBody extends StatelessWidget {
               commodity: c,
               isGainer: false,
               isDark: isDark,
-            )
-                .animate(delay: (80 + 50 * i).ms)
-                .fadeIn()
-                .slideY(begin: 0.04);
+            ).animate(delay: (80 + 50 * i).ms).fadeIn().slideY(begin: 0.04);
           }),
 
           const SizedBox(height: 20),
@@ -184,20 +180,10 @@ class _TrendsBody extends StatelessWidget {
                 .map((e) => (category: e.category, avg: e.avg))
                 .toList(),
             isDark: isDark,
-          )
-              .animate(delay: 300.ms)
-              .fadeIn()
-              .slideY(begin: 0.04),
-
-          const SizedBox(height: 20),
-
-          // [5] Market Insights
-          const SectionHeader(title: 'Market Insights'),
-          const SizedBox(height: 8),
-          const _MarketInsightsCard()
-              .animate(delay: 380.ms)
-              .fadeIn()
-              .slideY(begin: 0.04),
+          ).animate(delay: 300.ms).fadeIn().slideY(begin: 0.04),
+          // The fixed "Market Insights" headlines were removed: they never
+          // changed and read as current news. Bring the section back once
+          // insights come from a real, dated source.
         ],
       ),
     );
@@ -242,7 +228,8 @@ class _SummaryCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.bar_chart_rounded, color: Colors.white, size: 20),
+              const Icon(Icons.bar_chart_rounded,
+                  color: Colors.white, size: 20),
               const SizedBox(width: 8),
               const Text(
                 'Market Summary',
@@ -255,7 +242,8 @@ class _SummaryCard extends StatelessWidget {
               ),
               const Spacer(),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(20),
@@ -268,7 +256,8 @@ class _SummaryCard extends StatelessWidget {
                           ? Icons.arrow_upward_rounded
                           : Icons.arrow_downward_rounded,
                       size: 12,
-                      color: avgUp ? const Color(0xFF00C853) : const Color(0xFFEF9A9A),
+                      color:
+                          avgUp ? AppColors.mintGreen : const Color(0xFFEF9A9A),
                     ),
                     const SizedBox(width: 3),
                     Text(
@@ -276,8 +265,9 @@ class _SummaryCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color:
-                            avgUp ? const Color(0xFF00C853) : const Color(0xFFEF9A9A),
+                        color: avgUp
+                            ? AppColors.mintGreen
+                            : const Color(0xFFEF9A9A),
                       ),
                     ),
                   ],
@@ -293,7 +283,7 @@ class _SummaryCard extends StatelessWidget {
                   icon: Icons.trending_up_rounded,
                   label: 'Gainers',
                   value: '$gainers',
-                  chipColor: const Color(0xFF00C853),
+                  chipColor: AppColors.mintGreen,
                 ),
               ),
               const SizedBox(width: 10),
@@ -394,9 +384,9 @@ class _CommodityTrendCard extends StatelessWidget {
   BoxDecoration _card() {
     return isDark
         ? BoxDecoration(
-            color: const Color(0xFF1E1E1E),
+            color: AppColors.cardDark,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF2E3C2E)),
+            border: Border.all(color: AppColors.darkBorder),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.22),
@@ -408,7 +398,7 @@ class _CommodityTrendCard extends StatelessWidget {
         : BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE2EAE0)),
+            border: Border.all(color: AppColors.borderLight),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.05),
@@ -423,10 +413,9 @@ class _CommodityTrendCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = commodity;
     final up = c.changePct >= 0;
-    final pctColor =
-        up ? const Color(0xFF00C853) : const Color(0xFFC62828);
-    final sparkColor = up ? const Color(0xFF00C853) : const Color(0xFFC62828);
-    final sparkData = mockSparklineFromChange(c.changePct);
+    final pctColor = up ? AppColors.mintGreen : AppColors.errorRed;
+    final sparkColor = up ? AppColors.mintGreen : AppColors.errorRed;
+    final sparkData = trendFromChange(c.changePct);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -439,9 +428,7 @@ class _CommodityTrendCard extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: (isGainer
-                      ? const Color(0xFF00C853)
-                      : const Color(0xFFC62828))
+              color: (isGainer ? AppColors.mintGreen : AppColors.errorRed)
                   .withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(10),
             ),
@@ -449,9 +436,7 @@ class _CommodityTrendCard extends StatelessWidget {
               isGainer
                   ? Icons.trending_up_rounded
                   : Icons.trending_down_rounded,
-              color: isGainer
-                  ? const Color(0xFF00C853)
-                  : const Color(0xFFC62828),
+              color: isGainer ? AppColors.mintGreen : AppColors.errorRed,
               size: 22,
             ),
           ),
@@ -558,9 +543,9 @@ class _CategoryPerformanceCard extends StatelessWidget {
   BoxDecoration _card() {
     return isDark
         ? BoxDecoration(
-            color: const Color(0xFF1E1E1E),
+            color: AppColors.cardDark,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF2E3C2E)),
+            border: Border.all(color: AppColors.darkBorder),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.22),
@@ -572,7 +557,7 @@ class _CategoryPerformanceCard extends StatelessWidget {
         : BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE2EAE0)),
+            border: Border.all(color: AppColors.borderLight),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.05),
@@ -600,12 +585,12 @@ class _CategoryPerformanceCard extends StatelessWidget {
           final i = entry.key;
           final cat = entry.value;
           final up = cat.avg >= 0;
-          final barColor =
-              up ? const Color(0xFF00C853) : const Color(0xFFC62828);
+          final barColor = up ? AppColors.mintGreen : AppColors.errorRed;
           final barFraction = cat.avg.abs() / effectiveMax;
 
           return Padding(
-            padding: EdgeInsets.only(bottom: i < categories.length - 1 ? 14 : 0),
+            padding:
+                EdgeInsets.only(bottom: i < categories.length - 1 ? 14 : 0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -673,102 +658,6 @@ class _CategoryPerformanceCard extends StatelessWidget {
                       ],
                     );
                   },
-                ),
-              ],
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// [5] Market Insights Card
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _MarketInsightsCard extends StatelessWidget {
-  const _MarketInsightsCard();
-
-  static const _insights = [
-    (
-      icon: Icons.grain_rounded,
-      color: Color(0xFF2E7D32),
-      text: 'Maize prices rising due to seasonal demand ahead of planting season',
-    ),
-    (
-      icon: Icons.water_drop_rounded,
-      color: Color(0xFF0277BD),
-      text: 'Dry-season water scarcity in the north is tightening tomato supply',
-    ),
-    (
-      icon: Icons.local_shipping_rounded,
-      color: Color(0xFFFB8C00),
-      text: 'Improved Abuja-Kano corridor logistics reducing sorghum transport costs',
-    ),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: isDark
-          ? BoxDecoration(
-              color: const Color(0xFF1E1E1E),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF2E3C2E)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.22),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            )
-          : BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE2EAE0)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: _insights.asMap().entries.map((entry) {
-          final i = entry.key;
-          final insight = entry.value;
-          return Padding(
-            padding: EdgeInsets.only(bottom: i < _insights.length - 1 ? 14 : 0),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: insight.color.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(insight.icon, color: insight.color, size: 18),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    insight.text,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13,
-                      height: 1.45,
-                      color: AppColors.text(isDark),
-                    ),
-                  ),
                 ),
               ],
             ),

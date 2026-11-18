@@ -5,36 +5,40 @@ import '../../domain/entities/product_listing.dart';
 
 Commodity commodityFromMap(Map<String, dynamic> m) {
   return Commodity(
-    id: m['id'] as String,
-    name: m['name'] as String,
-    unit: m['unit'] as String,
-    priceNgn: (m['priceNgn'] as num).toInt(),
-    changePct: (m['changePct'] as num).toDouble(),
-    category: m['category'] as String,
+    id: (m['id'] as String?) ?? '',
+    name: (m['name'] as String?) ?? '',
+    unit: (m['unit'] as String?) ?? '',
+    priceNgn: (m['priceNgn'] as num?)?.toInt() ?? 0,
+    changePct: (m['changePct'] as num?)?.toDouble() ?? 0.0,
+    category: (m['category'] as String?) ?? '',
   );
 }
 
 ProductListing productFromMap(Map<String, dynamic> m) {
   return ProductListing(
     id: m['id'] as String,
-    title: m['title'] as String,
-    description: m['description'] as String,
-    priceNgn: (m['priceNgn'] as num).toInt(),
-    quantityKg: (m['quantityKg'] as num).toInt(),
-    state: m['state'] as String,
-    city: m['city'] as String,
-    sellerId: m['sellerId'] as String,
-    sellerName: m['sellerName'] as String,
-    sellerRating: (m['sellerRating'] as num).toDouble(),
-    verified: m['verified'] as bool,
+    title: (m['title'] as String?) ?? '',
+    description: (m['description'] as String?) ?? '',
+    priceNgn: (m['priceNgn'] as num?)?.toInt() ?? 0,
+    quantityKg: (m['quantityKg'] as num?)?.toInt() ?? 0,
+    state: (m['state'] as String?) ?? '',
+    city: (m['city'] as String?) ?? '',
+    sellerId: (m['sellerId'] as String?) ?? '',
+    sellerName: (m['sellerName'] as String?) ?? '',
+    sellerRating: (m['sellerRating'] as num?)?.toDouble() ?? 0.0,
+    verified: (m['verified'] as bool?) ?? false,
     availability: switch (m['availability'] as String?) {
       'limited' => ProductAvailability.limited,
+      'pre_order' => ProductAvailability.preOrder,
       'sold_out' => ProductAvailability.soldOut,
       _ => ProductAvailability.inStock,
     },
-    imageUrl: m['imageUrl'] as String,
-    lat: (m['lat'] as num).toDouble(),
-    lng: (m['lng'] as num).toDouble(),
+    imageUrl: (m['imageUrl'] as String?) ?? '',
+    lat: (m['lat'] as num?)?.toDouble() ?? 0.0,
+    lng: (m['lng'] as num?)?.toDouble() ?? 0.0,
+    imageUrls: (m['imageUrls'] is List)
+        ? (m['imageUrls'] as List).whereType<String>().toList()
+        : const [],
   );
 }
 

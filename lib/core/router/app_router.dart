@@ -10,10 +10,13 @@ import '../../features/admin/admin_moderation_screen.dart';
 import '../../features/admin/admin_users_screen.dart';
 import '../../features/auth/forgot_password_screen.dart';
 import '../../features/auth/login_screen.dart';
-import '../../features/auth/otp_screen.dart';
+import '../../features/auth/phone_sign_in_screen.dart';
 import '../../features/auth/register_screen.dart';
 import '../../features/chat/chat_list_screen.dart';
 import '../../features/chat/chat_room_screen.dart';
+import '../../features/delivery/delivery_screen.dart';
+import '../../features/delivery/jobs_screen.dart';
+import '../../features/delivery/request_transport_screen.dart';
 import '../../features/home/dashboard_screen.dart';
 import '../../features/map/map_screen.dart';
 import '../../features/market/commodity_detail_screen.dart';
@@ -21,9 +24,15 @@ import '../../features/market/commodity_market_screen.dart';
 import '../../features/market/market_trends_screen.dart';
 import '../../features/marketplace/add_product_screen.dart';
 import '../../features/marketplace/marketplace_screen.dart';
+import '../../features/marketplace/my_listings_screen.dart';
 import '../../features/marketplace/product_detail_screen.dart';
+import '../../features/marketplace/seller_profile_screen.dart';
 import '../../features/notifications/notifications_screen.dart';
 import '../../features/onboarding/onboarding_screen.dart';
+import '../../features/orders/orders_screen.dart';
+import '../../features/payouts/get_paid_screen.dart';
+import '../../features/profile/farm_profile_edit_screen.dart';
+import '../../features/profile/profile_edit_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/search/search_screen.dart';
 import '../../features/settings/settings_screen.dart';
@@ -32,6 +41,10 @@ import '../../features/splash/splash_screen.dart';
 import '../di/analytics_providers.dart';
 import '../di/auth_providers.dart';
 import '../di/initialization_provider.dart';
+
+/// Holds a deep-link path that arrived while the user was unauthenticated.
+/// Cleared and consumed on the first redirect after successful login.
+final pendingDeepLinkProvider = StateProvider<String?>((ref) => null);
 
 /// Global navigation graph with auth + onboarding redirects.
 final goRouterProvider = Provider<GoRouter>((ref) {
@@ -43,6 +56,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     initialLocation: '/splash',
     refreshListenable: refresh,
     observers: [ref.read(analyticsServiceProvider).observer],
+    // GoRouter reads the launch URI from the platform automatically when the
+    // app is opened via an HTTPS App Link or smartagro:// URI scheme intent.
     redirect: (context, state) {
       final prefs = ref.read(loadedSharedPreferencesProvider);
       final onboarded = prefs.getBool('onboarding_completed') ?? false;
@@ -60,24 +75,49 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       final authPublic = loc.startsWith('/login') ||
           loc.startsWith('/register') ||
           loc.startsWith('/forgot') ||
-          loc.startsWith('/otp');
+          loc.startsWith('/phone');
 
       final protected = loc.startsWith('/main') ||
           loc.startsWith('/marketplace') ||
+          loc.startsWith('/my-listings') ||
+          loc.startsWith('/profile') ||
           loc.startsWith('/search') ||
           loc.startsWith('/notifications') ||
           loc.startsWith('/map') ||
+          loc.startsWith('/jobs') ||
+          loc.startsWith('/delivery') ||
           loc.startsWith('/settings') ||
+          loc.startsWith('/seller') ||
+          loc.startsWith('/orders') ||
+          loc.startsWith('/chat') ||
+          loc.startsWith('/payouts') ||
           loc.startsWith('/admin');
 
       if (!authed) {
-        if (protected) return '/login';
+        if (protected) {
+          // Remember the intended destination so we can redirect back after login.
+          ref.read(pendingDeepLinkProvider.notifier).state = state.uri.path;
+          return '/login';
+        }
         return null;
       }
 
-      if (authed && authPublic) return '/main/home';
+      if (authed && authPublic) {
+        final pending = ref.read(pendingDeepLinkProvider);
+        if (pending != null) {
+          ref.read(pendingDeepLinkProvider.notifier).state = null;
+          return pending;
+        }
+        return '/main/home';
+      }
 
       if (loc.startsWith('/admin') && user.role != UserRole.admin) {
+        return '/main/home';
+      }
+      // Only sellers have sales money to receive.
+      if (loc == '/payouts' &&
+          user.role != UserRole.farmer &&
+          user.role != UserRole.admin) {
         return '/main/home';
       }
       if (loc == '/marketplace/add' &&
@@ -85,9 +125,17 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           user.role != UserRole.admin) {
         return '/main/home';
       }
+      // Transporters' second tab is the job board, not the produce market.
       if (user.role == UserRole.transporter &&
-          (loc.startsWith('/marketplace') || loc.startsWith('/main/market'))) {
-        return '/map';
+          (loc.startsWith('/marketplace') || loc.startsWith('/main/market/'))) {
+        return '/main/market';
+      }
+      // "/jobs" (used by notifications) is the second tab.
+      if (loc == '/jobs') return '/main/market';
+      // Only buyers and sellers ask for transport.
+      if (loc.startsWith('/delivery-request') &&
+          user.role == UserRole.transporter) {
+        return '/main/home';
       }
 
       return null;
@@ -114,8 +162,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ForgotPasswordScreen(),
       ),
       GoRoute(
-        path: '/otp',
-        builder: (context, state) => const OtpScreen(),
+        path: '/phone',
+        builder: (context, state) => const PhoneSignInScreen(),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
@@ -134,7 +182,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/main/market',
-                builder: (context, state) => const CommodityMarketScreen(),
+                builder: (context, state) => const _MarketOrJobs(),
                 routes: [
                   GoRoute(
                     path: 'trends',
@@ -154,6 +202,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
+                path: '/main/orders',
+                builder: (context, state) => const OrdersScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
                 path: '/main/messages',
                 builder: (context, state) => const ChatListScreen(),
                 routes: [
@@ -161,7 +217,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
                     path: 'thread/:id',
                     builder: (context, state) {
                       final id = state.pathParameters['id']!;
-                      return ChatRoomScreen(threadId: id);
+                      final name = state.uri.queryParameters['name'];
+                      final peerId = state.uri.queryParameters['peerId'];
+                      return ChatRoomScreen(
+                          threadId: id, peerName: name, peerId: peerId);
                     },
                   ),
                 ],
@@ -208,8 +267,69 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const MapScreen(),
       ),
       GoRoute(
+        path: '/jobs',
+        redirect: (context, state) => '/main/market',
+      ),
+      GoRoute(
+        path: '/delivery/:id',
+        builder: (context, state) =>
+            DeliveryScreen(jobId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/delivery-request',
+        redirect: (context, state) =>
+            state.extra is RequestTransportArgs ? null : '/orders',
+        builder: (context, state) =>
+            RequestTransportScreen(args: state.extra! as RequestTransportArgs),
+      ),
+      GoRoute(
         path: '/settings',
         builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: '/profile/edit',
+        builder: (context, state) => const ProfileEditScreen(),
+      ),
+      GoRoute(
+        path: '/profile/farm',
+        redirect: (context, state) =>
+            ref.read(authSessionProvider)?.role == UserRole.transporter
+                ? '/main/profile'
+                : null,
+        builder: (context, state) => const FarmProfileEditScreen(),
+      ),
+      // Orders is a tab now; old links (notifications) land on it.
+      GoRoute(
+        path: '/orders',
+        redirect: (context, state) => '/main/orders',
+      ),
+      GoRoute(
+        path: '/payouts',
+        builder: (context, state) => const GetPaidScreen(),
+      ),
+      GoRoute(
+        path: '/my-listings',
+        builder: (context, state) => const MyListingsScreen(),
+      ),
+      // Standalone chat thread route — used when navigating from outside the
+      // shell (e.g. marketplace product detail, seller profile).  Avoids the
+      // StatefulShellBranch key-reservation conflict that occurs when pushing
+      // a shell-nested route from a top-level navigator context.
+      GoRoute(
+        path: '/chat/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          final name = state.uri.queryParameters['name'];
+          final peerId = state.uri.queryParameters['peerId'];
+          return ChatRoomScreen(threadId: id, peerName: name, peerId: peerId);
+        },
+      ),
+      GoRoute(
+        path: '/seller/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return SellerProfileScreen(sellerId: id);
+        },
       ),
       GoRoute(
         path: '/admin',
@@ -239,4 +359,18 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 
 extension SmartAgroRouting on BuildContext {
   void goHome() => go('/main/home');
+}
+
+/// The second tab: the produce market for farmers and buyers, the job
+/// board for transporters.
+class _MarketOrJobs extends ConsumerWidget {
+  const _MarketOrJobs();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final role = ref.watch(authSessionProvider.select((u) => u?.role));
+    return role == UserRole.transporter
+        ? const JobsScreen()
+        : const CommodityMarketScreen();
+  }
 }

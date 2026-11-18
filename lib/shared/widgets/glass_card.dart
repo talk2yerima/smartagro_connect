@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import '../../core/constants/app_colors.dart';
 
 /// Soft glass surface for premium cards.
 ///
@@ -36,11 +37,11 @@ class GlassCard extends StatelessWidget {
 
   // Light-mode colours
   static const Color _lightBg = Color(0xFFFFFFFF);
-  static const Color _lightBorder = Color(0xFFE2EAE0);
+  static const Color _lightBorder = AppColors.borderLight;
 
   // Dark-mode colours
-  static const Color _darkBg = Color(0xFF1E1E1E);
-  static const Color _darkBorder = Color(0xFF2E3C2E);
+  static const Color _darkBg = AppColors.cardDark;
+  static const Color _darkBorder = AppColors.darkBorder;
 
   @override
   Widget build(BuildContext context) {

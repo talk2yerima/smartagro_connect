@@ -1,19 +1,34 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/di/auth_providers.dart';
+import '../../core/di/firestore_providers.dart';
 import '../../core/di/repositories_provider.dart';
+import '../../core/errors/friendly_error.dart';
+import '../../core/services/app_lock.dart';
+import '../../core/utils/app_logger.dart';
 import '../../domain/entities/chat_models.dart';
 import '../../shared/widgets/app_avatar.dart';
 import '../../shared/widgets/status_badge.dart';
+import 'voice_note.dart';
 
 // ---------------------------------------------------------------------------
 // Local state: extra messages appended via the input bar
 // ---------------------------------------------------------------------------
-final _localMessagesProvider =
-    StateProvider.family<List<ChatMessage>, String>((ref, threadId) => []);
+final _localMessagesProvider = StateProvider.autoDispose
+    .family<List<ChatMessage>, String>((ref, threadId) => []);
 
 // ---------------------------------------------------------------------------
 // Date helper
@@ -37,9 +52,12 @@ bool _sameDay(DateTime a, DateTime b) =>
 // ChatRoomScreen
 // ---------------------------------------------------------------------------
 class ChatRoomScreen extends ConsumerStatefulWidget {
-  const ChatRoomScreen({super.key, required this.threadId});
+  const ChatRoomScreen(
+      {super.key, required this.threadId, this.peerName, this.peerId});
 
   final String threadId;
+  final String? peerName;
+  final String? peerId;
 
   @override
   ConsumerState<ChatRoomScreen> createState() => _ChatRoomScreenState();
@@ -47,6 +65,18 @@ class ChatRoomScreen extends ConsumerStatefulWidget {
 
 class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
   final ScrollController _scroll = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final user = ref.read(authSessionProvider);
+      final firestore = ref.read(firestoreServiceProvider);
+      if (user != null && firestore.isAvailable) {
+        firestore.markThreadRead(widget.threadId, user.id);
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -71,8 +101,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final threadsAsync = ref.watch(chatThreadsProvider);
     final messagesAsync = ref.watch(chatMessagesProvider(widget.threadId));
-    final localMsgs =
-        ref.watch(_localMessagesProvider(widget.threadId));
+    final localMsgs = ref.watch(_localMessagesProvider(widget.threadId));
 
     // Resolve thread info
     final thread = threadsAsync.whenData(
@@ -83,13 +112,19 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
     );
 
     final participantName =
-        thread.valueOrNull?.peerName ?? 'Conversation';
-    final participantRole =
-        thread.valueOrNull?.peerRole ?? '';
+        thread.valueOrNull?.peerName ?? widget.peerName ?? 'Conversation';
+    final participantRole = thread.valueOrNull?.peerRole ?? '';
+    final peerId = thread.valueOrNull?.peerId ?? widget.peerId;
+    final peerLastReadAt = thread.valueOrNull?.peerLastReadAt;
+    final isTyping = peerId != null
+        ? ref
+                .watch(peerTypingProvider('${widget.threadId}|$peerId'))
+                .valueOrNull ??
+            false
+        : false;
 
     return Scaffold(
-      backgroundColor:
-          isDark ? AppColors.darkBg : AppColors.softWhite,
+      backgroundColor: isDark ? AppColors.darkBg : AppColors.softWhite,
       appBar: AppBar(
         elevation: 0,
         scrolledUnderElevation: 0.5,
@@ -135,31 +170,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.videocam_outlined),
-            color: AppColors.deepGreen,
-            tooltip: 'Video call',
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content: Text('Video call — coming soon')),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.call_outlined),
-            color: AppColors.deepGreen,
-            tooltip: 'Voice call',
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content: Text('Voice call — coming soon')),
-              );
-            },
-          ),
-          const SizedBox(width: 4),
-        ],
+        actions: const [SizedBox(width: 4)],
       ),
       body: Column(
         children: [
@@ -175,9 +186,8 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                 child: Text(
                   'Could not load messages',
                   style: TextStyle(
-                    color: isDark
-                        ? AppColors.darkTextSecondary
-                        : AppColors.gray,
+                    color:
+                        isDark ? AppColors.darkTextSecondary : AppColors.gray,
                   ),
                 ),
               ),
@@ -241,8 +251,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                       final i = all.length - 1 - reversedIndex;
                       final msg = all[i];
                       final prev = i > 0 ? all[i - 1] : null;
-                      final next =
-                          i < all.length - 1 ? all[i + 1] : null;
+                      final next = i < all.length - 1 ? all[i + 1] : null;
 
                       final isFirst = prev == null ||
                           prev.fromMe != msg.fromMe ||
@@ -251,13 +260,13 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                           next.fromMe != msg.fromMe ||
                           !_sameDay(next.sentAt, msg.sentAt);
 
-                      final showDate = prev == null ||
-                          !_sameDay(prev.sentAt, msg.sentAt);
+                      final showDate =
+                          prev == null || !_sameDay(prev.sentAt, msg.sentAt);
 
-                      // Fetched messages are considered read; locally-sent
-                      // ones are unread until server confirms.
-                      final isRead =
-                          !msg.id.startsWith('local_');
+                      final isRead = msg.fromMe &&
+                          !msg.id.startsWith('local_') &&
+                          peerLastReadAt != null &&
+                          !peerLastReadAt.isBefore(msg.sentAt);
 
                       return Column(
                         children: [
@@ -280,11 +289,17 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
             ),
           ),
 
+          // ── Typing indicator ──────────────────────────────────────
+          if (isTyping) const _TypingIndicator(),
+
           // ── Input bar ─────────────────────────────────────────────
           _InputBar(
             threadId: widget.threadId,
             isDark: isDark,
             onSent: _scrollToBottom,
+            peerId: peerId,
+            peerName: participantName,
+            peerRole: participantRole,
           ),
         ],
       ),
@@ -308,21 +323,16 @@ class _DateSeparator extends StatelessWidget {
         children: [
           Expanded(
             child: Divider(
-              color: isDark
-                  ? AppColors.darkBorder
-                  : AppColors.borderLight,
+              color: isDark ? AppColors.darkBorder : AppColors.borderLight,
               thickness: 1,
             ),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
-                color: isDark
-                    ? AppColors.darkSurface
-                    : AppColors.surfaceLight,
+                color: isDark ? AppColors.darkSurface : AppColors.surfaceLight,
                 borderRadius: BorderRadius.circular(99),
               ),
               child: Text(
@@ -330,18 +340,14 @@ class _DateSeparator extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: isDark
-                      ? AppColors.darkTextSecondary
-                      : AppColors.gray,
+                  color: isDark ? AppColors.darkTextSecondary : AppColors.gray,
                 ),
               ),
             ),
           ),
           Expanded(
             child: Divider(
-              color: isDark
-                  ? AppColors.darkBorder
-                  : AppColors.borderLight,
+              color: isDark ? AppColors.darkBorder : AppColors.borderLight,
               thickness: 1,
             ),
           ),
@@ -396,7 +402,7 @@ class _ChatBubble extends StatelessWidget {
 
     final bubbleColor = fromMe
         ? AppColors.deepGreen
-        : (isDark ? const Color(0xFF1E1E1E) : Colors.white);
+        : (isDark ? AppColors.cardDark : Colors.white);
 
     final textColor = fromMe
         ? Colors.white
@@ -409,36 +415,52 @@ class _ChatBubble extends StatelessWidget {
     Widget bubbleContent;
     switch (message.kind) {
       case ChatMessageKind.image:
-        bubbleContent = Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.image_outlined, size: 18, color: textColor),
-            const SizedBox(width: 6),
-            Text(
-              'Image attachment',
-              style: TextStyle(
-                color: textColor,
-                fontSize: 14,
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-          ],
-        );
+        bubbleContent = message.imageUrl != null
+            ? ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: CachedNetworkImage(
+                  imageUrl: message.imageUrl!,
+                  width: 220,
+                  height: 180,
+                  fit: BoxFit.cover,
+                  placeholder: (ctx, _) => Container(
+                    width: 220,
+                    height: 180,
+                    color: Colors.grey.withValues(alpha: 0.2),
+                    child: const Center(
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                  errorWidget: (ctx, _, __) => Container(
+                    width: 220,
+                    height: 180,
+                    color: Colors.grey.withValues(alpha: 0.2),
+                    child: const Icon(Icons.broken_image_outlined),
+                  ),
+                ),
+              )
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.image_outlined, size: 18, color: textColor),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Image',
+                    style: TextStyle(
+                      color: textColor,
+                      fontSize: 14,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
+              );
       case ChatMessageKind.voice:
-        bubbleContent = Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.graphic_eq_rounded, size: 18, color: textColor),
-            const SizedBox(width: 6),
-            Text(
-              'Voice message',
-              style: TextStyle(
-                color: textColor,
-                fontSize: 14,
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-          ],
+        bubbleContent = VoiceNoteBubble(
+          source: message.audioUrl,
+          duration: message.duration,
+          color: textColor,
+          // Local copy shown while it uploads.
+          uploading: message.id.startsWith('local_voice_'),
         );
       case ChatMessageKind.text:
         bubbleContent = Text(
@@ -468,9 +490,7 @@ class _ChatBubble extends StatelessWidget {
         border: fromMe
             ? null
             : Border.all(
-                color: isDark
-                    ? AppColors.darkBorder
-                    : AppColors.borderLight,
+                color: isDark ? AppColors.darkBorder : AppColors.borderLight,
               ),
         boxShadow: [
           BoxShadow(
@@ -481,9 +501,8 @@ class _ChatBubble extends StatelessWidget {
         ],
       ),
       child: Column(
-        crossAxisAlignment: fromMe
-            ? CrossAxisAlignment.end
-            : CrossAxisAlignment.start,
+        crossAxisAlignment:
+            fromMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           bubbleContent,
@@ -502,9 +521,7 @@ class _ChatBubble extends StatelessWidget {
               if (fromMe) ...[
                 const SizedBox(width: 3),
                 Icon(
-                  isRead
-                      ? Icons.done_all_rounded
-                      : Icons.done_rounded,
+                  isRead ? Icons.done_all_rounded : Icons.done_rounded,
                   size: 12,
                   color: isRead
                       ? AppColors.mintGreen
@@ -533,6 +550,66 @@ class _ChatBubble extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
+// Typing Indicator
+// ---------------------------------------------------------------------------
+class _TypingIndicator extends StatelessWidget {
+  const _TypingIndicator();
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'typing ',
+            style: TextStyle(
+              fontSize: 11,
+              fontStyle: FontStyle.italic,
+              color: isDark ? AppColors.darkTextSecondary : AppColors.gray,
+            ),
+          ),
+          const _Dot(index: 0),
+          const _Dot(index: 1),
+          const _Dot(index: 2),
+        ],
+      ),
+    );
+  }
+}
+
+class _Dot extends StatelessWidget {
+  const _Dot({required this.index});
+  final int index;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      width: 5,
+      height: 5,
+      margin: const EdgeInsets.symmetric(horizontal: 2),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkTextSecondary : AppColors.gray,
+        shape: BoxShape.circle,
+      ),
+    )
+        .animate(
+          delay: (index * 180).ms,
+          onPlay: (c) => c.repeat(reverse: true),
+        )
+        .moveY(
+          begin: 0,
+          end: -4,
+          duration: 380.ms,
+          curve: Curves.easeInOut,
+        );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Input Bar
 // ---------------------------------------------------------------------------
 class _InputBar extends ConsumerStatefulWidget {
@@ -540,11 +617,17 @@ class _InputBar extends ConsumerStatefulWidget {
     required this.threadId,
     required this.isDark,
     required this.onSent,
+    this.peerId,
+    this.peerName,
+    this.peerRole,
   });
 
   final String threadId;
   final bool isDark;
   final VoidCallback onSent;
+  final String? peerId;
+  final String? peerName;
+  final String? peerRole;
 
   @override
   ConsumerState<_InputBar> createState() => _InputBarState();
@@ -553,32 +636,271 @@ class _InputBar extends ConsumerStatefulWidget {
 class _InputBarState extends ConsumerState<_InputBar> {
   final _controller = TextEditingController();
   bool _hasText = false;
+  bool _sent = false;
+  Timer? _typingTimer;
+
+  // Voice notes
+  final _recorder = VoiceNoteRecorder();
+  bool _recording = false;
+  Duration _recorded = Duration.zero;
+  Timer? _recordTicker;
 
   @override
   void initState() {
     super.initState();
-    _controller.addListener(() {
-      final has = _controller.text.trim().isNotEmpty;
-      if (has != _hasText) setState(() => _hasText = has);
-    });
+    _controller.addListener(_onTextChanged);
   }
 
   @override
   void dispose() {
+    _typingTimer?.cancel();
+    _recordTicker?.cancel();
+    if (_recording) _recorder.cancel();
+    _recorder.dispose();
+    _clearTyping();
     _controller.dispose();
     super.dispose();
+  }
+
+  // ── Voice notes ──────────────────────────────────────────────────────────
+
+  bool _canSendLive() {
+    final user = ref.read(authSessionProvider);
+    final firestore = ref.read(firestoreServiceProvider);
+    return user != null && firestore.isAvailable && widget.peerId != null;
+  }
+
+  Future<void> _startVoice() async {
+    if (!_canSendLive()) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Voice notes need an internet connection.')));
+      return;
+    }
+    HapticFeedback.mediumImpact();
+    bool started;
+    try {
+      // Camera/gallery/permission screens are an expected trip: no re-lock.
+      ref.read(appLockProvider.notifier).allowNextReturn();
+      started = await _recorder.start();
+    } catch (e) {
+      log.e('[Voice] start failed', error: e);
+      started = false;
+    }
+    if (!mounted) return;
+    if (!started) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Allow microphone access in your phone settings to '
+              'send voice notes.')));
+      return;
+    }
+    setState(() {
+      _recording = true;
+      _recorded = Duration.zero;
+    });
+    _recordTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() => _recorded += const Duration(seconds: 1));
+      // Stop and send automatically at the limit.
+      if (_recorded >= maxVoiceNote) _sendVoice();
+    });
+  }
+
+  Future<void> _cancelVoice() async {
+    _recordTicker?.cancel();
+    setState(() => _recording = false);
+    await _recorder.cancel();
+  }
+
+  Future<void> _sendVoice() async {
+    if (!_recording) return;
+    _recordTicker?.cancel();
+    setState(() => _recording = false);
+    final note = await _recorder.stop();
+    if (note == null || !mounted) return;
+    HapticFeedback.lightImpact();
+
+    final user = ref.read(authSessionProvider);
+    final firestore = ref.read(firestoreServiceProvider);
+    if (user == null || widget.peerId == null) return;
+
+    // Show it in the chat straight away; it plays from the local file
+    // while it uploads.
+    final ts = DateTime.now();
+    final localId = 'local_voice_${ts.millisecondsSinceEpoch}';
+    ref.read(_localMessagesProvider(widget.threadId).notifier).update((s) => [
+          ...s,
+          ChatMessage(
+            id: localId,
+            threadId: widget.threadId,
+            fromMe: true,
+            text: '',
+            sentAt: ts,
+            kind: ChatMessageKind.voice,
+            audioUrl: note.path,
+            duration: note.duration,
+          ),
+        ]);
+    widget.onSent();
+
+    void removeLocal() {
+      if (!mounted) return;
+      ref
+          .read(_localMessagesProvider(widget.threadId).notifier)
+          .update((s) => s.where((m) => m.id != localId).toList());
+    }
+
+    try {
+      final url = await uploadVoiceNote(
+        threadId: widget.threadId,
+        messageId: firestore.newMessageId(widget.threadId),
+        filePath: note.path,
+      );
+      await firestore.sendChatMessage(
+        threadId: widget.threadId,
+        fromId: user.id,
+        fromName: user.name,
+        fromRole: user.role.name,
+        peerId: widget.peerId!,
+        peerName: widget.peerName ?? 'Unknown',
+        peerRole: widget.peerRole ?? '',
+        text: '',
+        audioUrl: url,
+        duration: note.duration,
+      );
+      removeLocal();
+    } catch (e) {
+      log.e('[Voice] send failed', error: e);
+      removeLocal();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Voice note not sent. ${friendlyError(e)}')));
+      }
+    }
+  }
+
+  void _onTextChanged() {
+    final has = _controller.text.trim().isNotEmpty;
+    if (has != _hasText) setState(() => _hasText = has);
+    if (!has) {
+      _typingTimer?.cancel();
+      _clearTyping();
+      return;
+    }
+    _typingTimer?.cancel();
+    _setTyping(true);
+    _typingTimer = Timer(const Duration(seconds: 3), _clearTyping);
+  }
+
+  void _setTyping(bool isTyping) {
+    if (!mounted) return;
+    final user = ref.read(authSessionProvider);
+    final firestore = ref.read(firestoreServiceProvider);
+    if (user == null || !firestore.isAvailable) return;
+    firestore.setTyping(widget.threadId, user.id, isTyping);
+  }
+
+  void _clearTyping() => _setTyping(false);
+
+  Future<void> _pickAndSendImage() async {
+    final user = ref.read(authSessionProvider);
+    final firestore = ref.read(firestoreServiceProvider);
+    if (user == null || !firestore.isAvailable || widget.peerId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Image sending requires a live connection')),
+        );
+      }
+      return;
+    }
+    ref.read(appLockProvider.notifier).allowNextReturn();
+    final picked = await ImagePicker()
+        .pickImage(source: ImageSource.gallery, imageQuality: 90);
+    if (picked == null || !mounted) return;
+    HapticFeedback.lightImpact();
+
+    final ts = DateTime.now();
+    final msgId = firestore.newMessageId(widget.threadId);
+    final localId = 'local_img_${ts.millisecondsSinceEpoch}';
+    final placeholder = ChatMessage(
+      id: localId,
+      threadId: widget.threadId,
+      fromMe: true,
+      text: '',
+      sentAt: ts,
+      kind: ChatMessageKind.image,
+    );
+    ref
+        .read(_localMessagesProvider(widget.threadId).notifier)
+        .update((s) => [...s, placeholder]);
+    widget.onSent();
+
+    try {
+      Uint8List? bytes;
+      if (!kIsWeb &&
+          (Platform.isAndroid || Platform.isIOS || Platform.isMacOS)) {
+        bytes = await FlutterImageCompress.compressWithFile(
+          picked.path,
+          minWidth: 1024,
+          minHeight: 1024,
+          quality: 82,
+        );
+      }
+      final storageRef = FirebaseStorage.instance
+          .ref('chat_images/${widget.threadId}/$msgId.jpg');
+      if (bytes != null) {
+        await storageRef.putData(
+            bytes, SettableMetadata(contentType: 'image/jpeg'));
+      } else {
+        await storageRef.putFile(
+            File(picked.path), SettableMetadata(contentType: 'image/jpeg'));
+      }
+      final imageUrl = await storageRef.getDownloadURL();
+      await firestore.sendChatMessage(
+        threadId: widget.threadId,
+        fromId: user.id,
+        fromName: user.name,
+        fromRole: user.role.name,
+        peerId: widget.peerId!,
+        peerName: widget.peerName ?? 'Unknown',
+        peerRole: widget.peerRole ?? '',
+        text: '',
+        imageUrl: imageUrl,
+      );
+      if (mounted) {
+        ref
+            .read(_localMessagesProvider(widget.threadId).notifier)
+            .update((s) => s.where((m) => m.id != localId).toList());
+      }
+    } catch (e) {
+      log.e('[Chat] pickAndSendImage failed', error: e);
+      if (mounted) {
+        ref
+            .read(_localMessagesProvider(widget.threadId).notifier)
+            .update((s) => s.where((m) => m.id != localId).toList());
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to send image')),
+        );
+      }
+    }
   }
 
   void _send() {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
+    _typingTimer?.cancel();
+    _clearTyping();
 
+    HapticFeedback.lightImpact();
+
+    final ts = DateTime.now();
+    final localId = 'local_${ts.millisecondsSinceEpoch}';
     final newMsg = ChatMessage(
-      id: 'local_${DateTime.now().millisecondsSinceEpoch}',
+      id: localId,
       threadId: widget.threadId,
       fromMe: true,
       text: text,
-      sentAt: DateTime.now(),
+      sentAt: ts,
       kind: ChatMessageKind.text,
     );
 
@@ -588,6 +910,52 @@ class _InputBarState extends ConsumerState<_InputBar> {
 
     _controller.clear();
     widget.onSent();
+
+    // Morph send → checkmark → send
+    setState(() => _sent = true);
+    Future.delayed(const Duration(milliseconds: 700), () {
+      if (mounted) setState(() => _sent = false);
+    });
+
+    // Persist to Firestore; remove optimistic message once confirmed
+    final user = ref.read(authSessionProvider);
+    final firestore = ref.read(firestoreServiceProvider);
+    if (user != null && firestore.isAvailable && widget.peerId != null) {
+      () async {
+        try {
+          await firestore.sendChatMessage(
+            threadId: widget.threadId,
+            fromId: user.id,
+            fromName: user.name,
+            fromRole: user.role.name,
+            peerId: widget.peerId!,
+            peerName: widget.peerName ?? 'Unknown',
+            peerRole: widget.peerRole ?? '',
+            text: text,
+          );
+          if (mounted) {
+            ref
+                .read(_localMessagesProvider(widget.threadId).notifier)
+                .update((s) => s.where((m) => m.id != localId).toList());
+          }
+        } catch (e) {
+          log.e('[Chat] sendChatMessage failed', error: e);
+          if (!mounted) return;
+          // Don't leave a bubble that looks delivered: take it back out and
+          // put the text back so the person can try again.
+          ref
+              .read(_localMessagesProvider(widget.threadId).notifier)
+              .update((s) => s.where((m) => m.id != localId).toList());
+          if (_controller.text.isEmpty) _controller.text = text;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Message not sent. Check your connection and '
+                  'tap send to try again.'),
+            ),
+          );
+        }
+      }();
+    }
   }
 
   @override
@@ -596,7 +964,7 @@ class _InputBarState extends ConsumerState<_InputBar> {
 
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        color: isDark ? AppColors.cardDark : Colors.white,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
@@ -609,134 +977,159 @@ class _InputBarState extends ConsumerState<_InputBar> {
         top: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              // Attach icon
-              IconButton(
-                icon: Icon(
-                  Icons.attach_file_rounded,
-                  color: isDark
-                      ? AppColors.darkTextSecondary
-                      : AppColors.gray,
-                ),
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('File attachment — coming soon')),
-                  );
-                },
-              ),
-
-              // Text field
-              Expanded(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 120),
-                  child: TextField(
-                    controller: _controller,
-                    maxLines: null,
-                    keyboardType: TextInputType.multiline,
-                    textCapitalization: TextCapitalization.sentences,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: isDark
-                          ? AppColors.darkTextPrimary
-                          : AppColors.charcoal,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: 'Type a message…',
-                      hintStyle: TextStyle(
-                        fontSize: 14,
+          child: _recording
+              ? RecordingBar(
+                  elapsed: _recorded,
+                  isDark: isDark,
+                  onCancel: _cancelVoice,
+                  onSend: _sendVoice,
+                )
+              : Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    // Attach icon
+                    IconButton(
+                      icon: Icon(
+                        Icons.attach_file_rounded,
                         color: isDark
                             ? AppColors.darkTextSecondary
                             : AppColors.gray,
                       ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide(
-                          color: isDark
-                              ? AppColors.darkBorder
-                              : AppColors.borderLight,
+                      tooltip: 'Send image',
+                      onPressed: _pickAndSendImage,
+                    ),
+
+                    // Text field
+                    Expanded(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 120),
+                        child: TextField(
+                          controller: _controller,
+                          maxLines: null,
+                          keyboardType: TextInputType.multiline,
+                          textCapitalization: TextCapitalization.sentences,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: isDark
+                                ? AppColors.darkTextPrimary
+                                : AppColors.charcoal,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: 'Type a message…',
+                            hintStyle: TextStyle(
+                              fontSize: 14,
+                              color: isDark
+                                  ? AppColors.darkTextSecondary
+                                  : AppColors.gray,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(24),
+                              borderSide: BorderSide(
+                                color: isDark
+                                    ? AppColors.darkBorder
+                                    : AppColors.borderLight,
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(24),
+                              borderSide: BorderSide(
+                                color: isDark
+                                    ? AppColors.darkBorder
+                                    : AppColors.borderLight,
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(24),
+                              borderSide: const BorderSide(
+                                color: AppColors.deepGreen,
+                                width: 1.5,
+                              ),
+                            ),
+                            filled: true,
+                            fillColor: isDark
+                                ? AppColors.darkSurface
+                                : AppColors.surfaceLight,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                          ),
+                          onSubmitted: (_) => _send(),
                         ),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide(
-                          color: isDark
-                              ? AppColors.darkBorder
-                              : AppColors.borderLight,
-                        ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: const BorderSide(
-                          color: AppColors.deepGreen,
-                          width: 1.5,
-                        ),
-                      ),
-                      filled: true,
-                      fillColor: isDark
-                          ? AppColors.darkSurface
-                          : AppColors.surfaceLight,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 10,
                       ),
                     ),
-                    onSubmitted: (_) => _send(),
-                  ),
+
+                    const SizedBox(width: 8),
+
+                    // Send button
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      child: _hasText
+                          ? GestureDetector(
+                              onTap: _send,
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 250),
+                                key: const ValueKey('send'),
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: _sent
+                                      ? AppColors.mintGreen
+                                      : AppColors.deepGreen,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 220),
+                                  transitionBuilder: (child, anim) =>
+                                      ScaleTransition(
+                                          scale: anim, child: child),
+                                  child: Icon(
+                                    _sent
+                                        ? Icons.check_rounded
+                                        : Icons.send_rounded,
+                                    key: ValueKey(_sent),
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : Tooltip(
+                              key: const ValueKey('mic'),
+                              message: 'Record a voice note',
+                              child: Semantics(
+                                button: true,
+                                label: 'Record a voice note',
+                                child: GestureDetector(
+                                  onTap: _startVoice,
+                                  child: Container(
+                                    width: 44,
+                                    height: 44,
+                                    decoration: BoxDecoration(
+                                      color: isDark
+                                          ? AppColors.darkSurface
+                                          : AppColors.surfaceLight,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: isDark
+                                            ? AppColors.darkBorder
+                                            : AppColors.borderLight,
+                                      ),
+                                    ),
+                                    child: Icon(
+                                      Icons.mic_rounded,
+                                      color: isDark
+                                          ? AppColors.lightGreen
+                                          : AppColors.deepGreen,
+                                      size: 22,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                    ),
+                  ],
                 ),
-              ),
-
-              const SizedBox(width: 8),
-
-              // Send button
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                child: _hasText
-                    ? GestureDetector(
-                        onTap: _send,
-                        child: Container(
-                          key: const ValueKey('send'),
-                          width: 44,
-                          height: 44,
-                          decoration: const BoxDecoration(
-                            color: AppColors.deepGreen,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.send_rounded,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
-                      )
-                    : Container(
-                        key: const ValueKey('mic'),
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: isDark
-                              ? AppColors.darkSurface
-                              : AppColors.surfaceLight,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: isDark
-                                ? AppColors.darkBorder
-                                : AppColors.borderLight,
-                          ),
-                        ),
-                        child: Icon(
-                          Icons.mic_none_rounded,
-                          color: isDark
-                              ? AppColors.darkTextSecondary
-                              : AppColors.gray,
-                          size: 20,
-                        ),
-                      ),
-              ),
-            ],
-          ),
         ),
       ),
     );
