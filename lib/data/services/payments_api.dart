@@ -27,10 +27,12 @@ class PaymentsApi {
   /// Starts a payment for [productId]. The amount is decided by the server.
   Future<PaymentInitResult> initialize({
     required String productId,
+    required int quantityKg,
     String? email,
   }) async {
     final result = await _call('initializePayment', {
       'productId': productId,
+      'quantityKg': quantityKg,
       if (email != null && email.isNotEmpty) 'email': email,
     });
     return PaymentInitResult(

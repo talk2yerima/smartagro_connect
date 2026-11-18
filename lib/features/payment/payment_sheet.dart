@@ -29,12 +29,16 @@ class PaymentSheet extends ConsumerStatefulWidget {
   const PaymentSheet({
     super.key,
     required this.productId,
+    required this.quantityKg,
     required this.amountNgn,
     required this.description,
   });
 
   /// Listing being bought. The backend prices it from Firestore.
   final String productId;
+
+  /// How many kg the buyer chose; the server checks it against stock.
+  final int quantityKg;
 
   /// Shown to the buyer only; the amount charged comes from the server.
   final double amountNgn;
@@ -43,6 +47,7 @@ class PaymentSheet extends ConsumerStatefulWidget {
   static Future<PaymentResult?> show(
     BuildContext context, {
     required String productId,
+    required int quantityKg,
     required double amountNgn,
     required String description,
   }) {
@@ -52,6 +57,7 @@ class PaymentSheet extends ConsumerStatefulWidget {
       backgroundColor: Colors.transparent,
       builder: (_) => PaymentSheet(
         productId: productId,
+        quantityKg: quantityKg,
         amountNgn: amountNgn,
         description: description,
       ),
@@ -101,6 +107,7 @@ class _PaymentSheetState extends ConsumerState<PaymentSheet> {
     try {
       final result = await api.initialize(
         productId: widget.productId,
+        quantityKg: widget.quantityKg,
         email: email,
       );
 

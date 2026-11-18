@@ -279,6 +279,26 @@ class _OrderCard extends ConsumerWidget {
                       style: TextStyle(fontSize: 13, color: sub))),
             ],
           ),
+          if (order.shortfallKg > 0) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.warningOrange.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                asSeller
+                    ? 'Another buyer paid for the last stock first: you are '
+                        '${order.shortfallKg} kg short on this order. Contact '
+                        'the buyer to agree a refund or a replacement.'
+                    : 'The seller ran ${order.shortfallKg} kg short (another '
+                        'buyer paid first). They will contact you about a '
+                        'refund or a replacement.',
+                style: const TextStyle(fontSize: 13),
+              ),
+            ),
+          ],
           if (order.rating != null) ...[
             const SizedBox(height: 10),
             _RatingView(rating: order.rating!, review: order.review),

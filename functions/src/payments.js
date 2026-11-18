@@ -35,17 +35,26 @@ class PaymentError extends Error {
 // ── Pure helpers ─────────────────────────────────────────────────────────────
 
 /**
- * Price of buying the whole lot, in kobo. Throws if the listing data is not
- * a sane positive integer price/quantity.
+ * Price of buying [quantityKg] of a listing (default: the whole lot), in
+ * kobo. Throws if the listing data is not a sane positive integer
+ * price/quantity, or the buyer asks for more than is available.
  */
-function computeAmountKobo(product) {
+function computeAmountKobo(product, quantityKg) {
   const price = product && product.priceNgn;
-  const qty = product && product.quantityKg;
+  const available = product && product.quantityKg;
   if (!Number.isInteger(price) || price <= 0) {
     throw new PaymentError('failed-precondition', 'Listing has an invalid price.');
   }
-  if (!Number.isInteger(qty) || qty <= 0) {
+  if (!Number.isInteger(available) || available <= 0) {
     throw new PaymentError('failed-precondition', 'Listing has an invalid quantity.');
+  }
+  // Older app versions don't send a quantity: they buy the whole lot.
+  const qty = quantityKg === undefined || quantityKg === null ? available : quantityKg;
+  if (!Number.isInteger(qty) || qty < 1 || qty > available) {
+    throw new PaymentError(
+      'invalid-argument',
+      `Choose between 1 and ${available} kg.`,
+    );
   }
   const kobo = price * qty * 100;
   if (!Number.isSafeInteger(kobo)) {
@@ -240,6 +249,7 @@ async function initializePayment({
   tokenEmail,
   email,
   productId,
+  quantityKg,
   feePercent = DEFAULT_FEE_PERCENT,
   now = () => new Date(),
   makeReference = newReference,
@@ -267,7 +277,8 @@ async function initializePayment({
     throw new PaymentError('failed-precondition', 'You cannot buy your own listing.');
   }
 
-  const amountKobo = computeAmountKobo(product);
+  const amountKobo = computeAmountKobo(product, quantityKg);
+  const qty = amountKobo / 100 / product.priceNgn;
 
   // Every sale is split at Paystack, so the seller must have a bank account
   // on file; otherwise the whole amount would land in SmartAgro's account.
@@ -284,7 +295,7 @@ async function initializePayment({
   const { platformFeeKobo, sellerShareKobo } = computeSplit(amountKobo, feePercent);
 
   const reference = makeReference();
-  const description = `${product.quantityKg} kg of ${product.title || 'produce'}`;
+  const description = `${qty} kg of ${product.title || 'produce'}`;
   const paymentRef = db.collection('payments').doc(reference);
 
   await paymentRef.set({
@@ -293,6 +304,7 @@ async function initializePayment({
     buyerEmail: receiptEmail,
     sellerId: product.sellerId || null,
     productId,
+    quantityKg: qty,
     description,
     amountKobo,
     platformFeeKobo,
@@ -310,7 +322,7 @@ async function initializePayment({
       email: receiptEmail,
       amountKobo,
       reference,
-      metadata: { productId, buyerId: uid, sellerId: product.sellerId },
+      metadata: { productId, quantityKg: qty, buyerId: uid, sellerId: product.sellerId },
       subaccount: payout.subaccountCode,
       transactionChargeKobo: platformFeeKobo,
     });
@@ -327,6 +339,7 @@ async function initializePayment({
     reference,
     authorizationUrl: init.authorizationUrl,
     amountKobo,
+    quantityKg: qty,
     sellerShareKobo,
     currency: CURRENCY,
     description,
@@ -345,6 +358,13 @@ async function applyStatus({ db, reference, status, tx, now = () => new Date() }
     const record = snap.data();
     if (FINAL_STATUSES.has(record.status)) return record.status;
 
+    // All reads before any writes (Firestore transactions require it).
+    const productRef = record.productId
+      ? db.collection('products').doc(record.productId)
+      : null;
+    const productSnap = status === 'success' && productRef ? await t.get(productRef) : null;
+    const product = productSnap && productSnap.exists ? productSnap.data() : null;
+
     const update = { status, updatedAt: now() };
     if (tx) {
       update.gatewayAmount = tx.amount === undefined ? null : tx.amount;
@@ -355,11 +375,22 @@ async function applyStatus({ db, reference, status, tx, now = () => new Date() }
     t.update(paymentRef, update);
 
     if (status === 'success') {
+      const inStock = product && Number.isInteger(product.quantityKg) ? product.quantityKg : 0;
+      // Payments from before partial buying took the whole lot.
+      const bought = Number.isInteger(record.quantityKg) ? record.quantityKg : inStock;
+      const remaining = Math.max(0, inStock - bought);
+      // Two buyers paying for the last kilos at once: both payments are
+      // real, so keep both orders and flag the one that can't be filled in
+      // full for the seller (and an admin) to sort out.
+      const shortfallKg = Math.max(0, bought - inStock);
+
       t.set(db.collection('orders').doc(reference), {
         reference,
         buyerId: record.buyerId,
         sellerId: record.sellerId,
         productId: record.productId,
+        quantityKg: bought,
+        ...(shortfallKg > 0 ? { shortfallKg } : {}),
         description: record.description,
         amountKobo: record.amountKobo,
         platformFeeKobo: record.platformFeeKobo === undefined ? null : record.platformFeeKobo,
@@ -368,9 +399,10 @@ async function applyStatus({ db, reference, status, tx, now = () => new Date() }
         status: 'paid',
         createdAt: now(),
       });
-      if (record.productId) {
-        t.update(db.collection('products').doc(record.productId), {
-          availability: 'sold_out',
+      if (product) {
+        t.update(productRef, {
+          quantityKg: remaining,
+          ...(remaining === 0 ? { availability: 'sold_out' } : {}),
           updatedAt: now(),
         });
       }

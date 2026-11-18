@@ -60,6 +60,7 @@ exports.initializePayment = onCall(
         tokenEmail: request.auth && request.auth.token && request.auth.token.email,
         email: data.email,
         productId: data.productId,
+        quantityKg: data.quantityKg,
         feePercent: PLATFORM_FEE_PERCENT.value(),
       });
     } catch (err) {

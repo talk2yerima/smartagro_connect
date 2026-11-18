@@ -18,6 +18,8 @@ class MarketOrder extends Equatable {
     this.receivedAt,
     this.rating,
     this.review,
+    this.quantityKg,
+    this.shortfallKg = 0,
   });
 
   factory MarketOrder.fromMap(String id, Map<String, dynamic> m) {
@@ -36,6 +38,8 @@ class MarketOrder extends Equatable {
       receivedAt: _date(m['receivedAt']),
       rating: (m['rating'] as num?)?.toInt(),
       review: m['review'] as String?,
+      quantityKg: (m['quantityKg'] as num?)?.toInt(),
+      shortfallKg: (m['shortfallKg'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -68,6 +72,13 @@ class MarketOrder extends Equatable {
   /// The buyer's 1-5 rating of the seller, once given.
   final int? rating;
   final String? review;
+
+  /// How many kg were bought (null on orders from before partial buying).
+  final int? quantityKg;
+
+  /// Kilos the seller couldn't supply because another buyer paid for the
+  /// last stock first. The two of them need to agree a refund or swap.
+  final int shortfallKg;
 
   bool get isPaid => status == 'paid';
   bool get isDispatched => status == 'dispatched';

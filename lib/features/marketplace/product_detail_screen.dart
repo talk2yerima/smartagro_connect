@@ -347,8 +347,8 @@ class _ProductDetailViewState extends ConsumerState<_ProductDetailView> {
                       const SizedBox(height: 12),
                     ],
 
-                    // Bottom padding to clear sticky bar
-                    const SizedBox(height: 96),
+                    // Room for the sticky bar (with its quantity picker).
+                    const SizedBox(height: 200),
                   ],
                 ),
               ),
@@ -1255,17 +1255,92 @@ class _SimilarCard extends StatelessWidget {
 // Bottom sticky bar
 // ---------------------------------------------------------------------------
 
-class _BottomBar extends ConsumerWidget {
+class _BottomBar extends ConsumerStatefulWidget {
   const _BottomBar({required this.product, required this.isDark});
 
   final ProductListing product;
   final bool isDark;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_BottomBar> createState() => _BottomBarState();
+}
+
+/// Sticky bar: the buyer chooses how many kg to buy (not the whole lot),
+/// sees the total, and pays for exactly that.
+class _BottomBarState extends ConsumerState<_BottomBar> {
+  late int _qty;
+  late final TextEditingController _qtyCtrl;
+
+  int get _available => widget.product.quantityKg;
+
+  @override
+  void initState() {
+    super.initState();
+    // Start small: 10 kg, or everything if there's less than that.
+    _qty = _available < 10 ? _available : 10;
+    if (_qty < 1) _qty = 1;
+    _qtyCtrl = TextEditingController(text: '$_qty');
+  }
+
+  @override
+  void dispose() {
+    _qtyCtrl.dispose();
+    super.dispose();
+  }
+
+  void _setQty(int value) {
+    final v = value.clamp(1, _available < 1 ? 1 : _available);
+    setState(() => _qty = v);
+    if (_qtyCtrl.text != '$v') {
+      _qtyCtrl.value = TextEditingValue(
+        text: '$v',
+        selection: TextSelection.collapsed(offset: '$v'.length),
+      );
+    }
+  }
+
+  bool get _qtyValid {
+    final typed = int.tryParse(_qtyCtrl.text);
+    return typed != null && typed >= 1 && typed <= _available;
+  }
+
+  Future<void> _buy() async {
+    final product = widget.product;
+    HapticFeedback.mediumImpact();
+    final result = await PaymentSheet.show(
+      context,
+      productId: product.id,
+      quantityKg: _qty,
+      amountNgn: (product.priceNgn * _qty).toDouble(),
+      description: '$_qty kg of ${product.title}',
+    );
+    if (!mounted) return;
+    if (result == PaymentResult.success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Payment successful! See it under Orders.'),
+          backgroundColor: AppColors.deepGreen,
+          duration: Duration(seconds: 4),
+        ),
+      );
+    } else if (result == PaymentResult.failed) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Payment was not completed. Try again.'),
+          backgroundColor: AppColors.errorRed,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final product = widget.product;
+    final isDark = widget.isDark;
     final user = ref.watch(authSessionProvider);
-    final subTextColor = AppColors.subText(isDark);
-    final isSoldOut = product.availability == ProductAvailability.soldOut;
+    final sub = AppColors.subText(isDark);
+    final isSoldOut =
+        product.availability == ProductAvailability.soldOut || _available < 1;
     final isOwnListing = user?.id == product.sellerId;
     // Sales are paid straight to the seller's bank, so a seller with no
     // bank account on file can't be paid yet (the server refuses too).
@@ -1273,21 +1348,42 @@ class _BottomBar extends ConsumerWidget {
         ? true
         : ref.watch(sellerCanBePaidProvider(product.sellerId)).valueOrNull ??
             true;
+    final canBuy = !isOwnListing && !isSoldOut && sellerCanBePaid;
+    final accent = isDark ? AppColors.lightGreen : AppColors.deepGreen;
+
+    final Widget action;
+    if (isOwnListing) {
+      action = OutlinedButton.icon(
+        onPressed: null,
+        icon: const Icon(Icons.storefront_rounded, size: 18),
+        label: const Text('Your Listing'),
+      );
+    } else if (isSoldOut) {
+      action = const PrimaryGradientButton(label: 'Sold Out', onPressed: null);
+    } else if (!sellerCanBePaid) {
+      action = Text(
+        "This seller can't receive payments yet. Contact them to arrange "
+        'the sale.',
+        style: TextStyle(color: sub, fontSize: 13),
+      );
+    } else {
+      action = PrimaryGradientButton(
+        label: 'Buy $_qty kg',
+        onPressed: _qtyValid ? _buy : null,
+      );
+    }
+
+    // Quick choices: a few round amounts below what's on sale, plus "All".
+    final quick = [10, 25, 50, 100].where((q) => q < _available).toList();
 
     return Container(
       padding: EdgeInsets.fromLTRB(
-        16,
-        12,
-        16,
-        12 + MediaQuery.of(context).padding.bottom,
-      ),
+          16, 12, 16, 12 + MediaQuery.of(context).padding.bottom),
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkBg : Colors.white,
         border: Border(
           top: BorderSide(
-            color: isDark ? AppColors.darkBorder : AppColors.borderLight,
-            width: 1,
-          ),
+              color: isDark ? AppColors.darkBorder : AppColors.borderLight),
         ),
         boxShadow: [
           BoxShadow(
@@ -1297,107 +1393,121 @@ class _BottomBar extends ConsumerWidget {
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Price column
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
+          if (canBuy) ...[
+            Row(
+              children: [
+                const Text('How much?',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+                const Spacer(),
+                IconButton.filledTonal(
+                  tooltip: 'Less',
+                  onPressed: _qty > 1 ? () => _setQty(_qty - 1) : null,
+                  icon: const Icon(Icons.remove_rounded),
+                ),
+                SizedBox(
+                  width: 64,
+                  child: TextField(
+                    controller: _qtyCtrl,
+                    textAlign: TextAlign.center,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.w700),
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(vertical: 8),
+                    ),
+                    onChanged: (v) {
+                      final n = int.tryParse(v);
+                      if (n != null && n >= 1 && n <= _available) {
+                        setState(() => _qty = n);
+                      } else {
+                        setState(() {}); // refresh the Buy button state
+                      }
+                    },
+                    onSubmitted: (v) => _setQty(int.tryParse(v) ?? _qty),
+                  ),
+                ),
+                IconButton.filledTonal(
+                  tooltip: 'More',
+                  onPressed: _qty < _available ? () => _setQty(_qty + 1) : null,
+                  icon: const Icon(Icons.add_rounded),
+                ),
+                const SizedBox(width: 4),
+                const Text('kg'),
+              ],
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        for (final q in quick)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: ChoiceChip(
+                              label: Text('$q kg'),
+                              selected: _qty == q,
+                              onSelected: (_) => _setQty(q),
+                            ),
+                          ),
+                        ChoiceChip(
+                          label: Text('All $_available kg'),
+                          selected: _qty == _available,
+                          onSelected: (_) => _setQty(_available),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (!_qtyValid)
+              Text('Choose between 1 and $_available kg.',
+                  style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                      fontSize: 12)),
+            const SizedBox(height: 8),
+          ],
+          Row(
             children: [
-              // The buyer pays for the whole lot (price per kg x quantity),
-              // so lead with that total; the per-kg price sits underneath.
-              Text(
-                'Total for ${product.quantityKg} kg',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: subTextColor,
-                    ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    canBuy ? 'Total for $_qty kg' : '$_available kg available',
+                    style: Theme.of(context)
+                        .textTheme
+                        .labelSmall
+                        ?.copyWith(color: sub),
+                  ),
+                  Text(
+                    formatNgn(product.priceNgn * (canBuy ? _qty : 1)),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontFamily: 'Poppins',
+                          fontWeight: FontWeight.w800,
+                          color: accent,
+                        ),
+                  ),
+                  Text(
+                    canBuy ? '${formatNgn(product.priceNgn)} per kg' : 'per kg',
+                    style: Theme.of(context)
+                        .textTheme
+                        .labelSmall
+                        ?.copyWith(color: sub),
+                  ),
+                ],
               ),
-              Text(
-                formatNgn(product.priceNgn * product.quantityKg),
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontFamily: 'Poppins',
-                      fontWeight: FontWeight.w800,
-                      color:
-                          isDark ? AppColors.lightGreen : AppColors.deepGreen,
-                    ),
-              ),
-              Text(
-                '${formatNgn(product.priceNgn)} per kg',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: subTextColor,
-                    ),
-              ),
+              const SizedBox(width: 16),
+              Expanded(child: action),
             ],
-          ),
-
-          const SizedBox(width: 16),
-
-          // Action button — varies by ownership / availability
-          Expanded(
-            child: isOwnListing
-                ? OutlinedButton.icon(
-                    onPressed: null,
-                    icon: const Icon(Icons.storefront_rounded, size: 18),
-                    label: const Text('Your Listing'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.gray,
-                      side: BorderSide(
-                          color: AppColors.gray.withValues(alpha: 0.40)),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      textStyle: const TextStyle(
-                        fontFamily: 'Poppins',
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15,
-                      ),
-                    ),
-                  )
-                : !sellerCanBePaid && !isSoldOut
-                    ? Text(
-                        "This seller can't receive payments yet. Contact "
-                        'them to arrange the sale.',
-                        style: TextStyle(color: subTextColor, fontSize: 13),
-                      )
-                    : PrimaryGradientButton(
-                        label: isSoldOut ? 'Sold Out' : 'Buy Now',
-                        onPressed: isSoldOut
-                            ? null
-                            : () async {
-                                HapticFeedback.mediumImpact();
-                                final result = await PaymentSheet.show(
-                                  context,
-                                  productId: product.id,
-                                  amountNgn:
-                                      (product.priceNgn * product.quantityKg)
-                                          .toDouble(),
-                                  description:
-                                      '${product.quantityKg} kg of ${product.title}',
-                                );
-                                if (!context.mounted) return;
-                                if (result == PaymentResult.success) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                          'Payment successful! Order placed.'),
-                                      backgroundColor: AppColors.deepGreen,
-                                      duration: Duration(seconds: 4),
-                                    ),
-                                  );
-                                } else if (result == PaymentResult.failed) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                          'Payment was not completed. Try again.'),
-                                      backgroundColor: AppColors.errorRed,
-                                    ),
-                                  );
-                                }
-                              },
-                        icon: isSoldOut
-                            ? null
-                            : Icons.shopping_cart_checkout_rounded,
-                      ),
           ),
         ],
       ),

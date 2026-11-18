@@ -61,6 +61,7 @@ void main() {
 
       final result = await _api(adapter).initialize(
         productId: 'p1',
+        quantityKg: 40,
         email: 'b@farm.ng',
       );
 
@@ -70,7 +71,7 @@ void main() {
       expect(req.uri.toString(), 'https://fn.test/initializePayment');
       expect(req.headers['Authorization'], 'Bearer id-token');
       expect(req.data, {
-        'data': {'productId': 'p1', 'email': 'b@farm.ng'},
+        'data': {'productId': 'p1', 'quantityKg': 40, 'email': 'b@farm.ng'},
       });
     });
 
@@ -83,7 +84,7 @@ void main() {
       });
 
       expect(
-        () => _api(adapter).initialize(productId: 'p1'),
+        () => _api(adapter).initialize(productId: 'p1', quantityKg: 1),
         throwsA(
           isA<PaymentException>().having(
             (e) => e.message,
@@ -97,7 +98,8 @@ void main() {
     test('refuses in demo mode without calling the server', () async {
       final adapter = _FakeAdapter(200, {});
       await expectLater(
-        () => _api(adapter, live: false).initialize(productId: 'p1'),
+        () => _api(adapter, live: false)
+            .initialize(productId: 'p1', quantityKg: 1),
         throwsA(isA<PaymentException>()),
       );
       expect(adapter.requests, isEmpty);
@@ -106,7 +108,8 @@ void main() {
     test('refuses when there is no signed-in token', () async {
       final adapter = _FakeAdapter(200, {});
       await expectLater(
-        () => _api(adapter, token: null).initialize(productId: 'p1'),
+        () => _api(adapter, token: null)
+            .initialize(productId: 'p1', quantityKg: 1),
         throwsA(isA<PaymentException>()),
       );
       expect(adapter.requests, isEmpty);

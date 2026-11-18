@@ -50,4 +50,17 @@ void main() {
     expect(o.rating, 4);
     expect(o.review, 'Fresh and on time');
   });
+
+  test('reads the quantity bought and any shortfall', () {
+    final o = MarketOrder.fromMap('SA-4', const {
+      'amountKobo': 100,
+      'buyerId': 'b1',
+      'sellerId': 's1',
+      'quantityKg': 30,
+      'shortfallKg': 10,
+    });
+    expect(o.quantityKg, 30);
+    expect(o.shortfallKg, 10);
+    expect(MarketOrder.fromMap('x', const {}).shortfallKg, 0);
+  });
 }

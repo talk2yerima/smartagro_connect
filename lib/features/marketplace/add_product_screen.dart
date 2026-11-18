@@ -597,8 +597,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                               const SizedBox(width: 6),
                               Expanded(
                                 child: Text(
-                                  'Buyers pay ${formatNgn(price * qty)} '
-                                  'for all $qty kg',
+                                  'Buyers choose how many kg to buy. '
+                                  'All $qty kg sells for '
+                                  '${formatNgn(price * qty)}.',
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,

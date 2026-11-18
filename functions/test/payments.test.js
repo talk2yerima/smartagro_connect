@@ -368,3 +368,65 @@ test('Paystack client lists active banks across pages, sorted', async () => {
   ]);
   assert.match(calls[1].url, /next=cursor2/);
 });
+
+// ── Buying part of a lot ───────────────────────────────────────────────────
+
+test('a buyer can pay for part of a lot', async () => {
+  const db = createFakeFirestore(seedProduct());
+  const paystack = fakePaystack();
+  const res = await startPayment(db, paystack, { quantityKg: 10, feePercent: 5 });
+  // 10 kg × ₦500 = ₦5,000
+  assert.equal(paystack.calls.initialize[0].amountKobo, 500_000);
+  assert.equal(paystack.calls.initialize[0].transactionChargeKobo, 25_000);
+  assert.equal(res.quantityKg, 10);
+  assert.equal(res.description, '10 kg of Maize');
+  assert.equal(db.store.get('payments/SA-ref1').quantityKg, 10);
+});
+
+test('the quantity must be a whole number of kg within what is available', async () => {
+  for (const bad of [0, -1, 2.5, 41, '10']) {
+    const db = createFakeFirestore(seedProduct());
+    await assert.rejects(startPayment(db, fakePaystack(), { quantityKg: bad }), (err) => {
+      assert.equal(err.code, 'invalid-argument');
+      assert.match(err.message, /between 1 and 40 kg/);
+      return true;
+    });
+  }
+});
+
+test('a partial purchase reduces stock but keeps the listing on sale', async () => {
+  const db = createFakeFirestore(seedProduct());
+  const paystack = fakePaystack({ verifyResult: { status: 'success', amount: 500_000, currency: 'NGN' } });
+  await startPayment(db, paystack, { quantityKg: 10 });
+  await p.verifyPayment({ db, paystack, uid: 'buyer-1', reference: 'SA-ref1', now: NOW });
+
+  const product = db.store.get('products/p1');
+  assert.equal(product.quantityKg, 30);
+  assert.equal(product.availability, 'in_stock');
+  assert.equal(db.store.get('orders/SA-ref1').quantityKg, 10);
+  assert.equal(db.store.get('orders/SA-ref1').shortfallKg, undefined);
+});
+
+test('buying the last kilos marks the listing sold out', async () => {
+  const db = createFakeFirestore(seedProduct());
+  const paystack = fakePaystack({ verifyResult: { status: 'success', amount: 2_000_000, currency: 'NGN' } });
+  await startPayment(db, paystack, { quantityKg: 40 });
+  await p.verifyPayment({ db, paystack, uid: 'buyer-1', reference: 'SA-ref1', now: NOW });
+  assert.equal(db.store.get('products/p1').quantityKg, 0);
+  assert.equal(db.store.get('products/p1').availability, 'sold_out');
+});
+
+test('when two buyers race for the last kilos, the late order is flagged', async () => {
+  const db = createFakeFirestore(seedProduct());
+  const paystack = fakePaystack({ verifyResult: { status: 'success', amount: 1_500_000, currency: 'NGN' } });
+  await startPayment(db, paystack, { quantityKg: 30 });
+  // Someone else bought 20 kg in the meantime: only 20 left.
+  db.store.set('products/p1', { ...db.store.get('products/p1'), quantityKg: 20 });
+  await p.verifyPayment({ db, paystack, uid: 'buyer-1', reference: 'SA-ref1', now: NOW });
+
+  const order = db.store.get('orders/SA-ref1');
+  assert.equal(order.quantityKg, 30);
+  assert.equal(order.shortfallKg, 10);
+  assert.equal(db.store.get('products/p1').quantityKg, 0);
+  assert.equal(db.store.get('products/p1').availability, 'sold_out');
+});
