@@ -51,6 +51,8 @@ android/local.properties
 android/key.properties
 android/app/*.jks
 android/app/*.keystore
+*.jks
+*.keystore
 build/debug-info/
 
 # Cloud Functions backend

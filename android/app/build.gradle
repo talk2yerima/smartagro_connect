@@ -27,6 +27,22 @@ if (keystorePropsFile.exists()) {
     keystoreProps.load(new FileInputStream(keystorePropsFile))
 }
 
+// A production build must be signed with the real upload key. Without this
+// check it silently fell back to the debug key, producing a bundle Google
+// Play rejects (or, worse, publishing under the wrong key).
+gradle.taskGraph.whenReady {
+    // Look at what was asked for (flutter build ... --flavor prod requests
+    // assembleProdRelease / bundleProdRelease); dev builds also pull in some
+    // prod helper tasks, so the task graph itself can't be used.
+    def requested = gradle.startParameter.taskNames*.toLowerCase()
+    def buildsProdRelease = requested.any { it.contains("prodrelease") }
+    if (buildsProdRelease && !keystorePropsFile.exists()) {
+        throw new GradleException(
+            "Release signing key missing. Create android/key.properties " +
+            "(see android/key.properties.example) before building the prod release.")
+    }
+}
+
 android {
     namespace "com.smartagro.connect"
     compileSdk flutter.compileSdkVersion
