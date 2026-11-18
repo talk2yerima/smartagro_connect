@@ -13,7 +13,7 @@ const {
   assertFails,
   assertSucceeds,
 } = require('@firebase/rules-unit-testing');
-const { doc, getDoc, setDoc, updateDoc, deleteDoc } = require('firebase/firestore');
+const { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, query, where, orderBy, getDocs } = require('firebase/firestore');
 
 let env;
 
@@ -179,4 +179,24 @@ test('nobody can write payout accounts or fake payoutReady from the app', async 
   await assertFails(setDoc(doc(as('bob'), 'payoutAccounts/alice'), { subaccountCode: 'ACCT_steal' }));
   await assertFails(updateDoc(doc(as('alice'), 'users/alice'), { payoutReady: true }));
   await assertFails(setDoc(doc(as('mallory'), 'users/mallory'), { name: 'M', role: 'farmer', payoutReady: true }));
+});
+
+// ── Orders screen queries ─────────────────────────────────────────────────
+
+test('buyers and sellers can list only their own orders', async () => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'orders/o1'), {
+      buyerId: 'bob', sellerId: 'alice', status: 'paid', createdAt: new Date(),
+    });
+  });
+  const mine = (db, field, uid) =>
+    getDocs(query(collection(db, 'orders'), where(field, '==', uid), orderBy('createdAt', 'desc')));
+  await assertSucceeds(mine(as('bob'), 'buyerId', 'bob'));
+  await assertSucceeds(mine(as('alice'), 'sellerId', 'alice'));
+});
+
+test('nobody can list other people\'s orders', async () => {
+  const db = as('vera');
+  await assertFails(getDocs(query(collection(db, 'orders'), where('buyerId', '==', 'bob'))));
+  await assertFails(getDocs(collection(db, 'orders')));
 });

@@ -1,218 +1,394 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/di/auth_providers.dart';
 import '../../core/di/payment_providers.dart';
 import '../../core/errors/friendly_error.dart';
 import '../../core/utils/money_format.dart';
 import '../../data/repositories/transaction_ref_queue.dart';
+import '../../domain/entities/app_user.dart';
+import '../../domain/entities/market_order.dart';
 import '../../shared/widgets/empty_state.dart';
 
+/// Orders, from the database (`orders/{ref}`, written by the payments
+/// backend once Paystack confirms a payment).
+///
+/// Sellers get a "Sold" tab with what they receive and the buyer's contact
+/// so they can arrange delivery. Everyone has "Bought". Payment attempts
+/// that were never confirmed (kept on this phone) are listed under Bought.
 class OrdersScreen extends ConsumerWidget {
   const OrdersScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final async = ref.watch(transactionHistoryProvider);
+    final role =
+        ref.watch(authSessionProvider.select((u) => u?.role ?? UserRole.buyer));
+    final sells = role == UserRole.farmer || role == UserRole.admin;
 
-    return Scaffold(
-      backgroundColor: isDark ? AppColors.darkBg : AppColors.softWhite,
-      appBar: AppBar(
-        elevation: 0,
-        scrolledUnderElevation: 0.5,
-        backgroundColor: isDark ? AppColors.cardDark : Colors.white,
-        title: Text(
-          'Payment History',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
+    if (!sells) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('My orders')),
+        body: const _BoughtTab(),
+      );
+    }
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Orders'),
+          bottom: const TabBar(
+            tabs: [Tab(text: 'Sold'), Tab(text: 'Bought')],
+          ),
         ),
-      ),
-      body: async.when(
-        loading: () => const Center(
-          child: CircularProgressIndicator(color: AppColors.deepGreen),
-        ),
-        error: (e, _) => Center(
-            child: Text('Could not load your orders.\n${friendlyError(e)}',
-                textAlign: TextAlign.center)),
-        data: (refs) {
-          if (refs.isEmpty) {
-            return const EmptyState(
-              icon: Icons.receipt_long_outlined,
-              title: 'No payments yet',
-              subtitle:
-                  'Your payment history will appear here after your first purchase.',
-            );
-          }
-          return RefreshIndicator(
-            color: AppColors.deepGreen,
-            onRefresh: () => ref.refresh(transactionHistoryProvider.future),
-            child: ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-              itemCount: refs.length,
-              itemBuilder: (context, i) =>
-                  _OrderTile(ref: refs[i], isDark: isDark)
-                      .animate(delay: (40 * i).ms)
-                      .fadeIn(duration: 260.ms)
-                      .slideY(begin: 0.04),
-            ),
-          );
-        },
+        body: const TabBarView(children: [_SoldTab(), _BoughtTab()]),
       ),
     );
   }
 }
 
-// ---------------------------------------------------------------------------
+// ── Tabs ─────────────────────────────────────────────────────────────────────
 
-class _OrderTile extends StatelessWidget {
-  const _OrderTile({required this.ref, required this.isDark});
+class _SoldTab extends ConsumerWidget {
+  const _SoldTab();
 
-  final TransactionRef ref;
-  final bool isDark;
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final orders = ref.watch(soldOrdersProvider);
+    return orders.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => _LoadError(
+        message: friendlyError(e),
+        onRetry: () => ref.invalidate(soldOrdersProvider),
+      ),
+      data: (list) {
+        if (list.isEmpty) {
+          return const EmptyState(
+            icon: Icons.storefront_outlined,
+            title: 'No sales yet',
+            subtitle: 'When a buyer pays for your produce, the order appears '
+                'here with their contact so you can arrange delivery.',
+          );
+        }
+        final earned = list.fold<int>(
+            0, (sum, o) => sum + (o.sellerShareKobo ?? o.amountKobo));
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          children: [
+            _Summary(
+              label: 'You received from ${list.length} '
+                  '${list.length == 1 ? 'sale' : 'sales'}',
+              amountKobo: earned,
+            ),
+            const SizedBox(height: 12),
+            for (final o in list) ...[
+              _OrderCard(order: o, asSeller: true),
+              const SizedBox(height: 10),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _BoughtTab extends ConsumerWidget {
+  const _BoughtTab();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final orders = ref.watch(boughtOrdersProvider);
+    final attempts = ref.watch(transactionHistoryProvider).valueOrNull ??
+        const <TransactionRef>[];
+    // Payment attempts on this phone that never became an order.
+    final unconfirmed = attempts.where((a) => a.status != 'success').toList();
+
+    return orders.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => _LoadError(
+        message: friendlyError(e),
+        onRetry: () => ref.invalidate(boughtOrdersProvider),
+      ),
+      data: (list) {
+        if (list.isEmpty && unconfirmed.isEmpty) {
+          return const EmptyState(
+            icon: Icons.shopping_bag_outlined,
+            title: 'No orders yet',
+            subtitle: 'Produce you buy will appear here, with the seller\'s '
+                'contact for delivery.',
+          );
+        }
+        return RefreshIndicator(
+          onRefresh: () async {
+            ref.invalidate(boughtOrdersProvider);
+            ref.invalidate(transactionHistoryProvider);
+          },
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            children: [
+              for (final o in list) ...[
+                _OrderCard(order: o, asSeller: false),
+                const SizedBox(height: 10),
+              ],
+              if (unconfirmed.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text('Payments not completed',
+                    style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: 8),
+                for (final a in unconfirmed) ...[
+                  _AttemptTile(attempt: a),
+                  const SizedBox(height: 8),
+                ],
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ── Pieces ───────────────────────────────────────────────────────────────────
+
+class _Summary extends StatelessWidget {
+  const _Summary({required this.label, required this.amountKobo});
+
+  final String label;
+  final int amountKobo;
 
   @override
   Widget build(BuildContext context) {
-    final cardColor = isDark ? AppColors.cardDark : Colors.white;
-    final textColor = AppColors.text(isDark);
-    final subColor = AppColors.subText(isDark);
-
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isDark ? AppColors.darkBorder : AppColors.borderLight,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.20 : 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+        gradient: AppColors.gradientGreen,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.85))),
+          const SizedBox(height: 4),
+          Text(
+            formatNgn(amountKobo / 100),
+            style: TextStyle(
+              color: isDark ? AppColors.softWhite : Colors.white,
+              fontSize: 26,
+              fontWeight: FontWeight.w700,
+              fontFamily: 'Poppins',
+            ),
           ),
+          const SizedBox(height: 2),
+          Text('Paid to your bank by Paystack after each sale',
+              style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.75), fontSize: 12)),
         ],
       ),
-      child: Row(
-        children: [
-          // Status icon
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: _statusColor(ref.status).withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              _statusIcon(ref.status),
-              color: _statusColor(ref.status),
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 12),
+    );
+  }
+}
 
-          // Description + date
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  ref.description,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: textColor,
-                        fontWeight: FontWeight.w600,
-                        height: 1.3,
-                      ),
-                  maxLines: 2,
+class _OrderCard extends ConsumerWidget {
+  const _OrderCard({required this.order, required this.asSeller});
+
+  final MarketOrder order;
+
+  /// True on the Sold tab: the other person is the buyer.
+  final bool asSeller;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final text = Theme.of(context).textTheme;
+    final sub = AppColors.subText(isDark);
+    final otherId = asSeller ? order.buyerId : order.sellerId;
+    final contact = ref.watch(orderContactProvider(otherId)).valueOrNull;
+    final myId = ref.watch(authSessionProvider.select((u) => u?.id)) ?? '';
+
+    final headline = asSeller
+        ? 'You receive ${formatNgn((order.sellerShareKobo ?? order.amountKobo) / 100)}'
+        : 'You paid ${formatNgn(order.amountKobo / 100)}';
+    final detail = asSeller
+        ? 'Buyer paid ${formatNgn(order.amountKobo / 100)}'
+            '${order.platformFeeKobo != null ? ' · SmartAgro fee ${formatNgn(order.platformFeeKobo! / 100)}' : ''}'
+        : null;
+    final nextStep = asSeller
+        ? 'Paid. Contact the buyer to arrange delivery.'
+        : 'Paid. The seller will contact you about delivery.';
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.card(isDark),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border_(isDark)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(order.description,
+                    style: text.titleSmall,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis),
+              ),
+              const _PaidChip(),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(DateFormat('d MMM yyyy, h:mm a').format(order.createdAt),
+              style: TextStyle(fontSize: 12, color: sub)),
+          const SizedBox(height: 10),
+          Text(headline,
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: isDark ? AppColors.lightGreen : AppColors.deepGreen,
+              )),
+          if (detail != null)
+            Text(detail, style: TextStyle(fontSize: 12, color: sub)),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Icon(Icons.local_shipping_outlined, size: 16, color: sub),
+              const SizedBox(width: 6),
+              Expanded(
+                  child: Text(nextStep,
+                      style: TextStyle(fontSize: 13, color: sub))),
+            ],
+          ),
+          const Divider(height: 22),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '${asSeller ? 'Buyer' : 'Seller'}: ${contact?.name ?? '…'}',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  DateFormat('d MMM yyyy · HH:mm').format(ref.createdAt),
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: subColor,
-                      ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-
-          // Amount + status badge
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                formatNgn(ref.amountNgn),
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontFamily: 'Poppins',
-                      fontWeight: FontWeight.w700,
-                      color: textColor,
-                    ),
               ),
-              const SizedBox(height: 4),
-              _StatusBadge(status: ref.status),
+              if (contact?.phone != null)
+                IconButton(
+                  tooltip: 'Call ${asSeller ? 'buyer' : 'seller'}',
+                  icon: const Icon(Icons.call_outlined),
+                  onPressed: () =>
+                      launchUrl(Uri(scheme: 'tel', path: contact!.phone)),
+                ),
+              IconButton(
+                tooltip: 'Message ${asSeller ? 'buyer' : 'seller'}',
+                icon: const Icon(Icons.chat_bubble_outline_rounded),
+                onPressed: otherId.isEmpty || myId.isEmpty
+                    ? null
+                    : () {
+                        final ids = [myId, otherId]..sort();
+                        context.push('/chat/${ids.join('_')}'
+                            '?name=${Uri.encodeComponent(contact?.name ?? '')}'
+                            '&peerId=$otherId');
+                      },
+              ),
             ],
           ),
         ],
       ),
     );
   }
-
-  Color _statusColor(String status) => switch (status) {
-        'success' => AppColors.deepGreen,
-        'failed' || 'reversed' || 'amount_mismatch' => AppColors.errorRed,
-        'abandoned' => AppColors.gray,
-        _ => const Color(0xFFF59E0B), // pending = amber
-      };
-
-  IconData _statusIcon(String status) => switch (status) {
-        'success' => Icons.check_circle_rounded,
-        'failed' || 'reversed' => Icons.cancel_rounded,
-        'amount_mismatch' => Icons.report_gmailerrorred_rounded,
-        'abandoned' => Icons.remove_circle_outline_rounded,
-        _ => Icons.hourglass_empty_rounded,
-      };
 }
 
-// ---------------------------------------------------------------------------
-
-class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.status});
-
-  final String status;
+class _PaidChip extends StatelessWidget {
+  const _PaidChip();
 
   @override
   Widget build(BuildContext context) {
-    final (label, bg, fg) = switch (status) {
-      'success' => ('Paid', const Color(0xFFE8F5E9), AppColors.deepGreen),
-      'failed' => ('Failed', const Color(0xFFFFEBEE), AppColors.errorRed),
-      'reversed' => ('Refunded', const Color(0xFFFFEBEE), AppColors.errorRed),
-      'amount_mismatch' => (
-          'Under review',
-          const Color(0xFFFFEBEE),
-          AppColors.errorRed
-        ),
-      'abandoned' => ('Abandoned', const Color(0xFFF5F5F5), AppColors.gray),
-      _ => ('Pending', const Color(0xFFFFF8E1), const Color(0xFFF59E0B)),
-    };
-
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: bg,
+        color: AppColors.emerald.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
       ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          color: fg,
-          letterSpacing: 0.3,
+      child: const Text('Paid',
+          style: TextStyle(
+              color: AppColors.emerald,
+              fontWeight: FontWeight.w700,
+              fontSize: 12)),
+    );
+  }
+}
+
+/// A payment started on this phone that never became an order.
+class _AttemptTile extends StatelessWidget {
+  const _AttemptTile({required this.attempt});
+
+  final TransactionRef attempt;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final (label, color) = switch (attempt.status) {
+      'failed' => ('Failed', AppColors.errorRed),
+      'reversed' => ('Refunded', AppColors.errorRed),
+      'amount_mismatch' => ('Under review', AppColors.warningOrange),
+      'abandoned' => ('Not completed', AppColors.gray),
+      _ => ('Waiting for confirmation', AppColors.warmOrange),
+    };
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.card(isDark),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border_(isDark)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(attempt.description,
+                    maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(
+                  '${formatNgn(attempt.amountKobo / 100)} · '
+                  '${DateFormat('d MMM, h:mm a').format(attempt.createdAt)}',
+                  style:
+                      TextStyle(fontSize: 12, color: AppColors.subText(isDark)),
+                ),
+              ],
+            ),
+          ),
+          Text(label,
+              style: TextStyle(
+                  color: color, fontWeight: FontWeight.w600, fontSize: 12)),
+        ],
+      ),
+    );
+  }
+}
+
+class _LoadError extends StatelessWidget {
+  const _LoadError({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Could not load your orders.\n$message',
+                textAlign: TextAlign.center),
+            const SizedBox(height: 12),
+            OutlinedButton(onPressed: onRetry, child: const Text('Try again')),
+          ],
         ),
       ),
     );

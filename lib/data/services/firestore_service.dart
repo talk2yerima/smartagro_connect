@@ -8,6 +8,7 @@ import '../../core/utils/app_logger.dart';
 import '../../domain/entities/app_notification.dart';
 import '../../domain/entities/app_user.dart';
 import '../../domain/entities/chat_models.dart';
+import '../../domain/entities/market_order.dart';
 
 /// Thin wrapper around Cloud Firestore for user profiles and product listings.
 ///
@@ -221,6 +222,42 @@ class FirestoreService {
       await batch.commit();
     } catch (e) {
       log.e('[Firestore] markAllNotificationsRead failed', error: e);
+    }
+  }
+
+  // ── Orders ─────────────────────────────────────────────────────────────────
+
+  /// Paid orders where [uid] is the buyer (or, with [asSeller], the
+  /// seller), newest first. The rules only allow these two queries.
+  Stream<List<MarketOrder>> ordersStream(String uid, {required bool asSeller}) {
+    if (!isAvailable) return Stream.value(const []);
+    return _db
+        .collection('orders')
+        .where(asSeller ? 'sellerId' : 'buyerId', isEqualTo: uid)
+        .orderBy('createdAt', descending: true)
+        .limit(100)
+        .snapshots()
+        .map((snap) => snap.docs.map((doc) {
+              final data = doc.data();
+              final ts = data['createdAt'];
+              if (ts is Timestamp) data['createdAt'] = ts.toDate();
+              return MarketOrder.fromMap(doc.id, data);
+            }).toList());
+  }
+
+  /// Name and phone of the other person on an order, for contacting them.
+  Future<({String name, String? phone})> fetchContact(String uid) async {
+    if (!isAvailable || uid.isEmpty) return (name: 'Unknown', phone: null);
+    try {
+      final d = (await _db.collection('users').doc(uid).get()).data();
+      final phone = d?['phone'] as String?;
+      return (
+        name: (d?['name'] as String?) ?? 'Unknown',
+        phone: phone == null || phone.trim().isEmpty ? null : phone.trim(),
+      );
+    } catch (e) {
+      log.w('[Firestore] fetchContact failed: $e');
+      return (name: 'Unknown', phone: null);
     }
   }
 

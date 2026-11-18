@@ -104,8 +104,8 @@ class ProfileScreen extends ConsumerWidget {
               // ── [4.6] Payment History shortcut ────────────────────────────
               _QuickLinkTile(
                 icon: Icons.receipt_long_outlined,
-                label: 'Payment History',
-                subtitle: 'View your past transactions',
+                label: 'Orders',
+                subtitle: 'Sales and purchases, with buyer and seller contacts',
                 isDark: isDark,
                 onTap: () => context.push('/orders'),
               ),
