@@ -196,6 +196,27 @@ service cloud.firestore {
       }
     }
 
+    // ── Price alerts ───────────────────────────────────────────────────────
+    // Each person creates, sees and deletes only their own alerts. Only the
+    // backend switches an alert off once it fires (no client updates).
+    match /priceAlerts/{alertId} {
+      allow read, delete: if isSignedIn() &&
+                             resource.data.uid == request.auth.uid;
+      allow create: if isSignedIn() &&
+                       request.resource.data.uid == request.auth.uid &&
+                       request.resource.data.keys().hasOnly([
+                         'uid', 'commodityId', 'commodityName', 'unit',
+                         'targetNgn', 'direction', 'active', 'createdAt']) &&
+                       request.resource.data.commodityId is string &&
+                       request.resource.data.targetNgn is int &&
+                       request.resource.data.targetNgn > 0 &&
+                       request.resource.data.targetNgn <= 100000000 &&
+                       request.resource.data.direction in ['above', 'below'] &&
+                       request.resource.data.active == true &&
+                       request.resource.data.createdAt == request.time;
+      allow update: if false;
+    }
+
     // ── Commodity reference data (admin-managed) ───────────────────────────
     match /commodities/{doc} {
       allow read: if isSignedIn();

@@ -1,25 +1,26 @@
-import 'dart:convert';
-
 import '../../core/errors/failures.dart';
 import '../../domain/entities/product_listing.dart';
 import '../datasources/asset_bundle_datasource.dart';
-import '../datasources/remote_api_datasource.dart';
 import '../local/app_database.dart';
 import '../mappers/market_mappers.dart';
 import '../services/firestore_service.dart';
 
+/// Product listings.
+///
+/// With Firebase (the real app), Firestore is the source of truth and the
+/// SQLite copy is only an offline cache. Without Firebase (demo mode), the
+/// SQLite copy is the store, seeded from the bundled sample listings.
+/// (A REST API at api.smartagro.ng used to sit in between; that server never
+/// existed, so writes only queued up and never arrived.)
 class ProductRepository {
   ProductRepository({
-    required RemoteApiDataSource remote,
     required AssetBundleDataSource assets,
     required AppDatabase db,
     required FirestoreService firestore,
-  })  : _remote = remote,
-        _assets = assets,
+  })  : _assets = assets,
         _db = db,
         _firestore = firestore;
 
-  final RemoteApiDataSource _remote;
   final AssetBundleDataSource _assets;
   final AppDatabase _db;
   final FirestoreService _firestore;
@@ -31,24 +32,19 @@ class ProductRepository {
   Future<void> addListing(Map<String, dynamic> data) async {
     if (_firestore.isAvailable) {
       final id = await _firestore.addProduct(data);
-      if (id != null) {
-        await _db.upsertProducts([
-          {...data, 'id': id}
-        ]);
-        return;
+      if (id == null) {
+        throw const ServerFailure(
+            'Could not save your listing. Please try again.');
       }
+      await _db.upsertProducts([
+        {...data, 'id': id}
+      ]);
+      return;
     }
-    // Fallback: REST API → offline queue.
-    try {
-      await _remote.createProduct(data);
-      await _db.upsertProducts([data]);
-    } on Failure catch (_) {
-      await _db.enqueueWrite(
-        operation: 'create_listing',
-        payload: jsonEncode(data),
-      );
-      await _db.upsertProducts([data]);
-    }
+    // Demo mode: keep it on this phone.
+    await _db.upsertProducts([
+      {...data, 'id': data['id'] ?? 'demo-${DateTime.now().millisecondsSinceEpoch}'}
+    ]);
   }
 
   /// Fields a seller may change on an existing listing. The Firestore rules
@@ -61,6 +57,8 @@ class ProductRepository {
     'availability',
     'description',
     'imageUrl',
+    'state',
+    'city',
   ];
 
   Future<void> updateListing(String id, Map<String, dynamic> data) async {
@@ -70,37 +68,17 @@ class ProductRepository {
           if (data.containsKey(key)) key: data[key],
       };
       await _firestore.updateProduct(id, fields);
-      await _db.upsertProducts([
-        {...data, 'id': id}
-      ]);
-      return;
     }
-    try {
-      await _remote.updateProduct(id, data);
-      await _db.upsertProducts([data]);
-    } on Failure catch (_) {
-      await _db.enqueueWrite(
-        operation: 'update_listing',
-        payload: jsonEncode({...data, 'id': id}),
-      );
-      await _db.upsertProducts([data]);
-    }
+    await _db.upsertProducts([
+      {...data, 'id': id}
+    ]);
   }
 
   Future<void> deleteListing(String id) async {
     if (_firestore.isAvailable) {
       await _firestore.deleteProduct(id);
-      await _db.deleteProduct(id);
-      return;
     }
-    try {
-      await _remote.deleteProduct(id);
-    } on Failure catch (_) {
-      await _db.enqueueWrite(
-        operation: 'delete_listing',
-        payload: jsonEncode({'id': id}),
-      );
-    }
+    await _db.deleteProduct(id);
   }
 
   // ── Read ──────────────────────────────────────────────────────────────────
@@ -121,24 +99,12 @@ class ProductRepository {
       }
     }
 
-    // No Firebase — REST → SQLite cache → bundled fixture.
-    try {
-      final rows = await _remote.fetchProducts();
-      await _db.upsertProducts(rows);
-      return rows.map(productFromMap).toList();
-    } on Failure catch (_) {
-      final cached = await _db.readProducts();
-      if (cached.isNotEmpty) return cached.map(productFromMap).toList();
-      final fixture = await _assets.loadJson(_asset);
-      final items = (fixture['items'] as List).cast<Map<String, dynamic>>();
-      await _db.upsertProducts(items);
-      return items.map(productFromMap).toList();
-    } catch (_) {
-      final cached = await _db.readProducts();
-      if (cached.isNotEmpty) return cached.map(productFromMap).toList();
-      final fixture = await _assets.loadJson(_asset);
-      final items = (fixture['items'] as List).cast<Map<String, dynamic>>();
-      return items.map(productFromMap).toList();
-    }
+    // Demo mode: this phone's copy, seeded once from the sample listings.
+    final cached = await _db.readProducts();
+    if (cached.isNotEmpty) return cached.map(productFromMap).toList();
+    final fixture = await _assets.loadJson(_asset);
+    final items = (fixture['items'] as List).cast<Map<String, dynamic>>();
+    await _db.upsertProducts(items);
+    return items.map(productFromMap).toList();
   }
 }

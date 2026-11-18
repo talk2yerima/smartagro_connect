@@ -1,14 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:smartagro_connect/core/errors/failures.dart';
 import 'package:smartagro_connect/data/datasources/asset_bundle_datasource.dart';
-import 'package:smartagro_connect/data/datasources/remote_api_datasource.dart';
 import 'package:smartagro_connect/data/local/app_database.dart';
 import 'package:smartagro_connect/data/repositories/product_repository.dart';
 import 'package:smartagro_connect/data/services/firestore_service.dart';
-import 'package:smartagro_connect/domain/entities/product_listing.dart';
-
-class MockRemote extends Mock implements RemoteApiDataSource {}
 
 class MockAssets extends Mock implements AssetBundleDataSource {}
 
@@ -56,86 +51,55 @@ const _rows = [
 const _assetFixture = {'items': _rows};
 
 void main() {
-  late MockRemote remote;
   late MockAssets assets;
   late MockDb db;
   late MockFirestoreService firestore;
   late ProductRepository repo;
 
   setUp(() {
-    remote = MockRemote();
     assets = MockAssets();
     db = MockDb();
     firestore = MockFirestoreService();
-    repo = ProductRepository(
-        remote: remote, assets: assets, db: db, firestore: firestore);
+    repo = ProductRepository(assets: assets, db: db, firestore: firestore);
     when(() => db.upsertProducts(any())).thenAnswer((_) async {});
-    // These tests cover the REST → cache → fixture path (no Firebase).
+    // Demo mode (no Firebase) unless a group says otherwise.
     when(() => firestore.isAvailable).thenReturn(false);
   });
 
-  group('fetchProducts — remote success', () {
-    setUp(() {
-      when(() => remote.fetchProducts())
-          .thenAnswer((_) async => List.from(_rows));
-    });
-
-    test('returns mapped products', () async {
-      final result = await repo.fetchProducts();
-      expect(result.length, 2);
-      expect(result.first.id, 'p1');
-      expect(result.first.availability, ProductAvailability.inStock);
-      expect(result.last.availability, ProductAvailability.limited);
-    });
-
-    test('upserts to DB', () async {
-      await repo.fetchProducts();
-      verify(() => db.upsertProducts(any())).called(1);
-    });
-  });
-
-  group('fetchProducts — remote fails, cache hit', () {
-    setUp(() {
-      when(() => remote.fetchProducts()).thenThrow(const ServerFailure('500'));
-      when(() => db.readProducts()).thenAnswer((_) async => List.from(_rows));
-    });
-
-    test('returns cached products', () async {
-      final result = await repo.fetchProducts();
-      expect(result.length, 2);
-    });
-
-    test('does not call asset bundle', () async {
-      await repo.fetchProducts();
-      verifyNever(() => assets.loadJson(any()));
-    });
-  });
-
-  group('fetchProducts — remote fails, empty cache, asset fallback', () {
-    setUp(() {
-      when(() => remote.fetchProducts())
-          .thenThrow(const NetworkFailure('No internet'));
+  group('demo mode (no Firebase)', () {
+    test('first run seeds this phone from the sample listings', () async {
       when(() => db.readProducts()).thenAnswer((_) async => []);
       when(() => assets.loadJson(any()))
           .thenAnswer((_) async => Map<String, dynamic>.from(_assetFixture));
-    });
 
-    test('returns products from asset fixture', () async {
       final result = await repo.fetchProducts();
-      expect(result.length, 2);
-      expect(result.first.id, 'p1');
-    });
 
-    test('loads correct asset path', () async {
-      await repo.fetchProducts();
+      expect(result.map((p) => p.id), ['p1', 'p2']);
       verify(() => assets.loadJson('assets/mock/products.json')).called(1);
-    });
-
-    test('upserts asset rows to DB', () async {
-      await repo.fetchProducts();
       verify(() => db.upsertProducts(any())).called(1);
     });
+
+    test("later runs use this phone's copy, including demo edits", () async {
+      when(() => db.readProducts()).thenAnswer((_) async => [_rows.first]);
+
+      final result = await repo.fetchProducts();
+
+      expect(result.single.id, 'p1');
+      verifyNever(() => assets.loadJson(any()));
+    });
+
+    test('demo edits and deletes stay on this phone', () async {
+      when(() => db.deleteProduct(any())).thenAnswer((_) async {});
+
+      await repo.updateListing('p1', Map<String, dynamic>.from(_rows.first));
+      await repo.deleteListing('p1');
+
+      verify(() => db.upsertProducts(any())).called(1);
+      verify(() => db.deleteProduct('p1')).called(1);
+      verifyNever(() => firestore.updateProduct(any(), any()));
+    });
   });
+
   // ── Firebase configured: Firestore is the source of truth ──────────────
   group('with Firestore', () {
     setUp(() {
@@ -190,20 +154,20 @@ void main() {
         'availability',
         'description',
         'imageUrl',
+        'state',
+        'city',
       });
       expect(sent.containsKey('sellerId'), isFalse);
       expect(sent.containsKey('verified'), isFalse);
-      verifyNever(() => remote.updateProduct(any(), any()));
     });
 
-    test('deletes go to Firestore and leave the offline cache', () async {
+    test('deletes go to Firestore and the offline copy', () async {
       when(() => firestore.deleteProduct(any())).thenAnswer((_) async {});
 
       await repo.deleteListing('p1');
 
       verify(() => firestore.deleteProduct('p1')).called(1);
       verify(() => db.deleteProduct('p1')).called(1);
-      verifyNever(() => remote.deleteProduct(any()));
     });
   });
 }

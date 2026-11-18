@@ -118,8 +118,7 @@ jobs:
         run: |
           flutter build apk --debug --no-pub \
             --flavor dev \
-            --build-number=$BUILD_NUMBER \
-            --dart-define=API_BASE=${{ vars.API_BASE || 'https://dev-api.smartagro.ng' }}
+            --build-number=$BUILD_NUMBER
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -189,8 +188,7 @@ jobs:
             --build-number=$BUILD_NUMBER \
             --obfuscate \
             --split-debug-info=build/debug-info \
-            --dart-define=FLAVOR=prod \
-            --dart-define=API_BASE=${{ secrets.API_BASE }}
+            --dart-define=FLAVOR=prod
 
       - name: Analyze bundle size
         run: flutter build apk --release --flavor prod --analyze-size --no-pub || true

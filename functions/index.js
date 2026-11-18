@@ -23,6 +23,7 @@ const payments = require('./src/payments');
 const notifications = require('./src/notifications');
 const payouts = require('./src/payouts');
 const ratings = require('./src/ratings');
+const priceAlerts = require('./src/priceAlerts');
 
 initializeApp();
 
@@ -247,5 +248,50 @@ exports.onOrderUpdated = onDocumentUpdated(
     const batch = db.batch();
     listings.forEach((d) => batch.update(d.ref, { sellerRating: result.rating }));
     if (!listings.empty) await batch.commit();
+  },
+);
+
+// ── Price alerts ────────────────────────────────────────────────────────────
+
+/**
+ * A commodity's price changed (admins edit prices in the app): notify
+ * everyone whose alert the new price crosses, once, then switch the alert
+ * off. People who turned price alerts off in Settings are skipped.
+ */
+exports.onCommodityPriceChanged = onDocumentUpdated(
+  { document: 'commodities/{commodityId}', region: REGION },
+  async (event) => {
+    const before = event.data && event.data.before.data();
+    const after = event.data && event.data.after.data();
+    if (!before || !after) return;
+    const oldPrice = Number(before.priceNgn);
+    const newPrice = Number(after.priceNgn);
+    if (!Number.isFinite(newPrice) || oldPrice === newPrice) return;
+
+    const db = getFirestore();
+    const snap = await db.collection('priceAlerts')
+      .where('commodityId', '==', event.params.commodityId)
+      .where('active', '==', true)
+      .limit(500)
+      .get();
+    const alerts = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const fired = priceAlerts.crossedAlerts(oldPrice, newPrice, alerts);
+    if (fired.length === 0) return;
+
+    const deps = notificationDeps();
+    const batch = db.batch();
+    for (const alert of fired) {
+      const user = await deps.getUser(alert.uid);
+      if (!user || user.priceAlertsEnabled !== false) {
+        await notifications.deliver(
+          priceAlerts.alertNotification(alert, after, newPrice), deps);
+      }
+      batch.update(db.collection('priceAlerts').doc(alert.id), {
+        active: false,
+        triggeredAt: FieldValue.serverTimestamp(),
+        triggeredPriceNgn: newPrice,
+      });
+    }
+    await batch.commit();
   },
 );

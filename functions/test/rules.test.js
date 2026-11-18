@@ -254,3 +254,28 @@ test('the buyer can rate once, 1 to 5, only after receipt', async () => {
   await assertSucceeds(updateDoc(doc(as('bob'), 'orders/d1'), rate(4)));
   await assertFails(updateDoc(doc(as('bob'), 'orders/d1'), rate(1)));
 });
+
+// ── Price alerts ──────────────────────────────────────────────────────────
+
+const goodAlert = (uid) => ({
+  uid, commodityId: 'maize', commodityName: 'Maize', unit: 'bag',
+  targetNgn: 30000, direction: 'above', active: true, createdAt: serverTimestamp(),
+});
+
+test('people can create and remove only their own price alerts', async () => {
+  await assertSucceeds(setDoc(doc(as('bob'), 'priceAlerts/b1'), goodAlert('bob')));
+  await assertFails(setDoc(doc(as('bob'), 'priceAlerts/x1'), goodAlert('alice')));
+  await assertSucceeds(getDoc(doc(as('bob'), 'priceAlerts/b1')));
+  await assertFails(getDoc(doc(as('vera'), 'priceAlerts/b1')));
+  await assertFails(deleteDoc(doc(as('vera'), 'priceAlerts/b1')));
+  await assertSucceeds(deleteDoc(doc(as('bob'), 'priceAlerts/b1')));
+});
+
+test('price alerts must be sensible and cannot be edited from the app', async () => {
+  await assertFails(setDoc(doc(as('bob'), 'priceAlerts/b2'), { ...goodAlert('bob'), targetNgn: 0 }));
+  await assertFails(setDoc(doc(as('bob'), 'priceAlerts/b3'), { ...goodAlert('bob'), direction: 'sideways' }));
+  await assertFails(setDoc(doc(as('bob'), 'priceAlerts/b4'), { ...goodAlert('bob'), active: false }));
+  await assertFails(setDoc(doc(as('bob'), 'priceAlerts/b5'), { ...goodAlert('bob'), extra: 1 }));
+  await assertSucceeds(setDoc(doc(as('bob'), 'priceAlerts/b6'), goodAlert('bob')));
+  await assertFails(updateDoc(doc(as('bob'), 'priceAlerts/b6'), { targetNgn: 1 }));
+});

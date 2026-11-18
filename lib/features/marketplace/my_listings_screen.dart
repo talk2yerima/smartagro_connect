@@ -2,10 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/constants/nigerian_states.dart';
+import '../../core/di/auth_providers.dart';
 import '../../core/di/repositories_provider.dart';
+import '../../core/di/upload_providers.dart';
 import '../../core/errors/friendly_error.dart';
+import '../../core/services/app_lock.dart';
 import '../../core/utils/money_format.dart' show formatNgn;
 import '../../domain/entities/product_listing.dart';
 import '../../shared/widgets/empty_state.dart';
@@ -389,6 +394,11 @@ class _EditListingSheetState extends State<_EditListingSheet> {
   late final TextEditingController _titleCtrl;
   late final TextEditingController _priceCtrl;
   late final TextEditingController _qtyCtrl;
+  late final TextEditingController _descCtrl;
+  late final TextEditingController _cityCtrl;
+  String? _state;
+  late String _imageUrl;
+  double? _uploadProgress;
   late ProductAvailability _availability;
   bool _saving = false;
 
@@ -402,7 +412,52 @@ class _EditListingSheetState extends State<_EditListingSheet> {
         TextEditingController(text: widget.listing.priceNgn.toString());
     _qtyCtrl =
         TextEditingController(text: widget.listing.quantityKg.toString());
+    _descCtrl = TextEditingController(text: widget.listing.description);
+    _cityCtrl = TextEditingController(text: widget.listing.city);
+    _state = kNigerianStates.contains(widget.listing.state)
+        ? widget.listing.state
+        : null;
+    _imageUrl = widget.listing.imageUrl;
     _availability = widget.listing.availability;
+  }
+
+  /// Picks and uploads a new photo; the listing keeps the old one until
+  /// "Save changes".
+  Future<void> _changePhoto(ImageSource source) async {
+    widget.ref.read(appLockProvider.notifier).allowNextReturn();
+    final XFile? file;
+    try {
+      file = await ImagePicker()
+          .pickImage(source: source, imageQuality: 80, maxWidth: 1200);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Could not open the camera or gallery.')));
+      }
+      return;
+    }
+    if (file == null || !mounted) return;
+    setState(() => _uploadProgress = 0);
+    try {
+      final url =
+          await widget.ref.read(imageUploadServiceProvider).uploadProductImage(
+                filePath: file.path,
+                productId:
+                    '${widget.listing.id}-${DateTime.now().millisecondsSinceEpoch}',
+                userId: widget.ref.read(authSessionProvider)?.id,
+                onProgress: (p) {
+                  if (mounted) setState(() => _uploadProgress = p);
+                },
+              );
+      if (mounted) setState(() => _imageUrl = url);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Photo not uploaded. ${friendlyError(e)}')));
+      }
+    } finally {
+      if (mounted) setState(() => _uploadProgress = null);
+    }
   }
 
   @override
@@ -410,6 +465,8 @@ class _EditListingSheetState extends State<_EditListingSheet> {
     _titleCtrl.dispose();
     _priceCtrl.dispose();
     _qtyCtrl.dispose();
+    _descCtrl.dispose();
+    _cityCtrl.dispose();
     super.dispose();
   }
 
@@ -430,14 +487,14 @@ class _EditListingSheetState extends State<_EditListingSheet> {
           ProductAvailability.limited => 'limited',
           ProductAvailability.soldOut => 'sold_out',
         },
-        'description': widget.listing.description,
-        'state': widget.listing.state,
-        'city': widget.listing.city,
+        'description': _descCtrl.text.trim(),
+        'state': _state ?? widget.listing.state,
+        'city': _cityCtrl.text.trim(),
         'sellerId': widget.listing.sellerId,
         'sellerName': widget.listing.sellerName,
         'sellerRating': widget.listing.sellerRating,
         'verified': widget.listing.verified,
-        'imageUrl': widget.listing.imageUrl,
+        'imageUrl': _imageUrl,
         'lat': widget.listing.lat,
         'lng': widget.listing.lng,
       };
@@ -489,169 +546,259 @@ class _EditListingSheetState extends State<_EditListingSheet> {
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
         child: Form(
           key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Drag handle
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? Colors.white24
-                        : Colors.black.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-
-              Text(
-                'Edit Listing',
-                style: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontWeight: FontWeight.w700,
-                  fontSize: 16,
-                  color:
-                      isDark ? AppColors.darkTextPrimary : AppColors.charcoal,
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Title
-              TextFormField(
-                controller: _titleCtrl,
-                decoration: _inputDeco('Title', Icons.label_outline, isDark),
-                validator: (v) =>
-                    v == null || v.trim().isEmpty ? 'Required' : null,
-              ),
-              const SizedBox(height: 12),
-
-              // Price + Qty row
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _priceCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration: _inputDeco(
-                          'Price per kg (₦)', Icons.sell_outlined, isDark),
-                      validator: (v) {
-                        final n = int.tryParse(v ?? '');
-                        if (n == null || n <= 0) return 'Invalid';
-                        return null;
-                      },
+          // Scrolls so the longer form fits small phones with the keyboard up.
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Drag handle
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? Colors.white24
+                          : Colors.black.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _qtyCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration:
-                          _inputDeco('Qty (kg)', Icons.scale_outlined, isDark),
-                      validator: (v) {
-                        final n = int.tryParse(v ?? '');
-                        if (n == null || n <= 0) return 'Invalid';
-                        return null;
-                      },
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-
-              // Availability chips
-              Text(
-                'AVAILABILITY',
-                style: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontWeight: FontWeight.w700,
-                  fontSize: 10,
-                  letterSpacing: 1.0,
-                  color: isDark ? Colors.white38 : Colors.black38,
                 ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: ProductAvailability.values.map((a) {
-                  final selected = _availability == a;
-                  final color = switch (a) {
-                    ProductAvailability.inStock => AppColors.mintGreen,
-                    ProductAvailability.limited => AppColors.golden,
-                    ProductAvailability.soldOut => AppColors.errorRed,
-                  };
-                  final label = switch (a) {
-                    ProductAvailability.inStock => 'In Stock',
-                    ProductAvailability.limited => 'Limited',
-                    ProductAvailability.soldOut => 'Sold Out',
-                  };
-                  return Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _availability = a),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
-                        margin: const EdgeInsets.only(right: 6),
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        decoration: BoxDecoration(
-                          color: selected
-                              ? color.withValues(alpha: 0.15)
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
+
+                Text(
+                  'Edit Listing',
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                    color:
+                        isDark ? AppColors.darkTextPrimary : AppColors.charcoal,
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Photo
+                Row(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: SizedBox(
+                        width: 72,
+                        height: 72,
+                        child: _uploadProgress != null
+                            ? Center(
+                                child: CircularProgressIndicator(
+                                    value: _uploadProgress))
+                            : ProduceImage(
+                                url: _imageUrl, width: 72, height: 72),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        children: [
+                          OutlinedButton.icon(
+                            onPressed: _uploadProgress != null
+                                ? null
+                                : () => _changePhoto(ImageSource.camera),
+                            icon: const Icon(Icons.photo_camera_outlined),
+                            label: const Text('Camera'),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: _uploadProgress != null
+                                ? null
+                                : () => _changePhoto(ImageSource.gallery),
+                            icon: const Icon(Icons.photo_library_outlined),
+                            label: const Text('Gallery'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Title
+                TextFormField(
+                  controller: _titleCtrl,
+                  decoration: _inputDeco('Title', Icons.label_outline, isDark),
+                  validator: (v) =>
+                      v == null || v.trim().isEmpty ? 'Required' : null,
+                ),
+                const SizedBox(height: 12),
+
+                // Description
+                TextFormField(
+                  controller: _descCtrl,
+                  minLines: 2,
+                  maxLines: 4,
+                  maxLength: 500,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration:
+                      _inputDeco('Description', Icons.notes_rounded, isDark),
+                ),
+                const SizedBox(height: 4),
+
+                // Location
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        initialValue: _state,
+                        isExpanded: true,
+                        decoration:
+                            _inputDeco('State', Icons.map_outlined, isDark),
+                        items: [
+                          for (final st in kNigerianStates)
+                            DropdownMenuItem(value: st, child: Text(st)),
+                        ],
+                        onChanged: (v) => setState(() => _state = v),
+                        validator: (v) => v == null ? 'Choose a state' : null,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _cityCtrl,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: _inputDeco(
+                            'City / LGA', Icons.location_on_outlined, isDark),
+                        validator: (v) =>
+                            v == null || v.trim().isEmpty ? 'Required' : null,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Price + Qty row
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _priceCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: _inputDeco(
+                            'Price per kg (₦)', Icons.sell_outlined, isDark),
+                        validator: (v) {
+                          final n = int.tryParse(v ?? '');
+                          if (n == null || n <= 0) return 'Invalid';
+                          return null;
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _qtyCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: _inputDeco(
+                            'Qty (kg)', Icons.scale_outlined, isDark),
+                        validator: (v) {
+                          final n = int.tryParse(v ?? '');
+                          if (n == null || n <= 0) return 'Invalid';
+                          return null;
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Availability chips
+                Text(
+                  'AVAILABILITY',
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 10,
+                    letterSpacing: 1.0,
+                    color: isDark ? Colors.white38 : Colors.black38,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: ProductAvailability.values.map((a) {
+                    final selected = _availability == a;
+                    final color = switch (a) {
+                      ProductAvailability.inStock => AppColors.mintGreen,
+                      ProductAvailability.limited => AppColors.golden,
+                      ProductAvailability.soldOut => AppColors.errorRed,
+                    };
+                    final label = switch (a) {
+                      ProductAvailability.inStock => 'In Stock',
+                      ProductAvailability.limited => 'Limited',
+                      ProductAvailability.soldOut => 'Sold Out',
+                    };
+                    return Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _availability = a),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          margin: const EdgeInsets.only(right: 6),
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          decoration: BoxDecoration(
                             color: selected
-                                ? color
-                                : (isDark ? Colors.white12 : Colors.black12),
+                                ? color.withValues(alpha: 0.15)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: selected
+                                  ? color
+                                  : (isDark ? Colors.white12 : Colors.black12),
+                            ),
+                          ),
+                          child: Text(
+                            label,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 11,
+                              fontWeight:
+                                  selected ? FontWeight.w700 : FontWeight.w400,
+                              color: selected
+                                  ? color
+                                  : (isDark ? Colors.white54 : Colors.black54),
+                            ),
                           ),
                         ),
-                        child: Text(
-                          label,
-                          textAlign: TextAlign.center,
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 20),
+
+                // Save button
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _green,
+                    minimumSize: const Size.fromHeight(50),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: _saving ? null : _save,
+                  child: _saving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Text(
+                          'Save Changes',
                           style: TextStyle(
                             fontFamily: 'Poppins',
-                            fontSize: 11,
-                            fontWeight:
-                                selected ? FontWeight.w700 : FontWeight.w400,
-                            color: selected
-                                ? color
-                                : (isDark ? Colors.white54 : Colors.black54),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
                           ),
                         ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 20),
-
-              // Save button
-              FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: _green,
-                  minimumSize: const Size.fromHeight(50),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
                 ),
-                onPressed: _saving ? null : _save,
-                child: _saving
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white),
-                      )
-                    : const Text(
-                        'Save Changes',
-                        style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
-                        ),
-                      ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

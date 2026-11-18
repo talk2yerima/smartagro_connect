@@ -8,6 +8,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/config/app_env.dart';
+import '../../core/di/auth_providers.dart';
+import '../../core/di/firestore_providers.dart';
 import '../../core/di/initialization_provider.dart';
 import '../../core/services/app_lock.dart';
 
@@ -107,14 +109,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     setState(() => _priceAlerts = next);
     final prefs = await ref.read(sharedPreferencesProvider.future);
     await prefs.setBool(_kPriceAlerts, next);
-    if (!_fcmSupported() || Firebase.apps.isEmpty) return;
+    // The backend checks this before sending a price alert. (It used to
+    // subscribe to a 'price-alerts' topic that nothing ever sent to.)
+    final uid = ref.read(authSessionProvider)?.id;
+    if (uid == null) return;
     try {
-      if (next) {
-        await FirebaseMessaging.instance.subscribeToTopic('price-alerts');
-      } else {
-        await FirebaseMessaging.instance.unsubscribeFromTopic('price-alerts');
+      await ref.read(firestoreServiceProvider).setPriceAlertsEnabled(uid, next);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _priceAlerts = !next);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text("Couldn't save that. Check your connection.")));
       }
-    } catch (_) {}
+      await prefs.setBool(_kPriceAlerts, !next);
+    }
   }
 
   @override
@@ -173,7 +181,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             value: _priceAlerts,
             onChanged: _handlePriceAlertsToggle,
             title: const Text('Price alerts'),
-            subtitle: const Text('Notify me when commodity prices change'),
+            subtitle: const Text(
+                'Notify me when a price I set an alert for is reached'),
           ),
           const Divider(),
           SwitchListTile(

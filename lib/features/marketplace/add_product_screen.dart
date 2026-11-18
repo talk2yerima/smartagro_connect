@@ -9,6 +9,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/constants/nigerian_states.dart';
 import '../../core/di/auth_providers.dart';
 import '../../core/di/repositories_provider.dart';
 import '../../core/di/upload_providers.dart';
@@ -24,46 +25,6 @@ const _kCategories = [
   'Fruits',
   'Livestock',
   'Oilseeds',
-];
-
-const _kNigerianStates = [
-  'Abia',
-  'Adamawa',
-  'Akwa Ibom',
-  'Anambra',
-  'Bauchi',
-  'Bayelsa',
-  'Benue',
-  'Borno',
-  'Cross River',
-  'Delta',
-  'Ebonyi',
-  'Edo',
-  'Ekiti',
-  'Enugu',
-  'FCT — Abuja',
-  'Gombe',
-  'Imo',
-  'Jigawa',
-  'Kaduna',
-  'Kano',
-  'Katsina',
-  'Kebbi',
-  'Kogi',
-  'Kwara',
-  'Lagos',
-  'Nasarawa',
-  'Niger',
-  'Ogun',
-  'Ondo',
-  'Osun',
-  'Oyo',
-  'Plateau',
-  'Rivers',
-  'Sokoto',
-  'Taraba',
-  'Yobe',
-  'Zamfara',
 ];
 
 // No pre-order: it was stored as 'pre_order' but read back as in stock
@@ -860,7 +821,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
         'Select state',
         style: GoogleFonts.poppins(fontSize: 13, color: textSub),
       ),
-      items: _kNigerianStates
+      items: kNigerianStates
           .map((s) => DropdownMenuItem(
                 value: s,
                 child: Text(

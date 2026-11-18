@@ -49,7 +49,6 @@ dependencies:
   # see lib/data/services/secure_token_store.dart for the platform guard.
 
   # ── Networking ───────────────────────────────────────────────────────────
-  dio_smart_retry: ^6.0.0
 
   # ── Image caching / compression ───────────────────────────────────────────
   flutter_image_compress: ^2.3.0

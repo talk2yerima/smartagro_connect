@@ -11,7 +11,6 @@ import '../../data/local/app_database.dart';
 import '../../data/services/connectivity_watcher.dart';
 import '../services/push_messaging_service.dart';
 import 'payment_providers.dart';
-import 'queue_provider.dart';
 
 /// Boot-time dependencies and global toggles (theme, onboarding, session).
 final sharedPreferencesProvider =
@@ -87,8 +86,6 @@ final connectivityWatcherProvider = Provider<ConnectivityWatcher>((ref) {
 final initializationProvider = FutureProvider<void>((ref) async {
   await ref.watch(sharedPreferencesProvider.future);
   await ref.read(appDatabaseProvider).open();
-  // Start offline write-queue flusher after DB is open.
-  ref.read(queueSyncServiceProvider).start();
   // Verify any Paystack transactions that completed while the app was closed.
   unawaited(ref.read(transactionRefQueueProvider).drainPendingRefs());
   // Register for push notifications (no-op when Firebase is not configured).

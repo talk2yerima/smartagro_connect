@@ -1,8 +1,7 @@
-/// Compile-time environment for API base URL, feature flags, and log level.
+/// Compile-time environment: flavor, feature flags, log level, backend URLs.
 ///
 /// Build with:
 ///   --dart-define=FLAVOR=dev|staging|prod
-///   --dart-define=API_BASE=https://custom.api.com   (optional override)
 ///   --dart-define=ENABLE_FCM=false                  (optional)
 ///
 /// [flavor] defaults to [Flavor.dev] when FLAVOR is omitted, so the
@@ -23,19 +22,6 @@ abstract final class AppEnv {
   static bool get isDev => flavor == Flavor.dev;
   static bool get isStaging => flavor == Flavor.staging;
   static bool get isProd => flavor == Flavor.prod;
-
-  // ── Per-flavor API base URL ───────────────────────────────────────────────
-  // Override at build time: --dart-define=API_BASE=https://api.yourdomain.com
-  static const _apiOverride = String.fromEnvironment('API_BASE');
-
-  static String get apiBase {
-    if (_apiOverride.isNotEmpty) return _apiOverride;
-    return switch (flavor) {
-      Flavor.prod => 'https://api.smartagro.ng',
-      Flavor.staging => 'https://staging-api.smartagro.ng',
-      Flavor.dev => 'https://dev-api.smartagro.ng',
-    };
-  }
 
   // ── Display name ─────────────────────────────────────────────────────────
   static String get appName => switch (flavor) {

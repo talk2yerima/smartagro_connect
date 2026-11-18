@@ -9,6 +9,7 @@ import '../../domain/entities/app_notification.dart';
 import '../../domain/entities/app_user.dart';
 import '../../domain/entities/chat_models.dart';
 import '../../domain/entities/market_order.dart';
+import '../../domain/entities/price_alert.dart';
 
 /// Thin wrapper around Cloud Firestore for user profiles and product listings.
 ///
@@ -297,6 +298,57 @@ class FirestoreService {
       return (name: 'Unknown', phone: null);
     }
   }
+
+  // ── Price alerts ───────────────────────────────────────────────────────────
+
+  /// Saves "tell me when [commodityName] crosses [targetNgn]". The backend
+  /// fires it once when an admin's price change crosses the target.
+  Future<void> createPriceAlert({
+    required String uid,
+    required String commodityId,
+    required String commodityName,
+    required String unit,
+    required int targetNgn,
+    required bool above,
+  }) =>
+      _awaitWrite(
+        _db.collection('priceAlerts').add({
+          'uid': uid,
+          'commodityId': commodityId,
+          'commodityName': commodityName,
+          'unit': unit,
+          'targetNgn': targetNgn,
+          'direction': above ? 'above' : 'below',
+          'active': true,
+          'createdAt': FieldValue.serverTimestamp(),
+        }).then((_) {}),
+        'createPriceAlert',
+      );
+
+  /// The signed-in person's alerts for one commodity, newest first.
+  Stream<List<PriceAlert>> priceAlertsStream(String uid, String commodityId) {
+    if (!isAvailable) return Stream.value(const []);
+    return _db
+        .collection('priceAlerts')
+        .where('uid', isEqualTo: uid)
+        .where('commodityId', isEqualTo: commodityId)
+        .limit(20)
+        .snapshots()
+        .map((snap) =>
+            snap.docs.map((d) => PriceAlert.fromMap(d.id, d.data())).toList());
+  }
+
+  Future<void> deletePriceAlert(String id) => _awaitWrite(
+      _db.collection('priceAlerts').doc(id).delete(), 'deletePriceAlert');
+
+  /// The Settings switch: the backend skips people who turned alerts off.
+  Future<void> setPriceAlertsEnabled(String uid, bool enabled) => _awaitWrite(
+        _db
+            .collection('users')
+            .doc(uid)
+            .update({'priceAlertsEnabled': enabled}),
+        'setPriceAlertsEnabled',
+      );
 
   // ── Farmer payouts ─────────────────────────────────────────────────────────
 

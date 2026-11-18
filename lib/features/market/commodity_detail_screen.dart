@@ -4,10 +4,13 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/di/auth_providers.dart';
+import '../../core/di/firestore_providers.dart';
 import '../../core/di/repositories_provider.dart';
 import '../../core/errors/friendly_error.dart';
 import '../../core/utils/money_format.dart';
 import '../../domain/entities/commodity.dart';
+import '../../domain/entities/price_alert.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/section_header.dart';
 import '../../shared/widgets/skeleton_list.dart';
@@ -713,105 +716,105 @@ class _DetailRow {
 
 // ─── [5] Price Alerts Card ────────────────────────────────────────────────────
 
-class _PriceAlertCard extends StatelessWidget {
+/// "Set Price Alert" plus the person's alerts for this commodity. Alerts are
+/// saved to Firestore; the backend notifies once when a price change crosses
+/// the target, then marks the alert as used.
+class _PriceAlertCard extends ConsumerWidget {
   const _PriceAlertCard({required this.commodity});
 
   final Commodity commodity;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final alerts =
+        ref.watch(priceAlertsProvider(commodity.id)).valueOrNull ?? const [];
+    final accent = isDark ? AppColors.lightGreen : AppColors.deepGreen;
 
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        showModalBottomSheet<void>(
-          context: context,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.card(isDark),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border_(isDark)),
+      ),
+      child: Column(
+        children: [
+          ListTile(
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            leading: CircleAvatar(
+              backgroundColor: accent.withValues(alpha: 0.12),
+              child: Icon(Icons.notifications_active_outlined, color: accent),
+            ),
+            title: const Text('Set Price Alert',
+                style: TextStyle(fontWeight: FontWeight.w700)),
+            subtitle:
+                Text('Get notified when ${commodity.name} reaches your price'),
+            trailing: Icon(Icons.chevron_right_rounded, color: accent),
+            onTap: () {
+              HapticFeedback.lightImpact();
+              showModalBottomSheet<void>(
+                context: context,
+                isScrollControlled: true,
+                useSafeArea: true,
+                builder: (_) => _PriceAlertSheet(commodity: commodity),
+              );
+            },
           ),
-          backgroundColor: isDark ? AppColors.cardDark : Colors.white,
-          builder: (_) => _PriceAlertSheet(commodity: commodity),
-        );
-      },
-      child: Container(
-        decoration: _card(isDark),
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: AppColors.deepGreen.withValues(alpha: 0.10),
-                shape: BoxShape.circle,
+          for (final a in alerts) ...[
+            Divider(height: 1, color: AppColors.border_(isDark)),
+            ListTile(
+              dense: true,
+              leading: Icon(
+                a.above
+                    ? Icons.trending_up_rounded
+                    : Icons.trending_down_rounded,
+                color: a.active ? accent : AppColors.subText(isDark),
               ),
-              child: const Icon(
-                Icons.notifications_active_outlined,
-                color: AppColors.deepGreen,
-                size: 22,
+              title: Text(
+                '${a.above ? 'Rises above' : 'Falls below'} '
+                '${formatNgn(a.targetNgn)}',
+                style: TextStyle(
+                  decoration: a.active ? null : TextDecoration.lineThrough,
+                ),
               ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Set Price Alert',
-                    style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                      color: isDark
-                          ? AppColors.darkTextPrimary
-                          : AppColors.charcoal,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Get notified when ${commodity.name} hits your target price',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color:
-                          isDark ? AppColors.darkTextSecondary : AppColors.gray,
-                      height: 1.4,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+              subtitle: Text(a.active ? 'Waiting' : 'Reached. You were told.'),
+              trailing: IconButton(
+                tooltip: 'Remove alert',
+                icon: const Icon(Icons.delete_outline_rounded),
+                onPressed: () => ref
+                    .read(firestoreServiceProvider)
+                    .deletePriceAlert(a.id)
+                    .catchError((Object e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(friendlyError(e))));
+                  }
+                }),
               ),
-            ),
-            const SizedBox(width: 8),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: AppColors.deepGreen,
-              size: 24,
             ),
           ],
-        ),
+        ],
       ),
-    )
-        .animate(delay: 160.ms)
-        .fadeIn(duration: 380.ms)
-        .slideY(begin: 0.04, curve: Curves.easeOut);
+    );
   }
 }
 
-class _PriceAlertSheet extends StatefulWidget {
+class _PriceAlertSheet extends ConsumerStatefulWidget {
   const _PriceAlertSheet({required this.commodity});
 
   final Commodity commodity;
 
   @override
-  State<_PriceAlertSheet> createState() => _PriceAlertSheetState();
+  ConsumerState<_PriceAlertSheet> createState() => _PriceAlertSheetState();
 }
 
-class _PriceAlertSheetState extends State<_PriceAlertSheet> {
+class _PriceAlertSheetState extends ConsumerState<_PriceAlertSheet> {
   final _controller = TextEditingController();
+  bool _saving = false;
+  String? _error;
+
+  int? get _target => int.tryParse(_controller.text.trim());
 
   @override
   void dispose() {
@@ -819,105 +822,95 @@ class _PriceAlertSheetState extends State<_PriceAlertSheet> {
     super.dispose();
   }
 
+  Future<void> _save() async {
+    final c = widget.commodity;
+    final target = _target;
+    final uid = ref.read(authSessionProvider)?.id;
+    if (target == null || target <= 0) {
+      setState(() => _error = 'Enter a price in naira, for example 30000.');
+      return;
+    }
+    if (target == c.priceNgn) {
+      setState(() => _error = "That's today's price. Choose a higher or "
+          'lower price to be told about.');
+      return;
+    }
+    if (uid == null) return;
+    final above = PriceAlert.directionFor(target: target, current: c.priceNgn);
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await ref.read(firestoreServiceProvider).createPriceAlert(
+            uid: uid,
+            commodityId: c.id,
+            commodityName: c.name,
+            unit: c.unit,
+            targetNgn: target,
+            above: above,
+          );
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text("Alert set. We'll tell you when ${c.name} "
+            '${above ? 'rises above' : 'falls below'} ${formatNgn(target)}.'),
+      ));
+    } catch (e) {
+      if (mounted) setState(() => _error = friendlyError(e));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = widget.commodity;
+    final target = _target;
+    final hint = target == null || target <= 0 || target == c.priceNgn
+        ? null
+        : PriceAlert.directionFor(target: target, current: c.priceNgn)
+            ? "You'll be told when it rises to ${formatNgn(target)} or more."
+            : "You'll be told when it falls to ${formatNgn(target)} or less.";
+
     return Padding(
-      padding: EdgeInsets.only(
-        left: 24,
-        right: 24,
-        top: 24,
-        bottom: MediaQuery.viewInsetsOf(context).bottom + 24,
-      ),
+      padding: EdgeInsets.fromLTRB(
+          24, 20, 24, MediaQuery.viewInsetsOf(context).bottom + 24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: (isDark ? Colors.white : Colors.black)
-                    .withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          Text(
-            'Set Alert — ${widget.commodity.name}',
-            style: const TextStyle(
-              fontFamily: 'Poppins',
-              fontWeight: FontWeight.w700,
-              fontSize: 16,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
+          Text('Price alert: ${c.name}',
+              style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 4),
-          Text(
-            'Current: ${formatNgn(widget.commodity.priceNgn)} / ${widget.commodity.unit}',
-            style: const TextStyle(
-              fontSize: 13,
-              color: AppColors.gray,
-            ),
-          ),
+          Text('Today: ${formatNgn(c.priceNgn)} per ${c.unit}'),
           const SizedBox(height: 16),
           TextField(
             controller: _controller,
+            autofocus: true,
             keyboardType: TextInputType.number,
-            decoration: InputDecoration(
-              labelText: 'Target price (₦)',
-              prefixIcon: const Icon(Icons.sell_outlined, size: 20),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide:
-                    const BorderSide(color: AppColors.deepGreen, width: 1.8),
-              ),
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            onChanged: (_) => setState(() => _error = null),
+            onSubmitted: (_) => _save(),
+            decoration: const InputDecoration(
+              labelText: 'Tell me when the price reaches (₦)',
+              prefixIcon: Icon(Icons.sell_outlined),
             ),
           ),
+          if (hint != null) ...[
+            const SizedBox(height: 8),
+            Text(hint),
+          ],
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(_error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error)),
+          ],
           const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [AppColors.deepGreen, AppColors.emerald],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: TextButton(
-                onPressed: () {
-                  HapticFeedback.mediumImpact();
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Alert set for ${widget.commodity.name} at '
-                        '${_controller.text.isEmpty ? '[no price]' : '₦${_controller.text}'}',
-                      ),
-                      duration: const Duration(seconds: 2),
-                    ),
-                  );
-                },
-                child: const Text(
-                  'Set Alert',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontFamily: 'Poppins',
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15,
-                  ),
-                ),
-              ),
-            ),
+          FilledButton.icon(
+            onPressed: _saving ? null : _save,
+            icon: const Icon(Icons.notifications_active_outlined),
+            label: Text(_saving ? 'Saving…' : 'Set alert'),
           ),
         ],
       ),

@@ -7,7 +7,7 @@
     "node": "22"
   },
   "scripts": {
-    "test": "node --test test/payments.test.js test/notifications.test.js test/payouts.test.js test/ratings.test.js",
+    "test": "node --test test/payments.test.js test/notifications.test.js test/payouts.test.js test/ratings.test.js test/priceAlerts.test.js",
     "test:rules": "firebase emulators:exec --only firestore --project demo-smartagro \"node --test test/rules.test.js\"",
     "deploy": "firebase deploy --only functions"
   },
