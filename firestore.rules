@@ -39,7 +39,8 @@ service cloud.firestore {
 
     // Trust fields only admins / the backend may set on a user profile.
     function protectedUserFields() {
-      return ['role', 'verified', 'banned', 'rating'];
+      // payoutReady is set only by the payouts backend.
+      return ['role', 'verified', 'banned', 'rating', 'payoutReady'];
     }
 
     // ── User profiles ──────────────────────────────────────────────────────
@@ -51,7 +52,7 @@ service cloud.firestore {
       // trust flags pre-set.
       allow create: if isOwner(uid) &&
                        isSelfServiceRole(request.resource.data.get('role', 'farmer')) &&
-                       !request.resource.data.keys().hasAny(['verified', 'banned', 'rating']);
+                       !request.resource.data.keys().hasAny(['verified', 'banned', 'rating', 'payoutReady']);
 
       // Owner may edit their own details but not role / verified / banned /
       // rating. Admins may edit anything.
@@ -103,6 +104,13 @@ service cloud.firestore {
                      (resource.data.buyerId == request.auth.uid ||
                       resource.data.sellerId == request.auth.uid ||
                       isAdmin());
+      allow write: if false;
+    }
+
+    // Seller bank details (masked) and Paystack subaccount code. Written only
+    // by the payouts backend; the seller and admins can read them.
+    match /payoutAccounts/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
       allow write: if false;
     }
 

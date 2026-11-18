@@ -5,6 +5,7 @@ import '../../data/repositories/transaction_ref_queue.dart';
 import '../../data/services/payments_api.dart';
 import '../config/app_env.dart';
 import 'auth_providers.dart';
+import 'firestore_providers.dart';
 import 'initialization_provider.dart';
 
 final paymentsApiProvider = Provider<PaymentsApi>((ref) {
@@ -33,4 +34,21 @@ final transactionHistoryProvider =
   final db = ref.watch(appDatabaseProvider);
   final maps = await db.allTransactionRefs();
   return maps.map(TransactionRef.fromMap).toList();
+});
+
+/// The signed-in seller's payout account (masked), or null when none yet.
+final myPayoutAccountProvider =
+    StreamProvider.autoDispose<PayoutAccount?>((ref) {
+  final uid = ref.watch(authSessionProvider.select((u) => u?.id));
+  if (uid == null) return Stream.value(null);
+  return ref
+      .watch(firestoreServiceProvider)
+      .payoutAccountStream(uid)
+      .map((m) => m == null ? null : PayoutAccount.fromMap(m));
+});
+
+/// Whether a seller can receive payments (has a bank account on file).
+final sellerCanBePaidProvider =
+    FutureProvider.autoDispose.family<bool, String>((ref, sellerId) {
+  return ref.watch(firestoreServiceProvider).sellerCanBePaid(sellerId);
 });

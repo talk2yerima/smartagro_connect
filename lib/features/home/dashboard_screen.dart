@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/di/auth_providers.dart';
+import '../../core/di/payment_providers.dart';
 import '../../core/di/repositories_provider.dart';
 import '../../core/utils/money_format.dart';
 import '../../domain/entities/app_user.dart';
@@ -147,6 +148,14 @@ class DashboardScreen extends ConsumerWidget {
                       .slideY(begin: 0.04, end: 0, duration: 400.ms),
 
                   const SizedBox(height: 16),
+
+                  // Farmers can't be paid until a bank account is on file.
+                  if (role == UserRole.farmer &&
+                      ref.watch(myPayoutAccountProvider).hasValue &&
+                      ref.watch(myPayoutAccountProvider).value == null) ...[
+                    const _GetPaidPrompt(),
+                    const SizedBox(height: 16),
+                  ],
 
                   // [2] MARKET TICKER STRIP
                   commodities.when(
@@ -1499,6 +1508,54 @@ class _InlineError extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Shown to farmers until they add a bank account for their sales.
+class _GetPaidPrompt extends StatelessWidget {
+  const _GetPaidPrompt();
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Material(
+      color: AppColors.golden.withValues(alpha: isDark ? 0.16 : 0.14),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => context.push('/payouts'),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              Icon(Icons.account_balance_outlined,
+                  color: isDark ? AppColors.golden : AppColors.warningOrange),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Add your bank account',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.text(isDark))),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Buyers can pay for your produce once your bank '
+                      'account is set. Takes a minute.',
+                      style: TextStyle(
+                          fontSize: 13, color: AppColors.subText(isDark)),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded,
+                  color: AppColors.subText(isDark)),
+            ],
+          ),
+        ),
       ),
     );
   }

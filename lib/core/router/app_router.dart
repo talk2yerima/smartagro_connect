@@ -27,6 +27,7 @@ import '../../features/marketplace/seller_profile_screen.dart';
 import '../../features/notifications/notifications_screen.dart';
 import '../../features/onboarding/onboarding_screen.dart';
 import '../../features/orders/orders_screen.dart';
+import '../../features/payouts/get_paid_screen.dart';
 import '../../features/profile/profile_edit_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/search/search_screen.dart';
@@ -81,6 +82,9 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           loc.startsWith('/map') ||
           loc.startsWith('/settings') ||
           loc.startsWith('/seller') ||
+          loc.startsWith('/orders') ||
+          loc.startsWith('/chat') ||
+          loc.startsWith('/payouts') ||
           loc.startsWith('/admin');
 
       if (!authed) {
@@ -102,6 +106,12 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       }
 
       if (loc.startsWith('/admin') && user.role != UserRole.admin) {
+        return '/main/home';
+      }
+      // Only sellers have sales money to receive.
+      if (loc == '/payouts' &&
+          user.role != UserRole.farmer &&
+          user.role != UserRole.admin) {
         return '/main/home';
       }
       if (loc == '/marketplace/add' &&
@@ -245,6 +255,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/orders',
         builder: (context, state) => const OrdersScreen(),
+      ),
+      GoRoute(
+        path: '/payouts',
+        builder: (context, state) => const GetPaidScreen(),
       ),
       GoRoute(
         path: '/my-listings',

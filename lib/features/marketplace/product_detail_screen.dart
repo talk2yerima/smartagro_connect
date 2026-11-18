@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/di/auth_providers.dart';
 import '../../core/di/firestore_providers.dart';
+import '../../core/di/payment_providers.dart';
 import '../../core/di/repositories_provider.dart';
 import '../../core/errors/friendly_error.dart';
 import '../../core/utils/money_format.dart';
@@ -1266,6 +1267,12 @@ class _BottomBar extends ConsumerWidget {
     final subTextColor = AppColors.subText(isDark);
     final isSoldOut = product.availability == ProductAvailability.soldOut;
     final isOwnListing = user?.id == product.sellerId;
+    // Sales are paid straight to the seller's bank, so a seller with no
+    // bank account on file can't be paid yet (the server refuses too).
+    final sellerCanBePaid = isOwnListing
+        ? true
+        : ref.watch(sellerCanBePaidProvider(product.sellerId)).valueOrNull ??
+            true;
 
     return Container(
       padding: EdgeInsets.fromLTRB(
@@ -1346,43 +1353,51 @@ class _BottomBar extends ConsumerWidget {
                       ),
                     ),
                   )
-                : PrimaryGradientButton(
-                    label: isSoldOut ? 'Sold Out' : 'Buy Now',
-                    onPressed: isSoldOut
-                        ? null
-                        : () async {
-                            HapticFeedback.mediumImpact();
-                            final result = await PaymentSheet.show(
-                              context,
-                              productId: product.id,
-                              amountNgn: (product.priceNgn * product.quantityKg)
-                                  .toDouble(),
-                              description:
-                                  '${product.quantityKg} kg of ${product.title}',
-                            );
-                            if (!context.mounted) return;
-                            if (result == PaymentResult.success) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content:
-                                      Text('Payment successful! Order placed.'),
-                                  backgroundColor: AppColors.deepGreen,
-                                  duration: Duration(seconds: 4),
-                                ),
-                              );
-                            } else if (result == PaymentResult.failed) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                      'Payment was not completed. Try again.'),
-                                  backgroundColor: AppColors.errorRed,
-                                ),
-                              );
-                            }
-                          },
-                    icon:
-                        isSoldOut ? null : Icons.shopping_cart_checkout_rounded,
-                  ),
+                : !sellerCanBePaid && !isSoldOut
+                    ? Text(
+                        "This seller can't receive payments yet. Contact "
+                        'them to arrange the sale.',
+                        style: TextStyle(color: subTextColor, fontSize: 13),
+                      )
+                    : PrimaryGradientButton(
+                        label: isSoldOut ? 'Sold Out' : 'Buy Now',
+                        onPressed: isSoldOut
+                            ? null
+                            : () async {
+                                HapticFeedback.mediumImpact();
+                                final result = await PaymentSheet.show(
+                                  context,
+                                  productId: product.id,
+                                  amountNgn:
+                                      (product.priceNgn * product.quantityKg)
+                                          .toDouble(),
+                                  description:
+                                      '${product.quantityKg} kg of ${product.title}',
+                                );
+                                if (!context.mounted) return;
+                                if (result == PaymentResult.success) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                          'Payment successful! Order placed.'),
+                                      backgroundColor: AppColors.deepGreen,
+                                      duration: Duration(seconds: 4),
+                                    ),
+                                  );
+                                } else if (result == PaymentResult.failed) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                          'Payment was not completed. Try again.'),
+                                      backgroundColor: AppColors.errorRed,
+                                    ),
+                                  );
+                                }
+                              },
+                        icon: isSoldOut
+                            ? null
+                            : Icons.shopping_cart_checkout_rounded,
+                      ),
           ),
         ],
       ),

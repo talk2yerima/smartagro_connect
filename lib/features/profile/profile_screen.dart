@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/di/auth_providers.dart';
+import '../../core/di/payment_providers.dart';
 import '../../core/di/repositories_provider.dart';
 import '../../domain/entities/app_user.dart';
 import '../../shared/widgets/app_avatar.dart';
@@ -85,6 +86,18 @@ class ProfileScreen extends ConsumerWidget {
               // ── [4.5] My Listings shortcut (farmers only) ─────────────────
               if (user?.role == UserRole.farmer) ...[
                 _MyListingsCard(isDark: isDark),
+                const SizedBox(height: 8),
+                // Where sales money goes (Paystack split to their bank).
+                _QuickLinkTile(
+                  icon: Icons.account_balance_outlined,
+                  label: 'Get paid',
+                  subtitle:
+                      ref.watch(myPayoutAccountProvider).valueOrNull == null
+                          ? 'Add your bank account to receive payments'
+                          : 'Payments go to your bank account',
+                  isDark: isDark,
+                  onTap: () => context.push('/payouts'),
+                ),
                 const SizedBox(height: 8),
               ],
 

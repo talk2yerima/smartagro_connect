@@ -13,7 +13,7 @@
 
 const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https');
 const { onDocumentCreated } = require('firebase-functions/v2/firestore');
-const { defineSecret } = require('firebase-functions/params');
+const { defineSecret, defineInt } = require('firebase-functions/params');
 const logger = require('firebase-functions/logger');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
@@ -21,10 +21,14 @@ const { getMessaging } = require('firebase-admin/messaging');
 
 const payments = require('./src/payments');
 const notifications = require('./src/notifications');
+const payouts = require('./src/payouts');
 
 initializeApp();
 
 const PAYSTACK_SECRET_KEY = defineSecret('PAYSTACK_SECRET_KEY');
+// SmartAgro's share of each sale, in percent. Set in functions/.env;
+// the seller receives the rest. SmartAgro pays Paystack's fee from its share.
+const PLATFORM_FEE_PERCENT = defineInt('PLATFORM_FEE_PERCENT', { default: 5 });
 const REGION = 'us-central1';
 
 function paystackClient() {
@@ -55,6 +59,7 @@ exports.initializePayment = onCall(
         tokenEmail: request.auth && request.auth.token && request.auth.token.email,
         email: data.email,
         productId: data.productId,
+        feePercent: PLATFORM_FEE_PERCENT.value(),
       });
     } catch (err) {
       throw toHttpsError(err);
@@ -146,6 +151,66 @@ exports.notifyOnOrder = onDocumentCreated(
     const deps = notificationDeps();
     for (const note of notifications.orderNotifications(order)) {
       await notifications.deliver(note, deps);
+    }
+  },
+);
+
+// ── Farmer payouts (Paystack split) ─────────────────────────────────────────
+
+let bankCache = null; // { banks, fetchedAt } per warm instance
+const BANK_CACHE_MS = 12 * 60 * 60 * 1000;
+
+/** Banks for the "Get paid" screen, plus the fee so the app can explain it. */
+exports.listBanks = onCall(
+  { region: REGION, secrets: [PAYSTACK_SECRET_KEY] },
+  async (request) => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
+    try {
+      if (!bankCache || Date.now() - bankCache.fetchedAt > BANK_CACHE_MS) {
+        bankCache = { banks: await paystackClient().listBanks(), fetchedAt: Date.now() };
+      }
+      return { banks: bankCache.banks, feePercent: PLATFORM_FEE_PERCENT.value() };
+    } catch (err) {
+      throw toHttpsError(err);
+    }
+  },
+);
+
+/** "Check account": returns the account name the bank has on file. */
+exports.resolveBankAccount = onCall(
+  { region: REGION, secrets: [PAYSTACK_SECRET_KEY] },
+  async (request) => {
+    try {
+      const data = request.data || {};
+      return await payouts.resolveBankAccount({
+        paystack: paystackClient(),
+        uid: request.auth && request.auth.uid,
+        accountNumber: data.accountNumber,
+        bankCode: data.bankCode,
+      });
+    } catch (err) {
+      throw toHttpsError(err);
+    }
+  },
+);
+
+/** Saves the seller's bank account as their Paystack subaccount. */
+exports.savePayoutAccount = onCall(
+  { region: REGION, secrets: [PAYSTACK_SECRET_KEY] },
+  async (request) => {
+    try {
+      const data = request.data || {};
+      return await payouts.savePayoutAccount({
+        db: getFirestore(),
+        paystack: paystackClient(),
+        uid: request.auth && request.auth.uid,
+        accountNumber: data.accountNumber,
+        bankCode: data.bankCode,
+        bankName: data.bankName,
+        feePercent: PLATFORM_FEE_PERCENT.value(),
+      });
+    } catch (err) {
+      throw toHttpsError(err);
     }
   },
 );

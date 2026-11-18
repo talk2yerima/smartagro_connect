@@ -224,6 +224,31 @@ class FirestoreService {
     }
   }
 
+  // ── Farmer payouts ─────────────────────────────────────────────────────────
+
+  /// The signed-in seller's payout account (masked), or null if none yet.
+  Stream<Map<String, dynamic>?> payoutAccountStream(String uid) {
+    if (!isAvailable) return Stream.value(null);
+    return _db
+        .collection('payoutAccounts')
+        .doc(uid)
+        .snapshots()
+        .map((snap) => snap.exists ? snap.data() : null);
+  }
+
+  /// Whether [sellerId] has a bank account on file (set by the backend).
+  Future<bool> sellerCanBePaid(String sellerId) async {
+    if (!isAvailable || sellerId.isEmpty) return false;
+    try {
+      final doc = await _db.collection('users').doc(sellerId).get();
+      return doc.data()?['payoutReady'] == true;
+    } catch (e) {
+      log.w('[Firestore] sellerCanBePaid failed: $e');
+      // Don't block buying on a read hiccup; the server checks anyway.
+      return true;
+    }
+  }
+
   // ── Product listings ───────────────────────────────────────────────────────
 
   Future<String?> addProduct(Map<String, dynamic> data) async {

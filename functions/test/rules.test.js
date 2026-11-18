@@ -159,3 +159,24 @@ test('chat participants cannot add a third person', async () => {
   await assertFails(updateDoc(doc(as('bob'), 'chats/alice_bob'), { participants: ['alice', 'bob', 'vera'] }));
   await assertFails(getDoc(doc(as('vera'), 'chats/alice_bob')));
 });
+
+// ── Farmer payouts ────────────────────────────────────────────────────────
+
+test('only the seller (and admins) can see their payout account', async () => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'payoutAccounts/alice'), {
+      subaccountCode: 'ACCT_1',
+      accountNumberMasked: '******6789',
+    });
+  });
+  await assertSucceeds(getDoc(doc(as('alice'), 'payoutAccounts/alice')));
+  await assertSucceeds(getDoc(doc(as('admin'), 'payoutAccounts/alice')));
+  await assertFails(getDoc(doc(as('bob'), 'payoutAccounts/alice')));
+});
+
+test('nobody can write payout accounts or fake payoutReady from the app', async () => {
+  await assertFails(setDoc(doc(as('alice'), 'payoutAccounts/alice'), { subaccountCode: 'ACCT_fake' }));
+  await assertFails(setDoc(doc(as('bob'), 'payoutAccounts/alice'), { subaccountCode: 'ACCT_steal' }));
+  await assertFails(updateDoc(doc(as('alice'), 'users/alice'), { payoutReady: true }));
+  await assertFails(setDoc(doc(as('mallory'), 'users/mallory'), { name: 'M', role: 'farmer', payoutReady: true }));
+});

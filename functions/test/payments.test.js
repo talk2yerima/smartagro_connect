@@ -10,7 +10,7 @@ const { createFakeFirestore } = require('./fake-firestore');
 const SECRET = 'sk_test_unit_only';
 const NOW = () => new Date('2026-11-14T10:00:00Z');
 
-function seedProduct(overrides = {}) {
+function seedProduct(overrides = {}, { payout = true } = {}) {
   return {
     'products/p1': {
       title: 'Maize',
@@ -21,6 +21,8 @@ function seedProduct(overrides = {}) {
       availability: 'in_stock',
       ...overrides,
     },
+    // The seller's Paystack subaccount (bank account on file).
+    ...(payout ? { 'payoutAccounts/seller-1': { subaccountCode: 'ACCT_seller1' } } : {}),
   };
 }
 
@@ -262,4 +264,107 @@ test('Paystack client turns provider errors into PaymentError', async () => {
     fetchImpl: async () => ({ ok: false, status: 400, json: async () => ({ status: false, message: 'Invalid key' }) }),
   });
   await assert.rejects(client.verify('r'), { code: 'unavailable', message: 'Invalid key' });
+});
+
+// ── Farmer payouts (Paystack split) ────────────────────────────────────────
+
+test('computeSplit keeps the platform fee and gives the seller the rest', () => {
+  assert.deepEqual(p.computeSplit(2_000_000, 5), {
+    platformFeeKobo: 100_000,
+    sellerShareKobo: 1_900_000,
+  });
+  assert.deepEqual(p.computeSplit(1_000, 0), { platformFeeKobo: 0, sellerShareKobo: 1_000 });
+  for (const bad of [-1, 51, Number.NaN, 'x']) {
+    assert.throws(() => p.computeSplit(1_000, bad), /fee is misconfigured/);
+  }
+});
+
+test('a seller without a bank account cannot be paid', async () => {
+  const db = createFakeFirestore(seedProduct({}, { payout: false }));
+  const paystack = fakePaystack();
+  await assert.rejects(startPayment(db, paystack), (err) => {
+    assert.equal(err.code, 'failed-precondition');
+    assert.match(err.message, /can't receive payments yet/);
+    return true;
+  });
+  assert.equal(paystack.calls.initialize.length, 0);
+  assert.equal(db.store.has('payments/SA-ref1'), false);
+});
+
+test('checkout is split to the seller subaccount with the platform fee', async () => {
+  const db = createFakeFirestore(seedProduct());
+  const paystack = fakePaystack();
+  const res = await startPayment(db, paystack, { feePercent: 5 });
+
+  const init = paystack.calls.initialize[0];
+  assert.equal(init.amountKobo, 2_000_000);
+  assert.equal(init.subaccount, 'ACCT_seller1');
+  assert.equal(init.transactionChargeKobo, 100_000);
+  assert.equal(res.sellerShareKobo, 1_900_000);
+
+  const record = db.store.get('payments/SA-ref1');
+  assert.equal(record.platformFeeKobo, 100_000);
+  assert.equal(record.sellerShareKobo, 1_900_000);
+  assert.equal(record.subaccountCode, 'ACCT_seller1');
+});
+
+test('the paid order records what the seller receives', async () => {
+  const db = createFakeFirestore(seedProduct());
+  const paystack = fakePaystack({
+    verifyResult: { status: 'success', amount: 2_000_000, currency: 'NGN' },
+  });
+  await startPayment(db, paystack, { feePercent: 5 });
+  await p.verifyPayment({ db, paystack, uid: 'buyer-1', reference: 'SA-ref1', now: NOW });
+  const order = db.store.get('orders/SA-ref1');
+  assert.equal(order.sellerShareKobo, 1_900_000);
+  assert.equal(order.platformFeeKobo, 100_000);
+});
+
+function recordingFetch(responses) {
+  const calls = [];
+  const fetchImpl = async (url, init) => {
+    calls.push({ url, init });
+    const body = responses.shift();
+    return { ok: true, status: 200, json: async () => body };
+  };
+  return { calls, fetchImpl };
+}
+
+test('Paystack client sends subaccount, flat charge and bearer on split', async () => {
+  const { calls, fetchImpl } = recordingFetch([
+    { status: true, data: { authorization_url: 'u', access_code: 'a', reference: 'r' } },
+  ]);
+  const client = p.createPaystackClient({ secretKey: SECRET, fetchImpl });
+  await client.initialize({
+    email: 'b@farm.ng',
+    amountKobo: 2_000_000,
+    reference: 'r',
+    subaccount: 'ACCT_x',
+    transactionChargeKobo: 100_000,
+  });
+  const body = JSON.parse(calls[0].init.body);
+  assert.equal(body.subaccount, 'ACCT_x');
+  assert.equal(body.transaction_charge, 100_000);
+  assert.equal(body.bearer, 'account');
+});
+
+test('Paystack client lists active banks across pages, sorted', async () => {
+  const { calls, fetchImpl } = recordingFetch([
+    {
+      status: true,
+      data: [
+        { name: 'Zenith Bank', code: '057', active: true },
+        { name: 'Old Bank', code: '999', active: false },
+      ],
+      meta: { next: 'cursor2' },
+    },
+    { status: true, data: [{ name: 'Access Bank', code: '044', active: true }], meta: {} },
+  ]);
+  const client = p.createPaystackClient({ secretKey: SECRET, fetchImpl });
+  const banks = await client.listBanks();
+  assert.deepEqual(banks, [
+    { name: 'Access Bank', code: '044' },
+    { name: 'Zenith Bank', code: '057' },
+  ]);
+  assert.match(calls[1].url, /next=cursor2/);
 });

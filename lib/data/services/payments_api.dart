@@ -41,6 +41,46 @@ class PaymentsApi {
     );
   }
 
+  // ── Farmer payouts ───────────────────────────────────────────────────────
+
+  /// Banks that accept transfers, and SmartAgro's fee in percent.
+  Future<({List<Bank> banks, int feePercent})> listBanks() async {
+    final result = await _call('listBanks', const {});
+    final banks = (result['banks'] as List? ?? const [])
+        .whereType<Map>()
+        .map((b) => Bank(name: '${b['name']}', code: '${b['code']}'))
+        .toList();
+    return (
+      banks: banks,
+      feePercent: (result['feePercent'] as num?)?.toInt() ?? 5,
+    );
+  }
+
+  /// The name the bank has on file for this account ("Check account").
+  Future<String> resolveBankAccount({
+    required String accountNumber,
+    required String bankCode,
+  }) async {
+    final result = await _call('resolveBankAccount', {
+      'accountNumber': accountNumber,
+      'bankCode': bankCode,
+    });
+    return result['accountName'] as String? ?? '';
+  }
+
+  /// Saves the seller's bank account; future sales are split to it.
+  Future<PayoutAccount> savePayoutAccount({
+    required String accountNumber,
+    required Bank bank,
+  }) async {
+    final result = await _call('savePayoutAccount', {
+      'accountNumber': accountNumber,
+      'bankCode': bank.code,
+      'bankName': bank.name,
+    });
+    return PayoutAccount.fromMap(result);
+  }
+
   /// Asks the server to confirm [reference] with Paystack.
   /// Returns the server status: `success`, `pending`, `failed`, `abandoned`,
   /// `reversed` or `amount_mismatch`.
@@ -122,4 +162,30 @@ class PaymentException implements Exception {
 
   @override
   String toString() => 'PaymentException: $message';
+}
+
+class Bank {
+  const Bank({required this.name, required this.code});
+
+  final String name;
+  final String code;
+}
+
+/// A seller's saved payout account, as shown back to them (masked).
+class PayoutAccount {
+  const PayoutAccount({
+    required this.bankName,
+    required this.accountName,
+    required this.accountNumberMasked,
+  });
+
+  factory PayoutAccount.fromMap(Map<dynamic, dynamic> m) => PayoutAccount(
+        bankName: '${m['bankName'] ?? ''}',
+        accountName: '${m['accountName'] ?? ''}',
+        accountNumberMasked: '${m['accountNumberMasked'] ?? ''}',
+      );
+
+  final String bankName;
+  final String accountName;
+  final String accountNumberMasked;
 }
