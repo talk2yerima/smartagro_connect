@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 
-enum ProductAvailability { inStock, limited, soldOut }
+/// preOrder: still growing; buyers pay now and it is delivered at harvest.
+enum ProductAvailability { inStock, limited, preOrder, soldOut }
 
 /// Farmer listing shown in marketplace + search.
 class ProductListing extends Equatable {
@@ -20,6 +21,7 @@ class ProductListing extends Equatable {
     required this.imageUrl,
     required this.lat,
     required this.lng,
+    this.imageUrls = const [],
   });
 
   final String id;
@@ -37,6 +39,25 @@ class ProductListing extends Equatable {
   final String imageUrl;
   final double lat;
   final double lng;
+
+  /// Every photo of the listing, the cover ([imageUrl]) first. Older
+  /// listings only have [imageUrl].
+  final List<String> imageUrls;
+
+  /// The photos to show (never empty when there is any photo).
+  List<String> get photos {
+    final all = <String>[
+      if (imageUrl.isNotEmpty) imageUrl,
+      for (final u in imageUrls)
+        if (u.isNotEmpty && u != imageUrl) u,
+    ];
+    return all;
+  }
+
+  /// Ready to collect now (not still growing, not sold out).
+  bool get readyNow =>
+      availability == ProductAvailability.inStock ||
+      availability == ProductAvailability.limited;
 
   @override
   List<Object?> get props => [id];

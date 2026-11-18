@@ -682,7 +682,7 @@ class _PartyActionsState extends ConsumerState<_PartyActions>
         child: FilledButton.icon(
           icon: const Icon(Icons.inventory_2_outlined),
           label: const Text('Confirm on your order'),
-          onPressed: () => context.push('/orders'),
+          onPressed: () => context.go('/main/orders'),
         ),
       ));
     }

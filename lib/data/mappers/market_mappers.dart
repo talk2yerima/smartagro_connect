@@ -29,12 +29,16 @@ ProductListing productFromMap(Map<String, dynamic> m) {
     verified: (m['verified'] as bool?) ?? false,
     availability: switch (m['availability'] as String?) {
       'limited' => ProductAvailability.limited,
+      'pre_order' => ProductAvailability.preOrder,
       'sold_out' => ProductAvailability.soldOut,
       _ => ProductAvailability.inStock,
     },
     imageUrl: (m['imageUrl'] as String?) ?? '',
     lat: (m['lat'] as num?)?.toDouble() ?? 0.0,
     lng: (m['lng'] as num?)?.toDouble() ?? 0.0,
+    imageUrls: (m['imageUrls'] is List)
+        ? (m['imageUrls'] as List).whereType<String>().toList()
+        : const [],
   );
 }
 

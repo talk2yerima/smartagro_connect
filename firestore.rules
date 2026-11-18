@@ -39,8 +39,10 @@ service cloud.firestore {
 
     // Trust fields only admins / the backend may set on a user profile.
     function protectedUserFields() {
-      // payoutReady is set only by the payouts backend.
-      return ['role', 'verified', 'banned', 'rating', 'payoutReady'];
+      // payoutReady is set only by the payouts backend; the rating totals
+      // only by the ratings backend (a seller must not inflate them).
+      return ['role', 'verified', 'banned', 'rating', 'ratingSum',
+              'ratingCount', 'ratingCounts', 'payoutReady'];
     }
 
     // ── User profiles ──────────────────────────────────────────────────────
@@ -52,7 +54,9 @@ service cloud.firestore {
       // trust flags pre-set.
       allow create: if isOwner(uid) &&
                        isSelfServiceRole(request.resource.data.get('role', 'farmer')) &&
-                       !request.resource.data.keys().hasAny(['verified', 'banned', 'rating', 'payoutReady']);
+                       !request.resource.data.keys().hasAny(['verified', 'banned', 'rating',
+                                                             'ratingSum', 'ratingCount',
+                                                             'ratingCounts', 'payoutReady']);
 
       // Owner may edit their own details but not role / verified / banned /
       // rating. Admins may edit anything.
@@ -303,6 +307,12 @@ service cloud.firestore {
                d.sellerId == resource.data.sellerId &&
                validJob(d);
       }
+    }
+
+    // ── Public reviews (written only by the ratings backend) ───────────────
+    match /reviews/{orderRef} {
+      allow read: if isSignedIn();
+      allow write: if false;
     }
 
     // ── Chat threads ───────────────────────────────────────────────────────

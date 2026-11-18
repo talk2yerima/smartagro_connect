@@ -8,6 +8,7 @@ import '../../core/utils/app_logger.dart';
 import '../../domain/entities/app_notification.dart';
 import '../../domain/entities/app_user.dart';
 import '../../domain/entities/chat_models.dart';
+import '../../domain/entities/farm_profile.dart';
 import '../../domain/entities/haulage_job.dart';
 import '../../domain/entities/market_order.dart';
 import '../../domain/entities/price_alert.dart';
@@ -151,6 +152,63 @@ class FirestoreService {
           (data['createdAt'] as Timestamp).toDate().toIso8601String();
     }
     return {'id': doc.id, ...data};
+  }
+
+  /// A user's profile, live (the farm profile page updates as it's edited).
+  Stream<Map<String, dynamic>?> userProfileStream(String uid) {
+    if (!isAvailable || uid.isEmpty) return Stream.value(null);
+    return _db.collection('users').doc(uid).snapshots().map((doc) {
+      if (!doc.exists) return null;
+      final data = doc.data()!;
+      final ts = data['createdAt'];
+      if (ts is Timestamp) data['createdAt'] = ts.toDate();
+      return {'id': doc.id, ...data};
+    });
+  }
+
+  /// Farmer: the public farm profile. Only these fields; the rules keep
+  /// role, verification and rating totals out of reach.
+  Future<void> updateFarmProfile(
+    String uid, {
+    required String about,
+    required String openingHours,
+    required List<String> categories,
+    required String? coverUrl,
+    required List<String> galleryUrls,
+  }) {
+    String cap(String s, int n) {
+      final t = s.trim();
+      return t.length > n ? t.substring(0, n) : t;
+    }
+
+    return _awaitWrite(
+      _db.collection('users').doc(uid).update({
+        'about': cap(about, 600),
+        'openingHours': cap(openingHours, 120),
+        'farmCategories': categories.take(10).toList(),
+        'coverUrl': coverUrl ?? FieldValue.delete(),
+        'galleryUrls': galleryUrls.take(6).toList(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }),
+      'updateFarmProfile',
+    );
+  }
+
+  /// Published reviews of a seller, newest first.
+  Stream<List<SellerReview>> sellerReviewsStream(String sellerId) {
+    if (!isAvailable || sellerId.isEmpty) return Stream.value(const []);
+    return _db
+        .collection('reviews')
+        .where('sellerId', isEqualTo: sellerId)
+        .orderBy('createdAt', descending: true)
+        .limit(50)
+        .snapshots()
+        .map((snap) => snap.docs.map((d) {
+              final data = d.data();
+              final ts = data['createdAt'];
+              if (ts is Timestamp) data['createdAt'] = ts.toDate();
+              return SellerReview.fromMap(d.id, data);
+            }).toList());
   }
 
   /// Returns the stored role, or `null` if the document does not exist.

@@ -60,6 +60,7 @@ class ProductRepository {
     'availability',
     'description',
     'imageUrl',
+    'imageUrls',
     'state',
     'city',
   ];

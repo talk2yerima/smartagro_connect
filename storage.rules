@@ -38,6 +38,15 @@ service firebase.storage {
       allow delete: if signedIn() && request.auth.uid == sellerUid;
     }
 
+    // ── Farm profile photos (cover, gallery): farm_photos/{uid}/{file} ─
+    match /farm_photos/{ownerUid}/{fileName} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() &&
+                               request.auth.uid == ownerUid &&
+                               isImage(5);
+      allow delete: if signedIn() && request.auth.uid == ownerUid;
+    }
+
     // ── Profile photos: avatars/{uid}.jpg ──────────────────────────────
     match /avatars/{fileName} {
       allow read: if signedIn();

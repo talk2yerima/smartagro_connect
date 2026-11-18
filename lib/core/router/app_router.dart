@@ -31,6 +31,7 @@ import '../../features/notifications/notifications_screen.dart';
 import '../../features/onboarding/onboarding_screen.dart';
 import '../../features/orders/orders_screen.dart';
 import '../../features/payouts/get_paid_screen.dart';
+import '../../features/profile/farm_profile_edit_screen.dart';
 import '../../features/profile/profile_edit_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/search/search_screen.dart';
@@ -201,6 +202,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
+                path: '/main/orders',
+                builder: (context, state) => const OrdersScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
                 path: '/main/messages',
                 builder: (context, state) => const ChatListScreen(),
                 routes: [
@@ -282,8 +291,17 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ProfileEditScreen(),
       ),
       GoRoute(
+        path: '/profile/farm',
+        redirect: (context, state) =>
+            ref.read(authSessionProvider)?.role == UserRole.transporter
+                ? '/main/profile'
+                : null,
+        builder: (context, state) => const FarmProfileEditScreen(),
+      ),
+      // Orders is a tab now; old links (notifications) land on it.
+      GoRoute(
         path: '/orders',
-        builder: (context, state) => const OrdersScreen(),
+        redirect: (context, state) => '/main/orders',
       ),
       GoRoute(
         path: '/payouts',

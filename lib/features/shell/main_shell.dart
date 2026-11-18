@@ -87,7 +87,7 @@ class _MainShellState extends ConsumerState<MainShell>
           action: route != null
               ? SnackBarAction(
                   label: 'View',
-                  onPressed: () => context.push(route),
+                  onPressed: () => openAppRoute(context, route),
                 )
               : null,
         ),
@@ -97,7 +97,7 @@ class _MainShellState extends ConsumerState<MainShell>
     push.onNotificationTap = (RemoteMessage message) {
       if (!mounted) return;
       final route = message.data['route'] as String?;
-      if (route != null) context.push(route);
+      if (route != null) openAppRoute(context, route);
     };
 
     push.onTokenRefresh = _persistFcmToken;
@@ -154,15 +154,25 @@ class _MainShellState extends ConsumerState<MainShell>
             .valueOrNull ??
         0;
     if (totalUnread > 0) {
-      destinations[2] = _NavDestination(
+      final i = destinations.indexWhere((d) => d.branch == _messagesBranch);
+      destinations[i] = _NavDestination(
+        branch: _messagesBranch,
         label: 'Messages',
         icon: Icons.chat_bubble_outline_rounded,
         activeIcon: Icons.chat_bubble_rounded,
         badgeCount: totalUnread,
       );
     }
+    // The bar may skip a branch (transporters have no Orders tab), so the
+    // highlighted item is found by branch, not by position.
+    final selected = destinations
+        .indexWhere((d) => d.branch == _currentIndex)
+        .clamp(0, destinations.length - 1);
+    void onBarTap(int i) => _onTap(destinations[i].branch);
 
-    final showFab = role == UserRole.farmer && _currentIndex != 2;
+    final showFab = role == UserRole.farmer &&
+        _currentIndex != _messagesBranch &&
+        _currentIndex != _ordersBranch;
     final useRail = MediaQuery.sizeOf(context).width >= 600;
 
     if (useRail) {
@@ -170,9 +180,9 @@ class _MainShellState extends ConsumerState<MainShell>
         body: Row(
           children: [
             _NavRail(
-              currentIndex: _currentIndex,
+              currentIndex: selected,
               destinations: destinations,
-              onTap: _onTap,
+              onTap: onBarTap,
               isDark: isDark,
               showFab: showFab,
             ),
@@ -188,28 +198,43 @@ class _MainShellState extends ConsumerState<MainShell>
       floatingActionButton: showFab ? _FarmerFab(isDark: isDark) : null,
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       bottomNavigationBar: _BottomNav(
-        currentIndex: _currentIndex,
+        currentIndex: selected,
         destinations: destinations,
-        onTap: _onTap,
+        onTap: onBarTap,
         isDark: isDark,
       ),
     );
   }
 
+  // Branch order in app_router.dart's StatefulShellRoute.
+  static const _ordersBranch = 2;
+  static const _messagesBranch = 3;
+
   List<_NavDestination> _buildDestinations(UserRole role, bool isDark) {
     return [
       const _NavDestination(
+        branch: 0,
         label: 'Home',
         icon: Icons.home_outlined,
         activeIcon: Icons.home_rounded,
       ),
       _tab1Destination(role),
+      // Transporters don't buy or sell; their deliveries live under Jobs.
+      if (role != UserRole.transporter)
+        const _NavDestination(
+          branch: _ordersBranch,
+          label: 'Orders',
+          icon: Icons.receipt_long_outlined,
+          activeIcon: Icons.receipt_long_rounded,
+        ),
       const _NavDestination(
+        branch: _messagesBranch,
         label: 'Messages',
         icon: Icons.chat_bubble_outline_rounded,
         activeIcon: Icons.chat_bubble_rounded,
       ),
       const _NavDestination(
+        branch: 4,
         label: 'Profile',
         icon: Icons.person_outline_rounded,
         activeIcon: Icons.person_rounded,
@@ -220,16 +245,19 @@ class _MainShellState extends ConsumerState<MainShell>
   _NavDestination _tab1Destination(UserRole role) {
     return switch (role) {
       UserRole.transporter => const _NavDestination(
+          branch: 1,
           label: 'Jobs',
           icon: Icons.local_shipping_outlined,
           activeIcon: Icons.local_shipping_rounded,
         ),
       UserRole.admin => const _NavDestination(
+          branch: 1,
           label: 'Listings',
           icon: Icons.list_alt_outlined,
           activeIcon: Icons.list_alt_rounded,
         ),
       _ => const _NavDestination(
+          branch: 1,
           label: 'Market',
           icon: Icons.candlestick_chart_outlined,
           activeIcon: Icons.candlestick_chart_rounded,
@@ -570,14 +598,28 @@ class _RailFab extends StatelessWidget {
 
 class _NavDestination {
   const _NavDestination({
+    required this.branch,
     required this.label,
     required this.icon,
     required this.activeIcon,
     this.badgeCount = 0,
   });
 
+  /// Which shell branch this item opens.
+  final int branch;
   final String label;
   final IconData icon;
   final IconData activeIcon;
   final int badgeCount;
+}
+
+/// Opens a route from a notification: tabs (and old links that now land on
+/// a tab) are switched to; anything else opens on top.
+void openAppRoute(BuildContext context, String route) {
+  const tabs = ['/main/', '/orders', '/jobs'];
+  if (tabs.any(route.startsWith)) {
+    context.go(route);
+  } else {
+    context.push(route);
+  }
 }

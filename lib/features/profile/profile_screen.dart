@@ -87,6 +87,26 @@ class ProfileScreen extends ConsumerWidget {
               if (user?.role == UserRole.farmer) ...[
                 _MyListingsCard(isDark: isDark),
                 const SizedBox(height: 8),
+                // What buyers see: story, hours, photos, reviews.
+                _QuickLinkTile(
+                  icon: Icons.agriculture_outlined,
+                  label: 'Farm profile',
+                  subtitle: 'Your story, what you grow, hours and farm photos',
+                  isDark: isDark,
+                  onTap: () => context.push('/profile/farm'),
+                ),
+                const SizedBox(height: 8),
+                _QuickLinkTile(
+                  icon: Icons.storefront_outlined,
+                  label: 'See my public page',
+                  subtitle: 'Your profile as buyers see it, with reviews',
+                  isDark: isDark,
+                  onTap: () {
+                    final id = user?.id;
+                    if (id != null) context.push('/seller/$id');
+                  },
+                ),
+                const SizedBox(height: 8),
                 // Where sales money goes (Paystack split to their bank).
                 _QuickLinkTile(
                   icon: Icons.account_balance_outlined,
@@ -107,7 +127,7 @@ class ProfileScreen extends ConsumerWidget {
                 label: 'Orders',
                 subtitle: 'Sales and purchases, with buyer and seller contacts',
                 isDark: isDark,
-                onTap: () => context.push('/orders'),
+                onTap: () => context.go('/main/orders'),
               ),
 
               const SizedBox(height: 8),

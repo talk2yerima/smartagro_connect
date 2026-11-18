@@ -60,12 +60,14 @@ String _signed(double v) =>
 String _availabilityLabel(ProductAvailability a) => switch (a) {
       ProductAvailability.inStock => 'In stock',
       ProductAvailability.limited => 'Limited',
+      ProductAvailability.preOrder => 'Pre-order',
       ProductAvailability.soldOut => 'Sold out',
     };
 
 Color _availabilityColor(ProductAvailability a) => switch (a) {
       ProductAvailability.inStock => AppColors.mintGreen,
       ProductAvailability.limited => AppColors.golden,
+      ProductAvailability.preOrder => AppColors.infoBlue,
       ProductAvailability.soldOut => AppColors.errorRed,
     };
 

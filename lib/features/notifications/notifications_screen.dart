@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/di/auth_providers.dart';
@@ -9,6 +8,7 @@ import '../../core/di/firestore_providers.dart';
 import '../../core/di/repositories_provider.dart';
 import '../../domain/entities/app_notification.dart';
 import '../../shared/widgets/empty_state.dart';
+import '../shell/main_shell.dart' show openAppRoute;
 
 // ── Type config ───────────────────────────────────────────────────────────────
 
@@ -249,7 +249,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               _markRead(n.notification.id);
               // Open what it's about (e.g. the order), if anything.
               final route = n.notification.route;
-              if (route != null && route.isNotEmpty) context.push(route);
+              if (route != null && route.isNotEmpty) {
+                openAppRoute(context, route);
+              }
             },
           );
         }

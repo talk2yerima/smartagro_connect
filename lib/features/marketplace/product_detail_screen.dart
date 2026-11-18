@@ -20,6 +20,7 @@ import '../../shared/widgets/section_header.dart';
 import '../../shared/widgets/skeleton_list.dart';
 import '../../shared/widgets/status_badge.dart';
 import '../payment/payment_sheet.dart';
+import 'seller_profile_screen.dart' show showPhotoViewer;
 
 // ---------------------------------------------------------------------------
 // Local helpers
@@ -460,13 +461,7 @@ class _ProductDetailViewState extends ConsumerState<_ProductDetailView> {
         background: Stack(
           fit: StackFit.expand,
           children: [
-            Hero(
-              tag: 'product-image-${p.id}',
-              child: ProduceImage(
-                url: p.imageUrl,
-                fit: BoxFit.cover,
-              ),
-            ),
+            _PhotoGallery(product: p),
             // Bottom shading is for photos only: over the plain no-photo
             // placeholder it made a muddy grey band.
             if (hasRealPhoto(p.imageUrl))
@@ -663,6 +658,8 @@ class _PriceHeroSection extends StatelessWidget {
         return AppColors.freshGreen;
       case ProductAvailability.limited:
         return AppColors.warmOrange;
+      case ProductAvailability.preOrder:
+        return AppColors.infoBlue;
       case ProductAvailability.soldOut:
         return AppColors.errorRed;
     }
@@ -674,6 +671,8 @@ class _PriceHeroSection extends StatelessWidget {
         return 'In Stock';
       case ProductAvailability.limited:
         return 'Limited';
+      case ProductAvailability.preOrder:
+        return 'Pre-order';
       case ProductAvailability.soldOut:
         return 'Sold Out';
     }
@@ -685,6 +684,8 @@ class _PriceHeroSection extends StatelessWidget {
         return Icons.check_circle_outline_rounded;
       case ProductAvailability.limited:
         return Icons.hourglass_bottom_rounded;
+      case ProductAvailability.preOrder:
+        return Icons.event_available_rounded;
       case ProductAvailability.soldOut:
         return Icons.remove_circle_outline_rounded;
     }
@@ -1511,6 +1512,70 @@ class _BottomBarState extends ConsumerState<_BottomBar> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The listing's photos: swipe through them, tap to view full screen.
+class _PhotoGallery extends StatefulWidget {
+  const _PhotoGallery({required this.product});
+
+  final ProductListing product;
+
+  @override
+  State<_PhotoGallery> createState() => _PhotoGalleryState();
+}
+
+class _PhotoGalleryState extends State<_PhotoGallery> {
+  int _page = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = widget.product;
+    final photos = p.photos;
+    if (photos.length <= 1) {
+      return Hero(
+        tag: 'product-image-${p.id}',
+        child: GestureDetector(
+          onTap:
+              photos.isEmpty ? null : () => showPhotoViewer(context, photos, 0),
+          child: ProduceImage(url: p.imageUrl, fit: BoxFit.cover),
+        ),
+      );
+    }
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        PageView.builder(
+          itemCount: photos.length,
+          onPageChanged: (i) => setState(() => _page = i),
+          itemBuilder: (_, i) {
+            final image = GestureDetector(
+              onTap: () => showPhotoViewer(context, photos, i),
+              child: ProduceImage(url: photos[i], fit: BoxFit.cover),
+            );
+            return i == 0
+                ? Hero(tag: 'product-image-${p.id}', child: image)
+                : image;
+          },
+        ),
+        Positioned(
+          right: 12,
+          bottom: 14,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.black54,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text('${_page + 1} / ${photos.length}',
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600)),
+          ),
+        ),
+      ],
     );
   }
 }

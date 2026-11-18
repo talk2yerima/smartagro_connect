@@ -171,12 +171,14 @@ class _ListingCard extends ConsumerWidget {
   Color get _availabilityColor => switch (listing.availability) {
         ProductAvailability.inStock => AppColors.mintGreen,
         ProductAvailability.limited => AppColors.golden,
+        ProductAvailability.preOrder => AppColors.infoBlue,
         ProductAvailability.soldOut => AppColors.errorRed,
       };
 
   String get _availabilityLabel => switch (listing.availability) {
         ProductAvailability.inStock => 'In Stock',
         ProductAvailability.limited => 'Limited',
+        ProductAvailability.preOrder => 'Pre-order',
         ProductAvailability.soldOut => 'Sold Out',
       };
 
@@ -485,6 +487,7 @@ class _EditListingSheetState extends State<_EditListingSheet> {
         'availability': switch (_availability) {
           ProductAvailability.inStock => 'in_stock',
           ProductAvailability.limited => 'limited',
+          ProductAvailability.preOrder => 'pre_order',
           ProductAvailability.soldOut => 'sold_out',
         },
         'description': _descCtrl.text.trim(),
@@ -727,11 +730,13 @@ class _EditListingSheetState extends State<_EditListingSheet> {
                     final color = switch (a) {
                       ProductAvailability.inStock => AppColors.mintGreen,
                       ProductAvailability.limited => AppColors.golden,
+                      ProductAvailability.preOrder => AppColors.infoBlue,
                       ProductAvailability.soldOut => AppColors.errorRed,
                     };
                     final label = switch (a) {
                       ProductAvailability.inStock => 'In Stock',
                       ProductAvailability.limited => 'Limited',
+                      ProductAvailability.preOrder => 'Pre-order',
                       ProductAvailability.soldOut => 'Sold Out',
                     };
                     return Expanded(

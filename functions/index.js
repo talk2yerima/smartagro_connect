@@ -241,7 +241,11 @@ exports.onOrderUpdated = onDocumentUpdated(
     const added = ratings.newRating(before, after);
     if (!added) return;
     const db = getFirestore();
-    const result = await ratings.applyRating({ db, ...added });
+    const buyer = await deps.getUser(after.buyerId);
+    const review = ratings.reviewDoc(event.params.orderId, after, buyer && buyer.name);
+    const result = await ratings.applyRating({
+      db, ...added, review, now: FieldValue.serverTimestamp(),
+    });
     if (!result) return;
     // Listings carry a copy of the seller's rating for the marketplace cards.
     const listings = await db.collection('products')

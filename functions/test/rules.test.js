@@ -390,3 +390,22 @@ test('a transporter can hand a job back before pickup; parties can cancel and re
   await assertFails(setDoc(doc(as('vera'), 'haulageJobs/d1'), newJob('vera')));
   await assertFails(deleteDoc(doc(as('bob'), 'haulageJobs/d1')));
 });
+
+// ── Reviews and rating totals ─────────────────────────────────────────────
+
+test('anyone signed in can read reviews; nobody can write them from the app', async () => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'reviews/r1'), { sellerId: 'alice', rating: 5 });
+  });
+  await assertSucceeds(getDoc(doc(as('vera'), 'reviews/r1')));
+  await assertFails(setDoc(doc(as('alice'), 'reviews/fake'), { sellerId: 'alice', rating: 5 }));
+  await assertFails(updateDoc(doc(as('alice'), 'reviews/r1'), { rating: 5 }));
+});
+
+test('a seller cannot inflate their own rating totals', async () => {
+  await assertFails(updateDoc(doc(as('alice'), 'users/alice'), { ratingSum: 500 }));
+  await assertFails(updateDoc(doc(as('alice'), 'users/alice'), { ratingCount: 100 }));
+  await assertFails(updateDoc(doc(as('alice'), 'users/alice'), { ratingCounts: { 5: 100 } }));
+  await assertFails(setDoc(doc(as('newbie'), 'users/newbie'), { name: 'N', role: 'farmer', ratingCount: 9 }));
+  await assertSucceeds(updateDoc(doc(as('alice'), 'users/alice'), { about: 'Mixed farm in Gashua' }));
+});

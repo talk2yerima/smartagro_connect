@@ -28,9 +28,22 @@ const _kCategories = [
   'Oilseeds',
 ];
 
-// No pre-order: it was stored as 'pre_order' but read back as in stock
-// and sold like normal stock. Add it back as a real availability state.
-enum _Availability { inStock, limited }
+// Pre-order is a real state now: read back as ProductAvailability.preOrder
+// and shown as "Pre-order" (still growing, delivered at harvest).
+enum _Availability { inStock, limited, preOrder }
+
+/// One extra listing photo (after the cover) and its upload.
+class _ExtraPhoto {
+  _ExtraPhoto(this.path);
+
+  final String path;
+  String? url;
+  double progress = 0;
+  bool failed = false;
+}
+
+/// Cover photo plus this many more.
+const _maxExtraPhotos = 4;
 
 // ─── Card decoration helper ───────────────────────────────────────────────────
 
@@ -75,6 +88,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
   String? _selectedCategory;
   String? _selectedState;
   _Availability _availability = _Availability.inStock;
+  final _extraPhotos = <_ExtraPhoto>[];
   bool _busy = false;
   bool _locating = false;
 
@@ -215,6 +229,43 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
     });
   }
 
+  // ─── Extra photos ─────────────────────────────────────────────────────────
+
+  Future<void> _addExtraPhotos() async {
+    ref.read(appLockProvider.notifier).allowNextReturn();
+    final room = _maxExtraPhotos - _extraPhotos.length;
+    if (room <= 0) return;
+    try {
+      final files = await ImagePicker()
+          .pickMultiImage(imageQuality: 80, maxWidth: 1200, limit: room);
+      for (final f in files.take(room)) {
+        final photo = _ExtraPhoto(f.path);
+        setState(() => _extraPhotos.add(photo));
+        _uploadExtra(photo);
+      }
+    } catch (_) {
+      _showSnack('Could not open your photos.');
+    }
+  }
+
+  void _uploadExtra(_ExtraPhoto photo) {
+    ref
+        .read(imageUploadServiceProvider)
+        .uploadProductImage(
+          filePath: photo.path,
+          productId: 'listing-${DateTime.now().microsecondsSinceEpoch}',
+          userId: ref.read(authSessionProvider)?.id,
+          onProgress: (p) {
+            if (mounted) setState(() => photo.progress = p);
+          },
+        )
+        .then((url) {
+      if (mounted) setState(() => photo.url = url);
+    }).catchError((_) {
+      if (mounted) setState(() => photo.failed = true);
+    });
+  }
+
   // ─── GPS ──────────────────────────────────────────────────────────────────
 
   Future<void> _useGps() async {
@@ -253,6 +304,10 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
   Future<void> _submit() async {
     FocusScope.of(context).unfocus();
     if (!_formKey.currentState!.validate()) return;
+    if (_extraPhotos.any((x) => x.url == null && !x.failed)) {
+      _showSnack('Please wait for the photos to finish uploading.');
+      return;
+    }
     if (_uploadProgress != null) {
       _showSnack('Please wait for the image to finish uploading.');
       return;
@@ -277,10 +332,16 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
         'availability': switch (_availability) {
           _Availability.limited => 'limited',
           _Availability.inStock => 'in_stock',
+          _Availability.preOrder => 'pre_order',
         },
         // No photo means no photo: listings used to get a random stock
         // picture (picsum), which looked like the real produce.
         'imageUrl': _uploadedImageUrl ?? '',
+        'imageUrls': [
+          if (_uploadedImageUrl != null) _uploadedImageUrl!,
+          for (final x in _extraPhotos)
+            if (x.url != null) x.url!,
+        ],
         'lat': 0.0,
         'lng': 0.0,
       };
@@ -416,6 +477,51 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                       ),
                     ),
                   ],
+                ),
+              ],
+              // More photos (buyers trust listings they can see well).
+              if (_imagePath != null) ...[
+                const SizedBox(height: 10),
+                SizedBox(
+                  height: 76,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: [
+                      for (final x in _extraPhotos)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: _ExtraThumb(
+                            photo: x,
+                            onRemove: () =>
+                                setState(() => _extraPhotos.remove(x)),
+                          ),
+                        ),
+                      if (_extraPhotos.length < _maxExtraPhotos)
+                        InkWell(
+                          borderRadius: BorderRadius.circular(10),
+                          onTap: _addExtraPhotos,
+                          child: Container(
+                            width: 76,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: AppColors.emerald),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.add_photo_alternate_outlined,
+                                    color: AppColors.emerald),
+                                Text(
+                                    'More (${_maxExtraPhotos - _extraPhotos.length})',
+                                    style: const TextStyle(
+                                        fontSize: 11,
+                                        color: AppColors.emerald)),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ],
 
@@ -1071,6 +1177,11 @@ class _AvailabilitySegment extends StatelessWidget {
               label: Text('Limited'),
               icon: Icon(Icons.warning_amber_outlined, size: 15),
             ),
+            ButtonSegment(
+              value: _Availability.preOrder,
+              label: Text('Pre-order'),
+              icon: Icon(Icons.event_available_rounded, size: 15),
+            ),
           ],
         ),
       ],
@@ -1108,6 +1219,56 @@ class _SectionLabel extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
         ),
       ],
+    );
+  }
+}
+
+class _ExtraThumb extends StatelessWidget {
+  const _ExtraThumb({required this.photo, required this.onRemove});
+
+  final _ExtraPhoto photo;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 76,
+      height: 76,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Image.file(File(photo.path), fit: BoxFit.cover),
+          ),
+          if (photo.url == null)
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.black45,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              alignment: Alignment.center,
+              child: photo.failed
+                  ? const Icon(Icons.error_outline, color: Colors.white)
+                  : CircularProgressIndicator(
+                      value: photo.progress > 0 ? photo.progress : null,
+                      strokeWidth: 3,
+                      color: Colors.white),
+            ),
+          Positioned(
+            right: 0,
+            top: 0,
+            child: GestureDetector(
+              onTap: onRemove,
+              child: const CircleAvatar(
+                radius: 11,
+                backgroundColor: Colors.black54,
+                child: Icon(Icons.close, size: 14, color: Colors.white),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

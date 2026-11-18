@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,15 +11,19 @@ import 'package:shimmer/shimmer.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/di/auth_providers.dart';
+import '../../core/di/haulage_providers.dart';
 import '../../core/di/repositories_provider.dart';
 import '../../core/errors/friendly_error.dart';
+import '../../core/utils/geo.dart';
 import '../../core/utils/money_format.dart';
 import '../../domain/entities/app_user.dart';
 import '../../domain/entities/product_listing.dart';
+import '../../domain/listing_filter.dart';
 import '../../shared/widgets/connectivity_banner.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/produce_image.dart';
 import '../../shared/widgets/skeleton_list.dart';
+import 'filter_sheet.dart';
 
 class _FavIdsNotifier extends StateNotifier<Set<String>> {
   _FavIdsNotifier() : super({}) {
@@ -73,7 +78,8 @@ enum _SortOption {
   newest('Newest'),
   priceLow('Price: Low'),
   priceHigh('Price: High'),
-  rating('Top Rated');
+  rating('Top Rated'),
+  nearest('Nearest');
 
   const _SortOption(this.label);
   final String label;
@@ -97,11 +103,17 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
   _SortOption _selectedSort = _SortOption.newest;
   String _searchQuery = '';
   Timer? _debounce;
+  ListingFilter _filter = ListingFilter.none;
+  GeoPoint2? _me;
 
   @override
   void initState() {
     super.initState();
     _loadPrefs();
+    // Distances need the person's position; never ask just for browsing.
+    ref.read(locationServiceProvider).currentIfAllowed().then((p) {
+      if (mounted && p != null) setState(() => _me = p);
+    });
   }
 
   Future<void> _loadPrefs() async {
@@ -157,8 +169,12 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
 
   // ── Filtering + sorting ───────────────────────────────────────────────────
 
-  List<ProductListing> _applyFilters(List<ProductListing> all) {
+  List<ProductListing> _applyFilters(List<ProductListing> all,
+      {ListingFilter? filter, GeoPoint2? me, _SortOption? sort}) {
+    final f = filter ?? _filter;
+    final here = me ?? _me;
     var results = all.where((p) {
+      if (!f.matches(p, me: here)) return false;
       final q = _searchQuery.toLowerCase();
       if (q.isNotEmpty &&
           !p.title.toLowerCase().contains(q) &&
@@ -179,9 +195,15 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
       return true;
     }).toList();
 
-    switch (_selectedSort) {
+    switch (sort ?? _selectedSort) {
       case _SortOption.newest:
         break; // preserve server order
+      case _SortOption.nearest:
+        if (here != null) {
+          double d(ProductListing p) =>
+              listingDistanceKm(p, here) ?? double.infinity;
+          results.sort((a, b) => d(a).compareTo(d(b)));
+        }
       case _SortOption.priceLow:
         results.sort((a, b) => a.priceNgn.compareTo(b.priceNgn));
       case _SortOption.priceHigh:
@@ -193,73 +215,36 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
     return results;
   }
 
-  // ── Sort bottom sheet ─────────────────────────────────────────────────────
+  // ── Filter sheet ──────────────────────────────────────────────────────────
 
-  void _showSortSheet() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: isDark ? AppColors.cardDark : Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.gray.withValues(alpha: 0.35),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Sort By',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontFamily: 'Poppins',
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.text(isDark),
-                  ),
-            ),
-            const SizedBox(height: 12),
-            ..._SortOption.values.map(
-              (opt) => ListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                title: Text(
-                  opt.label,
-                  style: TextStyle(
-                    fontFamily: 'Poppins',
-                    fontWeight: _selectedSort == opt
-                        ? FontWeight.w600
-                        : FontWeight.w400,
-                    color: _selectedSort == opt
-                        ? AppColors.deepGreen
-                        : AppColors.text(isDark),
-                  ),
-                ),
-                trailing: _selectedSort == opt
-                    ? const Icon(Icons.check_rounded,
-                        color: AppColors.deepGreen, size: 18)
-                    : null,
-                onTap: () {
-                  setState(() => _selectedSort = opt);
-                  _savePrefs();
-                  Navigator.pop(context);
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
+  Future<void> _showFilterSheet() async {
+    final items = ref.read(productsProvider).valueOrNull ?? const [];
+    final prices = items.map((p) => p.priceNgn).where((n) => n > 0).toList();
+    final minPrice = prices.isEmpty ? 0 : prices.reduce(math.min);
+    final maxPrice = prices.isEmpty ? 100000 : prices.reduce(math.max);
+    final states = {
+      for (final p in items)
+        if (p.state.isNotEmpty) p.state
+    }.toList()
+      ..sort();
+    final result = await showListingFilterSheet(
+      context,
+      current: _filter,
+      sortIndex: _selectedSort.index,
+      sortLabels: [for (final s in _SortOption.values) s.label],
+      minPrice: minPrice,
+      maxPrice: maxPrice,
+      states: states,
+      me: _me,
+      countFor: (f, me) => _applyFilters(items, filter: f, me: me).length,
     );
+    if (result == null || !mounted) return;
+    setState(() {
+      _filter = result.filter;
+      _selectedSort = _SortOption.values[result.sortIndex];
+      _me = result.me ?? _me;
+    });
+    _savePrefs();
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────
@@ -289,11 +274,15 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
         ),
         actions: [
           IconButton(
-            onPressed: _showSortSheet,
+            onPressed: _showFilterSheet,
             tooltip: 'Sort & Filter',
-            icon: Icon(
-              Icons.tune_rounded,
-              color: AppColors.text(isDark),
+            icon: Badge(
+              isLabelVisible: _filter.activeCount > 0,
+              label: Text('${_filter.activeCount}'),
+              child: Icon(
+                Icons.tune_rounded,
+                color: AppColors.text(isDark),
+              ),
             ),
           ),
           if (canAddListing)
@@ -373,7 +362,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                             controller: _searchController,
                             isDark: isDark,
                             onChanged: _onSearchChanged,
-                            onSortTap: _showSortSheet,
+                            onSortTap: _showFilterSheet,
                             sortLabel: _selectedSort.label,
                           ),
                         ),
@@ -393,7 +382,8 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
 
                       // ── Spotlight strip ─────────────────────────────────────
                       if (_selectedCategory == _Category.all &&
-                          _searchQuery.isEmpty)
+                          _searchQuery.isEmpty &&
+                          _filter.activeCount == 0)
                         SliverToBoxAdapter(
                           child: _SpotlightStrip(
                             products: _spotlight(items),
@@ -421,16 +411,31 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                       if (filtered.isEmpty)
                         SliverFillRemaining(
                           hasScrollBody: false,
-                          child: EmptyState(
-                            type: EmptyStateType.marketplace,
-                            icon: Icons.storefront_outlined,
-                            title: 'No listings',
-                            subtitle: 'Be the first to list your produce',
-                            actionLabel: canAddListing ? 'Add listing' : null,
-                            onAction: canAddListing
-                                ? () => context.push('/marketplace/add')
-                                : null,
-                          ),
+                          child: _filter.activeCount > 0 ||
+                                  _searchQuery.isNotEmpty
+                              ? EmptyState(
+                                  icon: Icons.filter_alt_off_outlined,
+                                  title: 'Nothing matches',
+                                  subtitle:
+                                      'Try a wider price range or distance, '
+                                      'or clear the filters.',
+                                  actionLabel: _filter.activeCount > 0
+                                      ? 'Clear filters'
+                                      : null,
+                                  onAction: () => setState(
+                                      () => _filter = ListingFilter.none),
+                                )
+                              : EmptyState(
+                                  type: EmptyStateType.marketplace,
+                                  icon: Icons.storefront_outlined,
+                                  title: 'No listings',
+                                  subtitle: 'Be the first to list your produce',
+                                  actionLabel:
+                                      canAddListing ? 'Add listing' : null,
+                                  onAction: canAddListing
+                                      ? () => context.push('/marketplace/add')
+                                      : null,
+                                ),
                         )
                       else
                         SliverPadding(
@@ -845,6 +850,8 @@ class _ProductCard extends ConsumerWidget {
         return AppColors.freshGreen;
       case ProductAvailability.limited:
         return AppColors.golden;
+      case ProductAvailability.preOrder:
+        return AppColors.infoBlue;
       case ProductAvailability.soldOut:
         return AppColors.errorRed;
     }
@@ -856,6 +863,8 @@ class _ProductCard extends ConsumerWidget {
         return 'In Stock';
       case ProductAvailability.limited:
         return 'Limited';
+      case ProductAvailability.preOrder:
+        return 'Pre-order';
       case ProductAvailability.soldOut:
         return 'Sold Out';
     }
