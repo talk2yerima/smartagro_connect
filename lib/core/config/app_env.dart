@@ -71,6 +71,11 @@ abstract final class AppEnv {
       ? _functionsOverride
       : 'https://us-central1-$firebaseProjectId.cloudfunctions.net';
 
+  // ── Public pages (Firebase Hosting, folder hosting/) ──────────────────────
+  static String get privacyPolicyUrl =>
+      'https://$firebaseProjectId.web.app/privacy';
+  static String get termsUrl => 'https://$firebaseProjectId.web.app/terms';
+
   /// Demo mode (any password works, no Firebase) is a development aid only.
   /// Production builds refuse to fall back to it.
   static bool get allowDemoMode => !isProd;

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/config/app_env.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/di/auth_providers.dart';
 import '../../core/errors/failures.dart';
@@ -184,6 +186,24 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   label: _busy ? 'Creating account…' : 'Create account',
                   onPressed: _busy ? null : _submit,
                 ),
+                const SizedBox(height: 10),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text('By creating an account, you agree to our ',
+                        style: text.bodySmall
+                            ?.copyWith(color: AppColors.subText(isDark))),
+                    _LinkText('Terms of Use', AppEnv.termsUrl),
+                    Text(' and ',
+                        style: text.bodySmall
+                            ?.copyWith(color: AppColors.subText(isDark))),
+                    _LinkText('Privacy Policy', AppEnv.privacyPolicyUrl),
+                    Text('.',
+                        style: text.bodySmall
+                            ?.copyWith(color: AppColors.subText(isDark))),
+                  ],
+                ),
                 const SizedBox(height: 8),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -197,6 +217,40 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A small underlined link that opens a public page in the browser.
+class _LinkText extends StatelessWidget {
+  const _LinkText(this.label, this.url);
+
+  final String label;
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).brightness == Brightness.dark
+        ? AppColors.lightGreen
+        : AppColors.deepGreen;
+    return Semantics(
+      link: true,
+      child: InkWell(
+        onTap: () =>
+            launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w600,
+                  decoration: TextDecoration.underline,
+                  decorationColor: color,
+                ),
           ),
         ),
       ),

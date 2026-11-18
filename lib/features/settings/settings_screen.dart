@@ -5,6 +5,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/config/app_env.dart';
 import '../../core/di/initialization_provider.dart';
@@ -30,6 +31,15 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  Future<void> _openPage(String url) async {
+    final ok =
+        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Could not open $url')));
+    }
+  }
+
   Future<void> _toggleAppLock(bool enable) async {
     final result = await ref.read(appLockProvider.notifier).setEnabled(enable);
     if (!mounted) return;
@@ -181,6 +191,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             subtitle: Text('English (Nigeria)'),
           ),
           const Divider(),
+          ListTile(
+            leading: const Icon(Icons.privacy_tip_outlined),
+            title: const Text('Privacy policy'),
+            trailing: const Icon(Icons.open_in_new_rounded, size: 18),
+            onTap: () => _openPage(AppEnv.privacyPolicyUrl),
+          ),
+          ListTile(
+            leading: const Icon(Icons.gavel_outlined),
+            title: const Text('Terms of use'),
+            trailing: const Icon(Icons.open_in_new_rounded, size: 18),
+            onTap: () => _openPage(AppEnv.termsUrl),
+          ),
           const ListTile(
             leading: Icon(Icons.info_outline),
             title: Text('Version'),
