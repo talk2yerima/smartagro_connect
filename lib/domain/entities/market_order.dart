@@ -14,10 +14,13 @@ class MarketOrder extends Equatable {
     required this.createdAt,
     this.sellerShareKobo,
     this.platformFeeKobo,
+    this.dispatchedAt,
+    this.receivedAt,
+    this.rating,
+    this.review,
   });
 
   factory MarketOrder.fromMap(String id, Map<String, dynamic> m) {
-    final created = m['createdAt'];
     return MarketOrder(
       reference: (m['reference'] as String?) ?? id,
       productId: (m['productId'] as String?) ?? '',
@@ -28,13 +31,19 @@ class MarketOrder extends Equatable {
       buyerId: (m['buyerId'] as String?) ?? '',
       sellerId: (m['sellerId'] as String?) ?? '',
       status: (m['status'] as String?) ?? 'paid',
-      createdAt: created is DateTime
-          ? created
-          : created is String
-              ? DateTime.tryParse(created) ?? DateTime.now()
-              : DateTime.now(),
+      createdAt: _date(m['createdAt']) ?? DateTime.now(),
+      dispatchedAt: _date(m['dispatchedAt']),
+      receivedAt: _date(m['receivedAt']),
+      rating: (m['rating'] as num?)?.toInt(),
+      review: m['review'] as String?,
     );
   }
+
+  static DateTime? _date(Object? v) => v is DateTime
+      ? v
+      : v is String
+          ? DateTime.tryParse(v)
+          : null;
 
   final String reference;
   final String productId;
@@ -50,10 +59,20 @@ class MarketOrder extends Equatable {
   final String buyerId;
   final String sellerId;
 
-  /// 'paid' for now; delivery confirmation will add more states.
+  /// 'paid' → 'dispatched' (seller) → 'received' (buyer).
   final String status;
   final DateTime createdAt;
+  final DateTime? dispatchedAt;
+  final DateTime? receivedAt;
+
+  /// The buyer's 1-5 rating of the seller, once given.
+  final int? rating;
+  final String? review;
+
+  bool get isPaid => status == 'paid';
+  bool get isDispatched => status == 'dispatched';
+  bool get isReceived => status == 'received';
 
   @override
-  List<Object?> get props => [reference, status];
+  List<Object?> get props => [reference, status, rating];
 }

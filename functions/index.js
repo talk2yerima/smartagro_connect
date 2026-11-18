@@ -12,7 +12,7 @@
  */
 
 const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https');
-const { onDocumentCreated } = require('firebase-functions/v2/firestore');
+const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore');
 const { defineSecret, defineInt } = require('firebase-functions/params');
 const logger = require('firebase-functions/logger');
 const { initializeApp } = require('firebase-admin/app');
@@ -22,6 +22,7 @@ const { getMessaging } = require('firebase-admin/messaging');
 const payments = require('./src/payments');
 const notifications = require('./src/notifications');
 const payouts = require('./src/payouts');
+const ratings = require('./src/ratings');
 
 initializeApp();
 
@@ -212,5 +213,38 @@ exports.savePayoutAccount = onCall(
     } catch (err) {
       throw toHttpsError(err);
     }
+  },
+);
+
+// ── Delivery tracking ───────────────────────────────────────────────────────
+
+/**
+ * Order updated by the seller (dispatched) or buyer (received, rated):
+ * notify the other person, and add any new rating to the seller's average
+ * (profile and their listings' seller rating).
+ */
+exports.onOrderUpdated = onDocumentUpdated(
+  { document: 'orders/{orderId}', region: REGION },
+  async (event) => {
+    const before = event.data && event.data.before.data();
+    const after = event.data && event.data.after.data();
+    if (!before || !after) return;
+
+    const deps = notificationDeps();
+    for (const note of notifications.orderStatusNotifications(before, after)) {
+      await notifications.deliver(note, deps);
+    }
+
+    const added = ratings.newRating(before, after);
+    if (!added) return;
+    const db = getFirestore();
+    const result = await ratings.applyRating({ db, ...added });
+    if (!result) return;
+    // Listings carry a copy of the seller's rating for the marketplace cards.
+    const listings = await db.collection('products')
+      .where('sellerId', '==', added.sellerId).limit(200).get();
+    const batch = db.batch();
+    listings.forEach((d) => batch.update(d.ref, { sellerRating: result.rating }));
+    if (!listings.empty) await batch.commit();
   },
 );

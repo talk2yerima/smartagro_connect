@@ -200,3 +200,57 @@ test('nobody can list other people\'s orders', async () => {
   await assertFails(getDocs(query(collection(db, 'orders'), where('buyerId', '==', 'bob'))));
   await assertFails(getDocs(collection(db, 'orders')));
 });
+
+// ── Delivery tracking ─────────────────────────────────────────────────────
+
+const { serverTimestamp } = require('firebase/firestore');
+
+async function seedOrder(extra = {}) {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'orders/d1'), {
+      buyerId: 'bob', sellerId: 'alice', status: 'paid',
+      amountKobo: 5000000, sellerShareKobo: 4750000, createdAt: new Date(), ...extra,
+    });
+  });
+}
+
+test('only the seller can mark an order dispatched', async () => {
+  await seedOrder();
+  const dispatch = { status: 'dispatched', dispatchedAt: serverTimestamp() };
+  await assertFails(updateDoc(doc(as('bob'), 'orders/d1'), dispatch));
+  await assertFails(updateDoc(doc(as('vera'), 'orders/d1'), dispatch));
+  await assertSucceeds(updateDoc(doc(as('alice'), 'orders/d1'), dispatch));
+});
+
+test('only the buyer can confirm receipt, from paid or dispatched', async () => {
+  await seedOrder({ status: 'dispatched' });
+  const received = { status: 'received', receivedAt: serverTimestamp() };
+  await assertFails(updateDoc(doc(as('alice'), 'orders/d1'), received));
+  await assertSucceeds(updateDoc(doc(as('bob'), 'orders/d1'), received));
+  await seedOrder({ status: 'paid' });
+  await assertSucceeds(updateDoc(doc(as('bob'), 'orders/d1'), received));
+});
+
+test('nobody can change the money or skip steps backwards', async () => {
+  await seedOrder();
+  await assertFails(updateDoc(doc(as('alice'), 'orders/d1'), {
+    status: 'dispatched', dispatchedAt: serverTimestamp(), sellerShareKobo: 5000000,
+  }));
+  await assertFails(updateDoc(doc(as('bob'), 'orders/d1'), { amountKobo: 1 }));
+  await seedOrder({ status: 'received' });
+  await assertFails(updateDoc(doc(as('alice'), 'orders/d1'), {
+    status: 'dispatched', dispatchedAt: serverTimestamp(),
+  }));
+});
+
+test('the buyer can rate once, 1 to 5, only after receipt', async () => {
+  const rate = (r) => ({ rating: r, review: 'Fresh and on time', ratedAt: serverTimestamp() });
+  await seedOrder({ status: 'dispatched' });
+  await assertFails(updateDoc(doc(as('bob'), 'orders/d1'), rate(5)));
+  await seedOrder({ status: 'received' });
+  await assertFails(updateDoc(doc(as('alice'), 'orders/d1'), rate(5)));
+  await assertFails(updateDoc(doc(as('bob'), 'orders/d1'), rate(6)));
+  await assertFails(updateDoc(doc(as('bob'), 'orders/d1'), rate(0)));
+  await assertSucceeds(updateDoc(doc(as('bob'), 'orders/d1'), rate(4)));
+  await assertFails(updateDoc(doc(as('bob'), 'orders/d1'), rate(1)));
+});

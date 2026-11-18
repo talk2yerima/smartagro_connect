@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/di/auth_providers.dart';
+import '../../core/di/firestore_providers.dart';
 import '../../core/di/payment_providers.dart';
 import '../../core/errors/friendly_error.dart';
 import '../../core/utils/money_format.dart';
@@ -217,9 +218,23 @@ class _OrderCard extends ConsumerWidget {
         ? 'Buyer paid ${formatNgn(order.amountKobo / 100)}'
             '${order.platformFeeKobo != null ? ' · SmartAgro fee ${formatNgn(order.platformFeeKobo! / 100)}' : ''}'
         : null;
-    final nextStep = asSeller
-        ? 'Paid. Contact the buyer to arrange delivery.'
-        : 'Paid. The seller will contact you about delivery.';
+    final fmt = DateFormat('d MMM, h:mm a');
+    final nextStep = switch ((asSeller, order.status)) {
+      (true, 'paid') =>
+        'Paid. Contact the buyer, then tap "Mark as dispatched".',
+      (true, 'dispatched') => 'Dispatched '
+          '${order.dispatchedAt == null ? '' : fmt.format(order.dispatchedAt!)}'
+          '. Waiting for the buyer to confirm.',
+      (true, 'received') => 'Delivered '
+          '${order.receivedAt == null ? '' : fmt.format(order.receivedAt!)}.',
+      (false, 'paid') => 'Paid. The seller will contact you about delivery.',
+      (false, 'dispatched') => 'On the way since '
+          '${order.dispatchedAt == null ? '' : fmt.format(order.dispatchedAt!)}'
+          '. Tap "I received it" when it arrives.',
+      (false, 'received') => 'You received this '
+          '${order.receivedAt == null ? '' : fmt.format(order.receivedAt!)}.',
+      _ => 'Paid.',
+    };
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -239,7 +254,7 @@ class _OrderCard extends ConsumerWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis),
               ),
-              const _PaidChip(),
+              _StatusChip(status: order.status),
             ],
           ),
           const SizedBox(height: 4),
@@ -264,6 +279,11 @@ class _OrderCard extends ConsumerWidget {
                       style: TextStyle(fontSize: 13, color: sub))),
             ],
           ),
+          if (order.rating != null) ...[
+            const SizedBox(height: 10),
+            _RatingView(rating: order.rating!, review: order.review),
+          ],
+          _OrderActions(order: order, asSeller: asSeller),
           const Divider(height: 22),
           Row(
             children: [
@@ -301,22 +321,255 @@ class _OrderCard extends ConsumerWidget {
   }
 }
 
-class _PaidChip extends StatelessWidget {
-  const _PaidChip();
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({required this.status});
+
+  final String status;
 
   @override
   Widget build(BuildContext context) {
+    final (label, color) = switch (status) {
+      'dispatched' => ('On the way', AppColors.infoBlue),
+      'received' => ('Delivered', AppColors.emerald),
+      _ => ('Paid', AppColors.warmOrange),
+    };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: AppColors.emerald.withValues(alpha: 0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
       ),
-      child: const Text('Paid',
+      child: Text(label,
           style: TextStyle(
-              color: AppColors.emerald,
-              fontWeight: FontWeight.w700,
-              fontSize: 12)),
+              color: color, fontWeight: FontWeight.w700, fontSize: 12)),
+    );
+  }
+}
+
+/// The one step this person can take next on the order, if any.
+class _OrderActions extends ConsumerStatefulWidget {
+  const _OrderActions({required this.order, required this.asSeller});
+
+  final MarketOrder order;
+  final bool asSeller;
+
+  @override
+  ConsumerState<_OrderActions> createState() => _OrderActionsState();
+}
+
+class _OrderActionsState extends ConsumerState<_OrderActions> {
+  bool _busy = false;
+
+  Future<void> _run(Future<void> Function() action, String done) async {
+    setState(() => _busy = true);
+    try {
+      await action();
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(done)));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(friendlyError(e))));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<bool> _confirm(String title, String body, String yes) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text(title),
+        content: Text(body),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: const Text('Not yet')),
+          FilledButton(
+              onPressed: () => Navigator.pop(c, true), child: Text(yes)),
+        ],
+      ),
+    );
+    return ok ?? false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final o = widget.order;
+    final firestore = ref.read(firestoreServiceProvider);
+
+    Widget button(String label, IconData icon, VoidCallback onTap,
+            {bool outlined = false}) =>
+        Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: SizedBox(
+            width: double.infinity,
+            height: 46,
+            child: outlined
+                ? OutlinedButton.icon(
+                    onPressed: _busy ? null : onTap,
+                    icon: Icon(icon),
+                    label: Text(label))
+                : FilledButton.icon(
+                    onPressed: _busy ? null : onTap,
+                    icon: Icon(icon),
+                    label: Text(_busy ? 'Saving…' : label)),
+          ),
+        );
+
+    if (widget.asSeller && o.isPaid) {
+      return button('Mark as dispatched', Icons.local_shipping_outlined,
+          () async {
+        if (!await _confirm(
+            'Mark as dispatched?',
+            'Only do this once the produce has left you and is on its way '
+                'to the buyer. They will be told.',
+            'Yes, dispatched')) {
+          return;
+        }
+        await _run(() => firestore.markOrderDispatched(o.reference),
+            'Marked as dispatched. The buyer has been told.');
+      });
+    }
+    if (!widget.asSeller && (o.isPaid || o.isDispatched)) {
+      return button('I received it', Icons.inventory_2_outlined, () async {
+        if (!await _confirm(
+            'Did you receive your order?',
+            'Only confirm once the produce is with you and you have checked '
+                'it. The seller will be told.',
+            'Yes, I received it')) {
+          return;
+        }
+        await _run(() => firestore.confirmOrderReceived(o.reference),
+            'Thanks! Delivery confirmed.');
+      });
+    }
+    if (!widget.asSeller && o.isReceived && o.rating == null) {
+      return button('Rate the seller', Icons.star_outline_rounded, () async {
+        final result = await showModalBottomSheet<(int, String)>(
+          context: context,
+          isScrollControlled: true,
+          useSafeArea: true,
+          builder: (_) => const _RateSheet(),
+        );
+        if (result == null) return;
+        await _run(() => firestore.rateOrder(o.reference, result.$1, result.$2),
+            'Thanks for rating the seller.');
+      }, outlined: true);
+    }
+    return const SizedBox.shrink();
+  }
+}
+
+class _RatingView extends StatelessWidget {
+  const _RatingView({required this.rating, this.review});
+
+  final int rating;
+  final String? review;
+
+  @override
+  Widget build(BuildContext context) {
+    final sub =
+        AppColors.subText(Theme.of(context).brightness == Brightness.dark);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            for (var i = 1; i <= 5; i++)
+              Icon(i <= rating ? Icons.star_rounded : Icons.star_border_rounded,
+                  size: 18, color: AppColors.golden),
+            const SizedBox(width: 6),
+            Text('Buyer rating', style: TextStyle(fontSize: 12, color: sub)),
+          ],
+        ),
+        if (review != null && review!.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text('"$review"',
+                style: const TextStyle(fontStyle: FontStyle.italic)),
+          ),
+      ],
+    );
+  }
+}
+
+/// 1-5 stars and an optional short comment. Returns (stars, comment).
+class _RateSheet extends StatefulWidget {
+  const _RateSheet();
+
+  @override
+  State<_RateSheet> createState() => _RateSheetState();
+}
+
+class _RateSheetState extends State<_RateSheet> {
+  int _stars = 0;
+  final _review = TextEditingController();
+
+  @override
+  void dispose() {
+    _review.dispose();
+    super.dispose();
+  }
+
+  static const _labels = ['', 'Poor', 'Not great', 'OK', 'Good', 'Excellent'];
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+          24, 20, 24, 24 + MediaQuery.viewInsetsOf(context).bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('How was this seller?',
+              style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 4),
+          const Text('Your rating helps other buyers. You can rate once.'),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              for (var i = 1; i <= 5; i++)
+                IconButton(
+                  iconSize: 40,
+                  tooltip: '$i star${i == 1 ? '' : 's'}',
+                  onPressed: () => setState(() => _stars = i),
+                  icon: Icon(
+                    i <= _stars
+                        ? Icons.star_rounded
+                        : Icons.star_border_rounded,
+                    color: AppColors.golden,
+                  ),
+                ),
+            ],
+          ),
+          Center(child: Text(_labels[_stars])),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _review,
+            maxLength: 500,
+            maxLines: 3,
+            minLines: 2,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: const InputDecoration(
+              labelText: 'Comment (optional)',
+              hintText: 'Quality, freshness, delivery…',
+            ),
+          ),
+          const SizedBox(height: 8),
+          FilledButton(
+            onPressed: _stars == 0
+                ? null
+                : () => Navigator.pop(context, (_stars, _review.text)),
+            child: const Text('Submit rating'),
+          ),
+        ],
+      ),
     );
   }
 }

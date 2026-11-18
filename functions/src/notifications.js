@@ -90,6 +90,50 @@ function orderNotifications(order) {
 }
 
 /**
+ * Notifications for delivery-tracking changes on an order:
+ * dispatched → tell the buyer; received → tell the seller; rated → tell
+ * the seller. Returns [] for any other update.
+ */
+function orderStatusNotifications(before, after) {
+  if (!before || !after) return [];
+  const what = after.description || 'your order';
+  const base = {
+    type: 'order',
+    route: '/orders',
+    tag: `order_${after.reference || ''}`,
+    saveToInbox: true,
+  };
+  const out = [];
+  if (before.status !== 'dispatched' && after.status === 'dispatched' && after.buyerId) {
+    out.push({
+      ...base,
+      recipientId: after.buyerId,
+      title: 'Your order is on the way',
+      body: `The seller has dispatched ${what}. Tap "I received it" when it arrives.`,
+    });
+  }
+  if (before.status !== 'received' && after.status === 'received' && after.sellerId) {
+    out.push({
+      ...base,
+      recipientId: after.sellerId,
+      title: 'Delivery confirmed',
+      body: `The buyer received ${what}.`,
+    });
+  }
+  if (!before.rating && Number.isInteger(after.rating) && after.sellerId) {
+    const stars = '★'.repeat(after.rating) + '☆'.repeat(5 - after.rating);
+    const review = String(after.review || '').trim();
+    out.push({
+      ...base,
+      recipientId: after.sellerId,
+      title: `New rating: ${stars}`,
+      body: review ? `"${review.slice(0, 120)}"` : `For ${what}.`,
+    });
+  }
+  return out;
+}
+
+/**
  * Delivers one notification.
  *
  * deps:
@@ -148,6 +192,7 @@ module.exports = {
   preview,
   messageNotification,
   orderNotifications,
+  orderStatusNotifications,
   deliver,
   DEAD_TOKEN_CODES,
 };

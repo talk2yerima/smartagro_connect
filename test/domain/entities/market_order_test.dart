@@ -22,7 +22,7 @@ void main() {
   });
 
   test('orders from before payouts have no seller share', () {
-    final o = MarketOrder.fromMap('SA-2', {
+    final o = MarketOrder.fromMap('SA-2', const {
       'amountKobo': 100,
       'buyerId': 'b1',
       'sellerId': 's1',
@@ -31,5 +31,23 @@ void main() {
     expect(o.reference, 'SA-2');
     expect(o.status, 'paid');
     expect(o.description, 'Order');
+  });
+
+  test('reads delivery tracking and the buyer rating', () {
+    final o = MarketOrder.fromMap('SA-3', {
+      'amountKobo': 100,
+      'buyerId': 'b1',
+      'sellerId': 's1',
+      'status': 'received',
+      'dispatchedAt': DateTime(2026, 11, 18, 9),
+      'receivedAt': DateTime(2026, 11, 19, 15),
+      'rating': 4,
+      'review': 'Fresh and on time',
+    });
+    expect(o.isReceived, isTrue);
+    expect(o.isPaid, isFalse);
+    expect(o.receivedAt, DateTime(2026, 11, 19, 15));
+    expect(o.rating, 4);
+    expect(o.review, 'Fresh and on time');
   });
 }

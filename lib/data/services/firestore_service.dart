@@ -239,10 +239,47 @@ class FirestoreService {
         .snapshots()
         .map((snap) => snap.docs.map((doc) {
               final data = doc.data();
-              final ts = data['createdAt'];
-              if (ts is Timestamp) data['createdAt'] = ts.toDate();
+              for (final key in ['createdAt', 'dispatchedAt', 'receivedAt']) {
+                final ts = data[key];
+                if (ts is Timestamp) data[key] = ts.toDate();
+              }
               return MarketOrder.fromMap(doc.id, data);
             }).toList());
+  }
+
+  // Delivery tracking. firestore.rules allows exactly these updates, each
+  // only for the right person and in order.
+
+  /// Seller: the produce is on its way.
+  Future<void> markOrderDispatched(String reference) => _awaitWrite(
+        _db.collection('orders').doc(reference).update({
+          'status': 'dispatched',
+          'dispatchedAt': FieldValue.serverTimestamp(),
+        }),
+        'markOrderDispatched',
+      );
+
+  /// Buyer: the produce arrived.
+  Future<void> confirmOrderReceived(String reference) => _awaitWrite(
+        _db.collection('orders').doc(reference).update({
+          'status': 'received',
+          'receivedAt': FieldValue.serverTimestamp(),
+        }),
+        'confirmOrderReceived',
+      );
+
+  /// Buyer: one 1-5 rating of the seller, with an optional short review.
+  Future<void> rateOrder(String reference, int rating, String review) {
+    final text = review.trim();
+    return _awaitWrite(
+      _db.collection('orders').doc(reference).update({
+        'rating': rating,
+        if (text.isNotEmpty)
+          'review': text.length > 500 ? text.substring(0, 500) : text,
+        'ratedAt': FieldValue.serverTimestamp(),
+      }),
+      'rateOrder',
+    );
   }
 
   /// Name and phone of the other person on an order, for contacting them.
