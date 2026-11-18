@@ -125,6 +125,10 @@ class PaymentsApi {
   }
 
   static String _messageFrom(DioException e) {
+    // The payments backend hasn't been deployed (no such function yet).
+    if (e.response?.statusCode == 404) {
+      return "Payments aren't switched on yet. Please try again later.";
+    }
     final body = e.response?.data;
     if (body is Map && body['error'] is Map) {
       final message = (body['error'] as Map)['message'];

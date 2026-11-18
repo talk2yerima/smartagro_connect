@@ -67,7 +67,12 @@ final chatRepositoryProvider = Provider<ChatRepository>((ref) {
 
 final commoditiesProvider = StreamProvider<List<Commodity>>((ref) {
   final firestore = ref.watch(firestoreServiceProvider);
+  // Re-subscribe whenever the signed-in person changes. Signing out cuts
+  // the listener (PERMISSION_DENIED) and it never came back after the next
+  // sign-in, leaving prices empty until the app was restarted.
+  final uid = ref.watch(authSessionProvider.select((u) => u?.id));
   if (firestore.isAvailable) {
+    if (uid == null) return Stream.value(const <Commodity>[]);
     return firestore.commoditiesStream().map((items) => items
         .map((m) => Commodity(
               id: (m['id'] as String?) ?? '',
@@ -85,12 +90,17 @@ final commoditiesProvider = StreamProvider<List<Commodity>>((ref) {
 });
 
 final productsProvider = FutureProvider((ref) {
+  // Reload for each signed-in person (see commoditiesProvider).
+  ref.watch(authSessionProvider.select((u) => u?.id));
   return ref.watch(productRepositoryProvider).fetchProducts();
 });
 
 final buyersNearbyProvider = FutureProvider<List<NearbyBuyer>>((ref) async {
   final firestore = ref.watch(firestoreServiceProvider);
+  // Reload for each signed-in person (see commoditiesProvider).
+  final uid = ref.watch(authSessionProvider.select((u) => u?.id));
   if (firestore.isAvailable) {
+    if (uid == null) return const <NearbyBuyer>[];
     final maps = await firestore.fetchBuyers();
     if (maps.isNotEmpty) {
       return maps
