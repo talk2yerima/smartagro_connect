@@ -43,7 +43,10 @@ class ProductRepository {
     }
     // Demo mode: keep it on this phone.
     await _db.upsertProducts([
-      {...data, 'id': data['id'] ?? 'demo-${DateTime.now().millisecondsSinceEpoch}'}
+      {
+        ...data,
+        'id': data['id'] ?? 'demo-${DateTime.now().millisecondsSinceEpoch}'
+      }
     ]);
   }
 
