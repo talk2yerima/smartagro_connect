@@ -8,6 +8,7 @@ import '../../core/di/auth_providers.dart';
 import '../../core/errors/failures.dart';
 import '../../core/errors/friendly_error.dart';
 import '../../domain/entities/app_user.dart';
+import '../../shared/widgets/farmland_illustration.dart';
 import '../../shared/widgets/gradient_button.dart';
 
 /// Full-screen sign-in: a brand header that runs under the status bar and a
@@ -179,7 +180,6 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.fromLTRB(24, topPadding + 28, 24, 52),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           colors: [AppColors.deepGreen, AppColors.emerald],
@@ -187,52 +187,61 @@ class _Header extends StatelessWidget {
           end: Alignment.bottomRight,
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      // Drawn farm landscape behind the text (no image file needed).
+      child: Stack(
         children: [
-          Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
+          const Positioned.fill(child: FarmlandIllustration()),
+          Padding(
+            padding: EdgeInsets.fromLTRB(24, topPadding + 28, 24, 92),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.eco_rounded,
+                          color: AppColors.deepGreen, size: 26),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'SmartAgro Connect',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 17,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
                 ),
-                child: const Icon(Icons.eco_rounded,
-                    color: AppColors.deepGreen, size: 26),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'SmartAgro Connect',
-                style: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontWeight: FontWeight.w700,
-                  fontSize: 17,
-                  color: Colors.white,
+                const SizedBox(height: 28),
+                const Text(
+                  'Welcome back',
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 30,
+                    height: 1.15,
+                    color: Colors.white,
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 28),
-          const Text(
-            'Welcome back',
-            style: TextStyle(
-              fontFamily: 'Poppins',
-              fontWeight: FontWeight.w700,
-              fontSize: 30,
-              height: 1.15,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Sign in to sell, buy and move produce.',
-            style: TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 15,
-              height: 1.4,
-              color: Colors.white.withValues(alpha: 0.85),
+                const SizedBox(height: 6),
+                Text(
+                  'Sign in to sell, buy and move produce.',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 15,
+                    height: 1.4,
+                    color: Colors.white.withValues(alpha: 0.85),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
