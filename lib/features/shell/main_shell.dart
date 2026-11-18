@@ -15,6 +15,7 @@ import '../../core/di/payment_providers.dart';
 import '../../core/di/repositories_provider.dart';
 import '../../core/services/push_messaging_service.dart';
 import '../../domain/entities/app_user.dart';
+import '../delivery/driver_tracker.dart';
 
 // ---------------------------------------------------------------------------
 // MainShell
@@ -138,6 +139,9 @@ class _MainShellState extends ConsumerState<MainShell>
   @override
   Widget build(BuildContext context) {
     final role = ref.watch(authSessionProvider)?.role ?? UserRole.farmer;
+    // Transporters: keep sharing location on a delivery under way, across
+    // every screen (starts and stops by itself).
+    if (role == UserRole.transporter) ref.watch(driverTrackerProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final destinations = _buildDestinations(role, isDark);
 
@@ -216,9 +220,9 @@ class _MainShellState extends ConsumerState<MainShell>
   _NavDestination _tab1Destination(UserRole role) {
     return switch (role) {
       UserRole.transporter => const _NavDestination(
-          label: 'Routes',
-          icon: Icons.map_outlined,
-          activeIcon: Icons.map_rounded,
+          label: 'Jobs',
+          icon: Icons.local_shipping_outlined,
+          activeIcon: Icons.local_shipping_rounded,
         ),
       UserRole.admin => const _NavDestination(
           label: 'Listings',

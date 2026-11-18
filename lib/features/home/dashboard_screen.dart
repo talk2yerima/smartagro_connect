@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/di/auth_providers.dart';
+import '../../core/di/haulage_providers.dart';
 import '../../core/di/payment_providers.dart';
 import '../../core/di/repositories_provider.dart';
 import '../../core/utils/money_format.dart';
@@ -195,12 +196,12 @@ class DashboardScreen extends ConsumerWidget {
                     // [7] TRANSPORTER WORKSPACE
                     SectionHeader(
                       title: 'Dispatch Center',
-                      actionLabel: 'Routes',
-                      onAction: () => context.push('/map'),
+                      actionLabel: 'Jobs',
+                      onAction: () => context.go('/main/market'),
                       icon: Icons.local_shipping_outlined,
                     ),
                     _TransporterWorkspace(
-                      onMap: () => context.push('/map'),
+                      onMap: () => context.go('/main/market'),
                       onMessages: () => context.push('/main/messages'),
                     )
                         .animate()
@@ -443,7 +444,7 @@ class _HeroBanner extends StatelessWidget {
                   onPressed: () => switch (role) {
                     UserRole.farmer => context.push('/marketplace/add'),
                     UserRole.buyer => context.push('/marketplace'),
-                    UserRole.transporter => context.push('/map'),
+                    UserRole.transporter => context.go('/main/market'),
                     UserRole.admin => context.push('/admin'),
                   },
                   icon: Icon(
@@ -1130,21 +1131,14 @@ class _TransporterWorkspace extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final productsAsync = ref.watch(productsProvider);
-    final buyersAsync = ref.watch(buyersNearbyProvider);
-
-    final openRequests = productsAsync.maybeWhen(
-      data: (list) => list.length,
-      orElse: () => null,
-    );
-    final routeInfo = buyersAsync.maybeWhen(
-      data: (buyers) {
-        final states = buyers.map((b) => b.state).toSet();
-        final preview = states.take(3).join(' · ');
-        return (count: states.length, preview: preview);
-      },
-      orElse: () => null,
-    );
+    final openJobs = ref.watch(openHaulageJobsProvider).valueOrNull;
+    final myJobs = ref.watch(myHaulageJobsProvider).valueOrNull;
+    final myId = ref.watch(authSessionProvider.select((u) => u?.id));
+    final openCount =
+        openJobs?.where((j) => j.buyerId != myId && j.sellerId != myId).length;
+    final active = myJobs?.where((j) => j.isActive).toList();
+    final delivered = myJobs?.where((j) => j.isDelivered).toList();
+    final earned = delivered?.fold<int>(0, (s, j) => s + j.offerNgn);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1164,9 +1158,9 @@ class _TransporterWorkspace extends ConsumerWidget {
           const SizedBox(height: 14),
           _DispatchRow(
             icon: Icons.local_shipping_outlined,
-            title: 'Open haulage requests',
-            value: openRequests != null ? '$openRequests' : '—',
-            status: 'Ready for assignment',
+            title: 'Open jobs',
+            value: openCount != null ? '$openCount' : '—',
+            status: 'Waiting for a transporter',
             color: AppColors.deepGreen,
           ),
           const Padding(
@@ -1174,10 +1168,12 @@ class _TransporterWorkspace extends ConsumerWidget {
             child: Divider(height: 1),
           ),
           _DispatchRow(
-            icon: Icons.route_outlined,
-            title: 'Buyer coverage zones',
-            value: routeInfo != null ? '${routeInfo.count}' : '—',
-            status: routeInfo?.preview ?? 'Loading…',
+            icon: Icons.sensors_rounded,
+            title: 'Under way',
+            value: active != null ? '${active.length}' : '—',
+            status: active == null || active.isEmpty
+                ? 'No delivery in progress'
+                : active.first.statusLabel,
             color: AppColors.infoBlue,
           ),
           const Padding(
@@ -1185,11 +1181,12 @@ class _TransporterWorkspace extends ConsumerWidget {
             child: Divider(height: 1),
           ),
           _DispatchRow(
-            icon: Icons.people_outline_rounded,
-            title: 'Active buyers on platform',
-            value: buyersAsync.maybeWhen(
-                data: (b) => '${b.length}', orElse: () => '—'),
-            status: 'Potential haulage clients',
+            icon: Icons.task_alt_rounded,
+            title: 'Delivered',
+            value: delivered != null ? '${delivered.length}' : '—',
+            status: earned == null || earned == 0
+                ? 'Completed deliveries'
+                : '${formatNgn(earned)} agreed in total',
             color: AppColors.golden,
           ),
           const SizedBox(height: 16),
@@ -1204,9 +1201,9 @@ class _TransporterWorkspace extends ConsumerWidget {
                     ),
                   ),
                   onPressed: onMap,
-                  icon: const Icon(Icons.map_outlined, size: 18),
+                  icon: const Icon(Icons.local_shipping_outlined, size: 18),
                   label: const Text(
-                    'Open Routes',
+                    'Find Jobs',
                     style: TextStyle(
                       fontFamily: 'Poppins',
                       fontWeight: FontWeight.w600,
@@ -1421,9 +1418,9 @@ class _QuickActions extends StatelessWidget {
         ],
       UserRole.transporter => [
           FilledButton.tonalIcon(
-            onPressed: () => context.push('/map'),
-            icon: const Icon(Icons.route_outlined, size: 16),
-            label: const Text('Route Map',
+            onPressed: () => context.go('/main/market'),
+            icon: const Icon(Icons.local_shipping_outlined, size: 16),
+            label: const Text('Jobs',
                 style: TextStyle(
                     fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
           ),

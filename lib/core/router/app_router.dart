@@ -14,6 +14,9 @@ import '../../features/auth/phone_sign_in_screen.dart';
 import '../../features/auth/register_screen.dart';
 import '../../features/chat/chat_list_screen.dart';
 import '../../features/chat/chat_room_screen.dart';
+import '../../features/delivery/delivery_screen.dart';
+import '../../features/delivery/jobs_screen.dart';
+import '../../features/delivery/request_transport_screen.dart';
 import '../../features/home/dashboard_screen.dart';
 import '../../features/map/map_screen.dart';
 import '../../features/market/commodity_detail_screen.dart';
@@ -80,6 +83,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           loc.startsWith('/search') ||
           loc.startsWith('/notifications') ||
           loc.startsWith('/map') ||
+          loc.startsWith('/jobs') ||
+          loc.startsWith('/delivery') ||
           loc.startsWith('/settings') ||
           loc.startsWith('/seller') ||
           loc.startsWith('/orders') ||
@@ -119,9 +124,17 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           user.role != UserRole.admin) {
         return '/main/home';
       }
+      // Transporters' second tab is the job board, not the produce market.
       if (user.role == UserRole.transporter &&
-          (loc.startsWith('/marketplace') || loc.startsWith('/main/market'))) {
-        return '/map';
+          (loc.startsWith('/marketplace') || loc.startsWith('/main/market/'))) {
+        return '/main/market';
+      }
+      // "/jobs" (used by notifications) is the second tab.
+      if (loc == '/jobs') return '/main/market';
+      // Only buyers and sellers ask for transport.
+      if (loc.startsWith('/delivery-request') &&
+          user.role == UserRole.transporter) {
+        return '/main/home';
       }
 
       return null;
@@ -168,7 +181,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/main/market',
-                builder: (context, state) => const CommodityMarketScreen(),
+                builder: (context, state) => const _MarketOrJobs(),
                 routes: [
                   GoRoute(
                     path: 'trends',
@@ -245,6 +258,22 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const MapScreen(),
       ),
       GoRoute(
+        path: '/jobs',
+        redirect: (context, state) => '/main/market',
+      ),
+      GoRoute(
+        path: '/delivery/:id',
+        builder: (context, state) =>
+            DeliveryScreen(jobId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/delivery-request',
+        redirect: (context, state) =>
+            state.extra is RequestTransportArgs ? null : '/orders',
+        builder: (context, state) =>
+            RequestTransportScreen(args: state.extra! as RequestTransportArgs),
+      ),
+      GoRoute(
         path: '/settings',
         builder: (context, state) => const SettingsScreen(),
       ),
@@ -312,4 +341,18 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 
 extension SmartAgroRouting on BuildContext {
   void goHome() => go('/main/home');
+}
+
+/// The second tab: the produce market for farmers and buyers, the job
+/// board for transporters.
+class _MarketOrJobs extends ConsumerWidget {
+  const _MarketOrJobs();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final role = ref.watch(authSessionProvider.select((u) => u?.role));
+    return role == UserRole.transporter
+        ? const JobsScreen()
+        : const CommodityMarketScreen();
+  }
 }

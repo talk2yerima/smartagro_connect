@@ -7,13 +7,17 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/di/auth_providers.dart';
 import '../../core/di/firestore_providers.dart';
+import '../../core/di/haulage_providers.dart';
 import '../../core/di/payment_providers.dart';
 import '../../core/errors/friendly_error.dart';
 import '../../core/utils/money_format.dart';
 import '../../data/repositories/transaction_ref_queue.dart';
 import '../../domain/entities/app_user.dart';
+import '../../domain/entities/haulage_job.dart';
 import '../../domain/entities/market_order.dart';
 import '../../shared/widgets/empty_state.dart';
+import '../delivery/delivery_widgets.dart';
+import '../delivery/request_transport_screen.dart';
 
 /// Orders, from the database (`orders/{ref}`, written by the payments
 /// backend once Paystack confirms a payment).
@@ -221,13 +225,14 @@ class _OrderCard extends ConsumerWidget {
     final fmt = DateFormat('d MMM, h:mm a');
     final nextStep = switch ((asSeller, order.status)) {
       (true, 'paid') =>
-        'Paid. Contact the buyer, then tap "Mark as dispatched".',
+        'Paid. Arrange delivery with the buyer or request transport.',
       (true, 'dispatched') => 'Dispatched '
           '${order.dispatchedAt == null ? '' : fmt.format(order.dispatchedAt!)}'
           '. Waiting for the buyer to confirm.',
       (true, 'received') => 'Delivered '
           '${order.receivedAt == null ? '' : fmt.format(order.receivedAt!)}.',
-      (false, 'paid') => 'Paid. The seller will contact you about delivery.',
+      (false, 'paid') =>
+        'Paid. Agree delivery with the seller, or request transport.',
       (false, 'dispatched') => 'On the way since '
           '${order.dispatchedAt == null ? '' : fmt.format(order.dispatchedAt!)}'
           '. Tap "I received it" when it arrives.',
@@ -279,6 +284,7 @@ class _OrderCard extends ConsumerWidget {
                       style: TextStyle(fontSize: 13, color: sub))),
             ],
           ),
+          _DeliveryPanel(order: order),
           if (order.shortfallKg > 0) ...[
             const SizedBox(height: 10),
             Container(
@@ -336,6 +342,94 @@ class _OrderCard extends ConsumerWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Transport for this order: ask for a transporter, or follow the one on
+/// the way (live on a map).
+class _DeliveryPanel extends ConsumerWidget {
+  const _DeliveryPanel({required this.order});
+
+  final MarketOrder order;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final job = ref.watch(haulageJobProvider(order.reference)).valueOrNull;
+    final canRequest = order.isPaid || order.isDispatched;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    void request([HaulageJob? previous]) => context.push('/delivery-request',
+        extra: RequestTransportArgs(order: order, previous: previous));
+
+    if (job == null || job.isCancelled) {
+      if (!canRequest) return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: SizedBox(
+          width: double.infinity,
+          height: 44,
+          child: OutlinedButton.icon(
+            icon: const Icon(Icons.local_shipping_outlined),
+            label: Text(job == null
+                ? 'Request transport'
+                : 'Transport cancelled · request again'),
+            onPressed: () => request(job),
+          ),
+        ),
+      );
+    }
+
+    final truck = job.driverLocation;
+    final live = job.isActive &&
+        truck != null &&
+        DateTime.now().difference(truck.updatedAt).inMinutes < 5;
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Material(
+        color: AppColors.infoBlue.withValues(alpha: isDark ? 0.18 : 0.08),
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => context.push('/delivery/${job.id}'),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Icon(
+                    live ? Icons.sensors_rounded : Icons.local_shipping_rounded,
+                    color: AppColors.infoBlue),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(job.statusLabel,
+                          style: const TextStyle(fontWeight: FontWeight.w700)),
+                      Text(
+                        [
+                          if (job.transporterName != null) job.transporterName!,
+                          '${placeText(job.pickup)} → ${placeText(job.dropoff)}',
+                        ].join(' · '),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(job.isActive ? 'Track' : 'View',
+                    style: const TextStyle(
+                        color: AppColors.infoBlue,
+                        fontWeight: FontWeight.w700)),
+                const Icon(Icons.chevron_right_rounded,
+                    color: AppColors.infoBlue),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

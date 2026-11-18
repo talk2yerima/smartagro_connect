@@ -162,6 +162,149 @@ service cloud.firestore {
       }
     }
 
+    // ── Deliveries (haulage jobs) ──────────────────────────────────────────
+    // One job per order, stored under the order's reference. The buyer or
+    // seller posts it; any transporter can see open jobs and accept one;
+    // only the accepted transporter moves it along and shares their live
+    // location, which only the buyer, the seller and admins can see.
+    function validPlace(p) {
+      return p is map && p.keys().hasOnly(['label', 'state', 'lat', 'lng']) &&
+             p.label is string && p.label.size() > 0 && p.label.size() <= 200 &&
+             p.get('state', '') is string && p.get('state', '').size() <= 60 &&
+             p.lat is number && p.lat >= -90 && p.lat <= 90 &&
+             p.lng is number && p.lng >= -180 && p.lng <= 180;
+    }
+
+    function validJob(d) {
+      return d.keys().hasOnly(['orderId', 'description', 'weightKg', 'requesterId',
+                               'sellerId', 'buyerId', 'pickup', 'dropoff',
+                               'distanceKm', 'offerNgn', 'notes', 'status',
+                               'createdAt']) &&
+             d.description is string && d.description.size() <= 200 &&
+             d.weightKg is int && d.weightKg > 0 && d.weightKg <= 100000 &&
+             d.offerNgn is int && d.offerNgn >= 0 && d.offerNgn <= 100000000 &&
+             d.distanceKm is number && d.distanceKm >= 0 && d.distanceKm <= 5000 &&
+             (!('notes' in d) || (d.notes is string && d.notes.size() <= 500)) &&
+             validPlace(d.pickup) && validPlace(d.dropoff) &&
+             d.status == 'open' &&
+             d.requesterId == request.auth.uid &&
+             d.createdAt == request.time;
+    }
+
+    function validDriverLocation(l) {
+      return l is map && l.keys().hasOnly(['lat', 'lng', 'speedKmh', 'updatedAt']) &&
+             l.lat is number && l.lat >= -90 && l.lat <= 90 &&
+             l.lng is number && l.lng >= -180 && l.lng <= 180 &&
+             (!('speedKmh' in l) || l.speedKmh is number) &&
+             l.updatedAt == request.time;
+    }
+
+    match /haulageJobs/{orderId} {
+      function isJobParty() {
+        return request.auth.uid in [resource.data.buyerId, resource.data.sellerId];
+      }
+      function isJobTransporter() {
+        return resource.data.get('transporterId', null) == request.auth.uid;
+      }
+
+      // A missing job reads as "no delivery yet" for the order screen.
+      allow read: if isSignedIn() &&
+                     (resource == null || isJobParty() || isJobTransporter() ||
+                      (resource.data.status == 'open' && userRole() == 'transporter') ||
+                      isAdmin());
+
+      // The buyer or seller of a paid order asks for transport.
+      allow create: if isSignedIn() && postsForOwnOrder();
+
+      allow update: if isSignedIn() &&
+                       (transporterAccepts() || transporterPicksUp() ||
+                        transporterDelivers() || transporterSharesLocation() ||
+                        transporterHandsBack() || partyCancels() || partyReposts());
+      allow delete: if false;
+
+      function postsForOwnOrder() {
+        let order = get(/databases/$(database)/documents/orders/$(orderId)).data;
+        let d = request.resource.data;
+        return order.status in ['paid', 'dispatched'] &&
+               request.auth.uid in [order.buyerId, order.sellerId] &&
+               d.orderId == orderId &&
+               d.buyerId == order.buyerId && d.sellerId == order.sellerId &&
+               validJob(d);
+      }
+
+      function transporterAccepts() {
+        return resource.data.status == 'open' &&
+               userRole() == 'transporter' &&
+               !isJobParty() &&
+               request.resource.data.status == 'accepted' &&
+               request.resource.data.transporterId == request.auth.uid &&
+               request.resource.data.transporterName is string &&
+               request.resource.data.transporterName.size() <= 100 &&
+               request.resource.data.acceptedAt == request.time &&
+               changedKeys().hasOnly(['status', 'transporterId', 'transporterName', 'acceptedAt']);
+      }
+
+      function transporterPicksUp() {
+        return isJobTransporter() &&
+               resource.data.status == 'accepted' &&
+               request.resource.data.status == 'picked_up' &&
+               request.resource.data.pickedUpAt == request.time &&
+               changedKeys().hasOnly(['status', 'pickedUpAt', 'driverLocation']) &&
+               (!('driverLocation' in changedKeys()) ||
+                validDriverLocation(request.resource.data.driverLocation));
+      }
+
+      function transporterDelivers() {
+        return isJobTransporter() &&
+               resource.data.status == 'picked_up' &&
+               request.resource.data.status == 'delivered' &&
+               request.resource.data.deliveredAt == request.time &&
+               changedKeys().hasOnly(['status', 'deliveredAt', 'driverLocation']) &&
+               (!('driverLocation' in changedKeys()) ||
+                validDriverLocation(request.resource.data.driverLocation));
+      }
+
+      function transporterSharesLocation() {
+        return isJobTransporter() &&
+               resource.data.status in ['accepted', 'picked_up'] &&
+               changedKeys().hasOnly(['driverLocation']) &&
+               validDriverLocation(request.resource.data.driverLocation);
+      }
+
+      // Before pickup, the transporter can give the job back to the board.
+      function transporterHandsBack() {
+        return isJobTransporter() &&
+               resource.data.status == 'accepted' &&
+               request.resource.data.status == 'open' &&
+               !('transporterId' in request.resource.data) &&
+               !('transporterName' in request.resource.data) &&
+               !('acceptedAt' in request.resource.data) &&
+               !('driverLocation' in request.resource.data) &&
+               changedKeys().hasOnly(['status', 'transporterId', 'transporterName',
+                                      'acceptedAt', 'driverLocation']);
+      }
+
+      // Buyer or seller calls it off before the produce is collected.
+      function partyCancels() {
+        return isJobParty() &&
+               resource.data.status in ['open', 'accepted'] &&
+               request.resource.data.status == 'cancelled' &&
+               request.resource.data.cancelledAt == request.time &&
+               changedKeys().hasOnly(['status', 'cancelledAt']);
+      }
+
+      // ...and may post it again later, as a fresh open job.
+      function partyReposts() {
+        let d = request.resource.data;
+        return isJobParty() &&
+               resource.data.status == 'cancelled' &&
+               d.orderId == resource.data.orderId &&
+               d.buyerId == resource.data.buyerId &&
+               d.sellerId == resource.data.sellerId &&
+               validJob(d);
+      }
+    }
+
     // ── Chat threads ───────────────────────────────────────────────────────
     match /chats/{threadId} {
       // Read/update: must be an existing participant

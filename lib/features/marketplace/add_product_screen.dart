@@ -4,17 +4,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/nigerian_states.dart';
 import '../../core/di/auth_providers.dart';
+import '../../core/di/haulage_providers.dart';
 import '../../core/di/repositories_provider.dart';
 import '../../core/di/upload_providers.dart';
 import '../../core/services/app_lock.dart';
 import '../../core/utils/money_format.dart';
+import '../../data/services/location_service.dart';
 import '../../shared/widgets/gradient_button.dart';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -218,33 +219,28 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
 
   Future<void> _useGps() async {
     setState(() => _locating = true);
+    final location = ref.read(locationServiceProvider);
     try {
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        _showSnack('Location services are disabled.');
+      final here = await location.current(
+          beforeSystemPrompt: () =>
+              ref.read(appLockProvider.notifier).allowNextReturn());
+      final place = await location.describe(here);
+      if (!mounted) return;
+      if (place == null) {
+        _showSnack('Found you, but not the place name. Choose the state and '
+            'type the town.');
         return;
       }
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        ref.read(appLockProvider.notifier).allowNextReturn();
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          _showSnack('Location permission denied.');
-          return;
-        }
-      }
-      if (permission == LocationPermission.deniedForever) {
-        _showSnack(
-            'Location permission permanently denied. Enable in settings.');
-        return;
-      }
-      await Geolocator.getCurrentPosition(
-        locationSettings:
-            const LocationSettings(accuracy: LocationAccuracy.medium),
-      );
-      // In production: reverse-geocode to fill state/city fields.
-      _showSnack('GPS location detected. Fill city manually for accuracy.',
+      setState(() {
+        if (place.state.isNotEmpty) _selectedState = place.state;
+        // The town: the last part of "Street, Area, Town".
+        final town = place.label.split(', ').last.trim();
+        if (town.isNotEmpty) _cityCtrl.text = town;
+      });
+      _showSnack('Location filled in. Check it before you post.',
           success: true);
+    } on LocationProblem catch (p) {
+      _showSnack(p.message);
     } catch (e) {
       _showSnack('Could not get location. Try again.');
     } finally {
@@ -816,6 +812,8 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
     final fillColor = isDark ? AppColors.darkBg : AppColors.surfaceLight;
 
     return DropdownButtonFormField<String>(
+      // Re-created when "Use GPS" fills in the state.
+      key: ValueKey(_selectedState),
       initialValue: _selectedState,
       hint: Text(
         'Select state',

@@ -279,3 +279,114 @@ test('price alerts must be sensible and cannot be edited from the app', async ()
   await assertSucceeds(setDoc(doc(as('bob'), 'priceAlerts/b6'), goodAlert('bob')));
   await assertFails(updateDoc(doc(as('bob'), 'priceAlerts/b6'), { targetNgn: 1 }));
 });
+
+// ── Deliveries (haulage jobs) ─────────────────────────────────────────────
+
+const { deleteField } = require('firebase/firestore');
+
+const place = (label, lat, lng) => ({ label, state: 'Yobe', lat, lng });
+const newJob = (requesterId, extra = {}) => ({
+  orderId: 'd1', description: '50 kg of Maize', weightKg: 50,
+  requesterId, sellerId: 'alice', buyerId: 'bob',
+  pickup: place('Gashua market', 12.87, 11.04),
+  dropoff: place('Potiskum', 11.71, 11.08),
+  distanceKm: 168.5, offerNgn: 20000, notes: 'Call on arrival',
+  status: 'open', createdAt: serverTimestamp(), ...extra,
+});
+const accept = (uid) => ({
+  status: 'accepted', transporterId: uid, transporterName: 'Tunde', acceptedAt: serverTimestamp(),
+});
+const here = (lat = 12.5, lng = 11.0) => ({ lat, lng, speedKmh: 40, updatedAt: serverTimestamp() });
+
+async function seedDrivers() {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'users/tunde'), { name: 'Tunde', role: 'transporter' });
+    await setDoc(doc(ctx.firestore(), 'users/tola'), { name: 'Tola', role: 'transporter' });
+  });
+}
+
+async function seedJob(extra = {}) {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'haulageJobs/d1'), {
+      ...newJob('alice'), createdAt: new Date(), ...extra,
+    });
+  });
+}
+
+test('the buyer or seller of a paid order can ask for transport', async () => {
+  await seedOrder();
+  await assertSucceeds(setDoc(doc(as('bob'), 'haulageJobs/d1'), newJob('bob')));
+  await env.clearFirestore();
+  await seedOrder();
+  await assertSucceeds(setDoc(doc(as('alice'), 'haulageJobs/d1'), newJob('alice')));
+});
+
+test('strangers, bad numbers and unpaid orders cannot post a job', async () => {
+  await seedOrder();
+  await assertFails(setDoc(doc(as('vera'), 'haulageJobs/d1'), newJob('vera')));
+  await assertFails(setDoc(doc(as('bob'), 'haulageJobs/d1'), newJob('bob', { buyerId: 'vera' })));
+  await assertFails(setDoc(doc(as('bob'), 'haulageJobs/d1'), newJob('bob', { weightKg: 0 })));
+  await assertFails(setDoc(doc(as('bob'), 'haulageJobs/d1'), newJob('bob', { status: 'accepted' })));
+  await assertFails(setDoc(doc(as('bob'), 'haulageJobs/d1'), newJob('bob', { transporterId: 'bob' })));
+  await assertFails(setDoc(doc(as('bob'), 'haulageJobs/d1'), newJob('bob', { pickup: place('X', 200, 0) })));
+  await seedOrder({ status: 'received' });
+  await assertFails(setDoc(doc(as('bob'), 'haulageJobs/d1'), newJob('bob')));
+});
+
+test('transporters see open jobs; others do not', async () => {
+  await seedDrivers();
+  await seedJob();
+  const openJobs = (db) =>
+    getDocs(query(collection(db, 'haulageJobs'), where('status', '==', 'open'), orderBy('createdAt', 'desc')));
+  await assertSucceeds(openJobs(as('tunde')));
+  await assertFails(openJobs(as('vera')));
+  await assertSucceeds(getDoc(doc(as('bob'), 'haulageJobs/d1')));
+  await assertSucceeds(getDoc(doc(as('bob'), 'haulageJobs/none')));
+  await assertFails(getDoc(doc(as('vera'), 'haulageJobs/d1')));
+});
+
+test('a transporter accepts an open job; only one gets it', async () => {
+  await seedDrivers();
+  await seedJob();
+  await assertFails(updateDoc(doc(as('vera'), 'haulageJobs/d1'), accept('vera')));
+  await assertFails(updateDoc(doc(as('tola'), 'haulageJobs/d1'), accept('tunde')));
+  await assertSucceeds(updateDoc(doc(as('tunde'), 'haulageJobs/d1'), accept('tunde')));
+  await assertFails(updateDoc(doc(as('tola'), 'haulageJobs/d1'), accept('tola')));
+  // Once taken, the job leaves other transporters' view.
+  await assertFails(getDoc(doc(as('tola'), 'haulageJobs/d1')));
+  await assertSucceeds(getDocs(query(collection(as('tunde'), 'haulageJobs'), where('transporterId', '==', 'tunde'))));
+});
+
+test('only the assigned transporter shares location and moves the job on, in order', async () => {
+  await seedDrivers();
+  await seedJob({ status: 'accepted', transporterId: 'tunde', transporterName: 'Tunde', acceptedAt: new Date() });
+  const ref = (uid) => doc(as(uid), 'haulageJobs/d1');
+  await assertFails(updateDoc(ref('tola'), { driverLocation: here() }));
+  await assertFails(updateDoc(ref('bob'), { driverLocation: here() }));
+  await assertSucceeds(updateDoc(ref('tunde'), { driverLocation: here() }));
+  await assertFails(updateDoc(ref('tunde'), { driverLocation: { lat: 1, lng: 2, updatedAt: new Date(2000, 1, 1) } }));
+  await assertFails(updateDoc(ref('tunde'), { status: 'delivered', deliveredAt: serverTimestamp() }));
+  await assertFails(updateDoc(ref('tunde'), { status: 'picked_up', pickedUpAt: serverTimestamp(), offerNgn: 90000 }));
+  await assertSucceeds(updateDoc(ref('tunde'), { status: 'picked_up', pickedUpAt: serverTimestamp(), driverLocation: here() }));
+  await assertSucceeds(updateDoc(ref('tunde'), { status: 'delivered', deliveredAt: serverTimestamp() }));
+  await assertFails(updateDoc(ref('tunde'), { driverLocation: here() }));
+  await assertSucceeds(getDoc(ref('bob')));
+  await assertFails(getDoc(ref('tola')));
+});
+
+test('a transporter can hand a job back before pickup; parties can cancel and repost', async () => {
+  await seedDrivers();
+  await seedJob({ status: 'accepted', transporterId: 'tunde', transporterName: 'Tunde', acceptedAt: new Date() });
+  const handBack = {
+    status: 'open', transporterId: deleteField(), transporterName: deleteField(),
+    acceptedAt: deleteField(), driverLocation: deleteField(),
+  };
+  await assertFails(updateDoc(doc(as('tunde'), 'haulageJobs/d1'), { status: 'open' }));
+  await assertSucceeds(updateDoc(doc(as('tunde'), 'haulageJobs/d1'), handBack));
+  const cancel = { status: 'cancelled', cancelledAt: serverTimestamp() };
+  await assertFails(updateDoc(doc(as('vera'), 'haulageJobs/d1'), cancel));
+  await assertSucceeds(updateDoc(doc(as('bob'), 'haulageJobs/d1'), cancel));
+  await assertSucceeds(setDoc(doc(as('bob'), 'haulageJobs/d1'), newJob('bob', { offerNgn: 25000 })));
+  await assertFails(setDoc(doc(as('vera'), 'haulageJobs/d1'), newJob('vera')));
+  await assertFails(deleteDoc(doc(as('bob'), 'haulageJobs/d1')));
+});

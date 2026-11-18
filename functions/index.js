@@ -12,7 +12,7 @@
  */
 
 const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https');
-const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore');
+const { onDocumentCreated, onDocumentUpdated, onDocumentWritten } = require('firebase-functions/v2/firestore');
 const { defineSecret, defineInt } = require('firebase-functions/params');
 const logger = require('firebase-functions/logger');
 const { initializeApp } = require('firebase-admin/app');
@@ -24,6 +24,7 @@ const notifications = require('./src/notifications');
 const payouts = require('./src/payouts');
 const ratings = require('./src/ratings');
 const priceAlerts = require('./src/priceAlerts');
+const haulage = require('./src/haulage');
 
 initializeApp();
 
@@ -293,5 +294,48 @@ exports.onCommodityPriceChanged = onDocumentUpdated(
       });
     }
     await batch.commit();
+  },
+);
+
+// ── Deliveries (haulage jobs) ───────────────────────────────────────────────
+
+/**
+ * A delivery was posted or moved on (haulageJobs/{orderReference}): tell the
+ * buyer, seller and transporter what changed; alert nearby transporters to
+ * a newly posted job; and mark the order dispatched once the produce is
+ * collected. Live location updates change nothing here.
+ */
+exports.onHaulageJobWritten = onDocumentWritten(
+  { document: 'haulageJobs/{jobId}', region: REGION },
+  async (event) => {
+    const before = event.data && event.data.before.exists ? event.data.before.data() : null;
+    const after = event.data && event.data.after.exists ? event.data.after.data() : null;
+    if (!after) return;
+    const jobId = event.params.jobId;
+    const deps = notificationDeps();
+
+    for (const note of haulage.jobNotifications(jobId, before, after)) {
+      await notifications.deliver(note, deps);
+    }
+
+    const db = getFirestore();
+    const posted = after.status === 'open' &&
+      (!before || before.status === 'cancelled' || before.status === 'accepted');
+    if (posted) {
+      const snap = await db.collection('users')
+        .where('role', '==', 'transporter').limit(500).get();
+      const transporters = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      for (const t of haulage.transportersToAlert(after, transporters)) {
+        await notifications.deliver(haulage.newJobAlert(jobId, after, t.id), deps);
+      }
+    }
+
+    if (after.status === 'picked_up') {
+      const orderRef = db.collection('orders').doc(jobId);
+      const order = await orderRef.get();
+      if (haulage.shouldMarkOrderDispatched(before, after, order.exists ? order.data() : null)) {
+        await orderRef.update({ status: 'dispatched', dispatchedAt: FieldValue.serverTimestamp() });
+      }
+    }
   },
 );

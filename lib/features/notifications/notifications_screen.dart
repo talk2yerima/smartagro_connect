@@ -25,6 +25,8 @@ const Map<String, _TypeConfig> _typeConfigs = {
       _TypeConfig(icon: Icons.person_add_outlined, color: AppColors.infoBlue),
   'order':
       _TypeConfig(icon: Icons.inventory_2_outlined, color: AppColors.deepGreen),
+  'delivery': _TypeConfig(
+      icon: Icons.local_shipping_outlined, color: AppColors.infoBlue),
   'message': _TypeConfig(
       icon: Icons.chat_bubble_outline_rounded, color: AppColors.infoBlue),
   'system': _TypeConfig(icon: Icons.info_outline, color: AppColors.gray),

@@ -8,6 +8,7 @@ import '../../core/utils/app_logger.dart';
 import '../../domain/entities/app_notification.dart';
 import '../../domain/entities/app_user.dart';
 import '../../domain/entities/chat_models.dart';
+import '../../domain/entities/haulage_job.dart';
 import '../../domain/entities/market_order.dart';
 import '../../domain/entities/price_alert.dart';
 
@@ -298,6 +299,186 @@ class FirestoreService {
       return (name: 'Unknown', phone: null);
     }
   }
+
+  // ── Deliveries (haulage jobs) ──────────────────────────────────────────────
+  //
+  // haulageJobs/{orderReference}: one delivery per order. firestore.rules
+  // allows exactly these writes, each only for the right person, in order.
+
+  static const _jobDates = [
+    'createdAt',
+    'acceptedAt',
+    'pickedUpAt',
+    'deliveredAt',
+    'cancelledAt',
+  ];
+
+  static HaulageJob _jobFromDoc(String id, Map<String, dynamic> data) {
+    for (final key in _jobDates) {
+      final ts = data[key];
+      if (ts is Timestamp) data[key] = ts.toDate();
+    }
+    final loc = data['driverLocation'];
+    if (loc is Map && loc['updatedAt'] is Timestamp) {
+      data['driverLocation'] = {
+        ...loc,
+        'updatedAt': (loc['updatedAt'] as Timestamp).toDate(),
+      };
+    }
+    return HaulageJob.fromMap(id, data);
+  }
+
+  /// The delivery for an order, live (null when none was requested yet).
+  Stream<HaulageJob?> haulageJobStream(String orderReference) {
+    if (!isAvailable || orderReference.isEmpty) return Stream.value(null);
+    return _db
+        .collection('haulageJobs')
+        .doc(orderReference)
+        .snapshots()
+        .map((s) => s.exists ? _jobFromDoc(s.id, s.data()!) : null);
+  }
+
+  /// Jobs waiting for a transporter, newest first (transporters only).
+  Stream<List<HaulageJob>> openHaulageJobsStream() {
+    if (!isAvailable) return Stream.value(const []);
+    return _db
+        .collection('haulageJobs')
+        .where('status', isEqualTo: 'open')
+        .orderBy('createdAt', descending: true)
+        .limit(100)
+        .snapshots()
+        .map((snap) =>
+            snap.docs.map((d) => _jobFromDoc(d.id, d.data())).toList());
+  }
+
+  /// Jobs this transporter accepted, most recent first.
+  Stream<List<HaulageJob>> myHaulageJobsStream(String uid) {
+    if (!isAvailable) return Stream.value(const []);
+    return _db
+        .collection('haulageJobs')
+        .where('transporterId', isEqualTo: uid)
+        .orderBy('acceptedAt', descending: true)
+        .limit(50)
+        .snapshots()
+        .map((snap) =>
+            snap.docs.map((d) => _jobFromDoc(d.id, d.data())).toList());
+  }
+
+  /// Buyer or seller: ask for transport (or post again after a cancel).
+  Future<void> postHaulageJob({
+    required String orderReference,
+    required String requesterId,
+    required String sellerId,
+    required String buyerId,
+    required String description,
+    required int weightKg,
+    required Map<String, dynamic> pickup,
+    required Map<String, dynamic> dropoff,
+    required double distanceKm,
+    required int offerNgn,
+    String notes = '',
+  }) {
+    final text = notes.trim();
+    return _awaitWrite(
+      _db.collection('haulageJobs').doc(orderReference).set({
+        'orderId': orderReference,
+        'description': description.length > 200
+            ? description.substring(0, 200)
+            : description,
+        'weightKg': weightKg,
+        'requesterId': requesterId,
+        'sellerId': sellerId,
+        'buyerId': buyerId,
+        'pickup': pickup,
+        'dropoff': dropoff,
+        'distanceKm': double.parse(distanceKm.toStringAsFixed(1)),
+        'offerNgn': offerNgn,
+        if (text.isNotEmpty)
+          'notes': text.length > 500 ? text.substring(0, 500) : text,
+        'status': 'open',
+        'createdAt': FieldValue.serverTimestamp(),
+      }),
+      'postHaulageJob',
+    );
+  }
+
+  /// Transporter: take an open job. Waits for the server, because two
+  /// transporters may tap Accept at once and only the first one wins (the
+  /// rules reject the second).
+  Future<void> acceptHaulageJob(String id, String uid, String name) async {
+    await _db.collection('haulageJobs').doc(id).update({
+      'status': 'accepted',
+      'transporterId': uid,
+      'transporterName': name.length > 100 ? name.substring(0, 100) : name,
+      'acceptedAt': FieldValue.serverTimestamp(),
+    }).timeout(const Duration(seconds: 15));
+  }
+
+  static Map<String, dynamic> _location(
+          double lat, double lng, double? speedKmh) =>
+      {
+        'lat': lat,
+        'lng': lng,
+        if (speedKmh != null)
+          'speedKmh': double.parse(speedKmh.toStringAsFixed(1)),
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+  /// Transporter: where the truck is now (while the job is active).
+  Future<void> shareDriverLocation(
+          String id, double lat, double lng, double? speedKmh) =>
+      _awaitWrite(
+        _db
+            .collection('haulageJobs')
+            .doc(id)
+            .update({'driverLocation': _location(lat, lng, speedKmh)}),
+        'shareDriverLocation',
+      );
+
+  /// Transporter: collected from the seller.
+  Future<void> markJobPickedUp(String id, {double? lat, double? lng}) =>
+      _awaitWrite(
+        _db.collection('haulageJobs').doc(id).update({
+          'status': 'picked_up',
+          'pickedUpAt': FieldValue.serverTimestamp(),
+          if (lat != null && lng != null)
+            'driverLocation': _location(lat, lng, null),
+        }),
+        'markJobPickedUp',
+      );
+
+  /// Transporter: handed over to the buyer.
+  Future<void> markJobDelivered(String id, {double? lat, double? lng}) =>
+      _awaitWrite(
+        _db.collection('haulageJobs').doc(id).update({
+          'status': 'delivered',
+          'deliveredAt': FieldValue.serverTimestamp(),
+          if (lat != null && lng != null)
+            'driverLocation': _location(lat, lng, null),
+        }),
+        'markJobDelivered',
+      );
+
+  /// Transporter: give an accepted job back to the board before pickup.
+  Future<void> handBackHaulageJob(String id) => _awaitWrite(
+        _db.collection('haulageJobs').doc(id).update({
+          'status': 'open',
+          'transporterId': FieldValue.delete(),
+          'transporterName': FieldValue.delete(),
+          'acceptedAt': FieldValue.delete(),
+          'driverLocation': FieldValue.delete(),
+        }),
+        'handBackHaulageJob',
+      );
+
+  /// Buyer or seller: call it off before pickup.
+  Future<void> cancelHaulageJob(String id) => _awaitWrite(
+        _db.collection('haulageJobs').doc(id).update({
+          'status': 'cancelled',
+          'cancelledAt': FieldValue.serverTimestamp(),
+        }),
+        'cancelHaulageJob',
+      );
 
   // ── Price alerts ───────────────────────────────────────────────────────────
 
