@@ -58,7 +58,8 @@ class SellerProfileScreen extends ConsumerWidget {
               expandedHeight: 300,
               backgroundColor: AppColors.deepGreen,
               foregroundColor: Colors.white,
-              title: Text(profile.name),
+              iconTheme: const IconThemeData(color: Colors.white),
+              actionsIconTheme: const IconThemeData(color: Colors.white),
               actions: [
                 if (isMe)
                   IconButton(
@@ -78,9 +79,45 @@ class SellerProfileScreen extends ConsumerWidget {
                         .toggle(sellerId),
                   ),
               ],
-              flexibleSpace: FlexibleSpaceBar(
-                collapseMode: CollapseMode.pin,
-                background: _Header(profile: profile),
+              // The name is already in the header; show it in the bar only
+              // once the header has scrolled away.
+              flexibleSpace: LayoutBuilder(
+                builder: (context, c) {
+                  final top = MediaQuery.paddingOf(context).top;
+                  final collapsed =
+                      c.maxHeight <= top + kToolbarHeight + 48 + 12;
+                  return Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      FlexibleSpaceBar(
+                        collapseMode: CollapseMode.pin,
+                        background: _Header(profile: profile),
+                      ),
+                      Positioned(
+                        top: top,
+                        left: 56,
+                        right: 56,
+                        height: kToolbarHeight,
+                        child: AnimatedOpacity(
+                          opacity: collapsed ? 1 : 0,
+                          duration: const Duration(milliseconds: 150),
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              profile.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
               bottom: PreferredSize(
                 preferredSize: const Size.fromHeight(48),

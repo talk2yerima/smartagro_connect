@@ -327,7 +327,8 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
         'city': _cityCtrl.text.trim(),
         'sellerId': session?.id ?? 'unknown',
         'sellerName': session?.name ?? 'Farmer',
-        'sellerRating': session?.rating ?? 5.0,
+        // The seller's real average; 0 (shown as "New") until rated.
+        'sellerRating': session?.rating ?? 0.0,
         'verified': session?.verified ?? false,
         'availability': switch (_availability) {
           _Availability.limited => 'limited',
