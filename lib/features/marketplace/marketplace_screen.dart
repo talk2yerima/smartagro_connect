@@ -88,7 +88,10 @@ enum _SortOption {
 // ─── Main screen ─────────────────────────────────────────────────────────────
 
 class MarketplaceScreen extends ConsumerStatefulWidget {
-  const MarketplaceScreen({super.key});
+  const MarketplaceScreen({super.key, this.initialState});
+
+  /// Open already filtered to this state (from Explore by state).
+  final String? initialState;
 
   @override
   ConsumerState<MarketplaceScreen> createState() => _MarketplaceScreenState();
@@ -109,6 +112,9 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialState != null && widget.initialState!.isNotEmpty) {
+      _filter = ListingFilter(state: widget.initialState);
+    }
     _loadPrefs();
     // Distances need the person's position; never ask just for browsing.
     ref.read(locationServiceProvider).currentIfAllowed().then((p) {

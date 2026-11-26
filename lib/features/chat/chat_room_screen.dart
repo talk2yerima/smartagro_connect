@@ -9,12 +9,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/di/auth_providers.dart';
 import '../../core/di/firestore_providers.dart';
+import '../../core/di/payment_providers.dart';
 import '../../core/di/repositories_provider.dart';
 import '../../core/errors/friendly_error.dart';
 import '../../core/services/app_lock.dart';
@@ -174,6 +176,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
       ),
       body: Column(
         children: [
+          if (peerId != null) _OngoingOrderBanner(peerId: peerId),
           // ── Message list ──────────────────────────────────────────
           Expanded(
             child: messagesAsync.when(
@@ -1130,6 +1133,60 @@ class _InputBarState extends ConsumerState<_InputBar> {
                     ),
                   ],
                 ),
+        ),
+      ),
+    );
+  }
+}
+
+/// "You have an ongoing order with them": shown at the top of a chat when
+/// this person and the other one have a paid order not yet received.
+class _OngoingOrderBanner extends ConsumerWidget {
+  const _OngoingOrderBanner({required this.peerId});
+
+  final String peerId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bought = ref.watch(boughtOrdersProvider).valueOrNull ?? const [];
+    final sold = ref.watch(soldOrdersProvider).valueOrNull ?? const [];
+    final open = [
+      ...bought.where((o) => o.sellerId == peerId),
+      ...sold.where((o) => o.buyerId == peerId),
+    ].where((o) => o.isPaid || o.isDispatched).toList();
+    if (open.isEmpty) return const SizedBox.shrink();
+    final o = open.first;
+    final status = o.isDispatched ? 'on the way' : 'paid';
+    return Material(
+      color: AppColors.golden.withValues(alpha: 0.18),
+      child: InkWell(
+        onTap: () => context.go('/main/orders'),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            children: [
+              const Icon(Icons.receipt_long_rounded,
+                  size: 20, color: AppColors.warningOrange),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  open.length == 1
+                      ? 'Ongoing order: ${o.description} ($status)'
+                      : '${open.length} ongoing orders with this person',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+              ),
+              const Text('View',
+                  style: TextStyle(
+                      color: AppColors.warningOrange,
+                      fontWeight: FontWeight.w700)),
+              const Icon(Icons.chevron_right_rounded,
+                  color: AppColors.warningOrange),
+            ],
+          ),
         ),
       ),
     );

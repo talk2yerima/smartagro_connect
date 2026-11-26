@@ -23,6 +23,7 @@ import '../../shared/widgets/skeleton_list.dart';
 import '../../shared/widgets/sparkline_chart.dart';
 import '../../shared/widgets/stat_card.dart';
 import '../../shared/widgets/status_badge.dart';
+import 'farmers_for_you.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Card decoration helper (spec-compliant, defined locally per file)
@@ -179,6 +180,9 @@ class DashboardScreen extends ConsumerWidget {
 
                   const SizedBox(height: 16),
 
+                  // Buyers: farmers picked for them, and ones they viewed.
+                  if (role == UserRole.buyer) const FarmersForYou(),
+
                   // [3] KPI GRID: farmer/buyer numbers. Transporters get
                   // their own dispatch figures below instead.
                   if (role != UserRole.transporter) ...[
@@ -245,7 +249,7 @@ class DashboardScreen extends ConsumerWidget {
                     SectionHeader(
                       title: 'Market Watch',
                       actionLabel: 'See all',
-                      onAction: () => context.push('/main/market'),
+                      onAction: () => context.push('/main/market/prices'),
                       icon: Icons.show_chart_rounded,
                     ),
                     commodities.when(
@@ -487,7 +491,7 @@ class _HeroBanner extends StatelessWidget {
                   onPressed: () => switch (role) {
                     UserRole.farmer ||
                     UserRole.admin =>
-                      context.push('/main/market'),
+                      context.push('/main/market/prices'),
                     UserRole.buyer => context.push('/map'),
                     UserRole.transporter => context.push('/main/messages'),
                   },
@@ -1386,7 +1390,7 @@ class _QuickActions extends StatelessWidget {
                     fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
           ),
           FilledButton.tonalIcon(
-            onPressed: () => context.push('/main/market'),
+            onPressed: () => context.push('/main/market/prices'),
             icon: const Icon(Icons.show_chart_rounded, size: 16),
             label: const Text('Prices',
                 style: TextStyle(
@@ -1410,7 +1414,7 @@ class _QuickActions extends StatelessWidget {
                     fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
           ),
           FilledButton.tonalIcon(
-            onPressed: () => context.push('/main/market'),
+            onPressed: () => context.push('/main/market/prices'),
             icon: const Icon(Icons.show_chart_rounded, size: 16),
             label: const Text('Market',
                 style: TextStyle(
@@ -1458,7 +1462,7 @@ class _QuickActions extends StatelessWidget {
                     fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
           ),
           FilledButton.tonalIcon(
-            onPressed: () => context.push('/main/market'),
+            onPressed: () => context.push('/main/market/prices'),
             icon: const Icon(Icons.show_chart_rounded, size: 16),
             label: const Text('Market',
                 style: TextStyle(

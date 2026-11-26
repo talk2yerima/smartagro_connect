@@ -12,6 +12,7 @@ class ChatThread extends Equatable {
     required this.updatedAt,
     required this.unread,
     this.peerLastReadAt,
+    this.archived = false,
   });
 
   final String id;
@@ -25,6 +26,9 @@ class ChatThread extends Equatable {
   /// When the peer last marked this thread as read.
   /// Used to show ✓✓ (blue) on sent messages the peer has seen.
   final DateTime? peerLastReadAt;
+
+  /// Moved to "Archived" by this person (a new message brings it back).
+  final bool archived;
 
   @override
   List<Object?> get props => [id];

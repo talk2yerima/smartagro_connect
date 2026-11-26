@@ -10,9 +10,11 @@ import '../../core/di/repositories_provider.dart';
 import '../../core/utils/money_format.dart';
 import '../../domain/entities/farm_profile.dart';
 import '../../domain/entities/product_listing.dart';
+import '../../domain/farmer_directory.dart';
 import '../../shared/widgets/app_avatar.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/produce_image.dart';
+import '../orders/orders_screen.dart' show ReviewTagChips;
 
 /// A farmer's public page: cover photo, About (story, what they grow,
 /// opening hours, farm photos), Products, and Reviews with the star
@@ -38,6 +40,11 @@ class SellerProfileScreen extends ConsumerWidget {
         );
     final myId = ref.watch(authSessionProvider.select((u) => u?.id));
     final isMe = myId == sellerId;
+    if (!isMe) {
+      // For "Recently viewed farmers" on Home.
+      Future.microtask(
+          () => ref.read(recentFarmersProvider.notifier).viewed(sellerId));
+    }
     final saved = ref.watch(favouriteFarmersProvider).contains(sellerId);
 
     return DefaultTabController(
@@ -445,7 +452,7 @@ class _ProductsTab extends StatelessWidget {
                 scrollDirection: Axis.horizontal,
                 itemCount: similar.length,
                 separatorBuilder: (_, __) => const SizedBox(width: 10),
-                itemBuilder: (_, i) => _FarmerCard(farmer: similar[i]),
+                itemBuilder: (_, i) => FarmerCard(farmer: similar[i]),
               ),
             ),
           ),
@@ -456,66 +463,8 @@ class _ProductsTab extends StatelessWidget {
   }
 }
 
-/// Another farmer for "Similar farmers near you".
-typedef FarmerSummary = ({
-  String id,
-  String name,
-  double rating,
-  bool verified,
-  String imageUrl,
-  String place,
-  int products,
-});
-
-/// Other sellers in the same state(s) as [sellerId], those selling the
-/// same kind of produce first, then the best rated.
-List<FarmerSummary> similarFarmers(String sellerId, List<ProductListing> all,
-    {int max = 8}) {
-  final mine = all.where((p) => p.sellerId == sellerId).toList();
-  if (mine.isEmpty) return const [];
-  final states = {for (final p in mine) p.state};
-  final words = {
-    for (final p in mine) ...p.title.toLowerCase().split(RegExp(r'\s+'))
-  }..removeWhere((w) => w.length < 4);
-  final bySeller = <String, List<ProductListing>>{};
-  for (final p in all) {
-    if (p.sellerId == sellerId || p.sellerId.isEmpty) continue;
-    if (!states.contains(p.state)) continue;
-    bySeller.putIfAbsent(p.sellerId, () => []).add(p);
-  }
-  int overlap(List<ProductListing> ps) => ps
-      .where((p) =>
-          p.title.toLowerCase().split(RegExp(r'\s+')).any(words.contains))
-      .length;
-  final ids = bySeller.keys.toList()
-    ..sort((a, b) {
-      final o = overlap(bySeller[b]!).compareTo(overlap(bySeller[a]!));
-      if (o != 0) return o;
-      return bySeller[b]!
-          .first
-          .sellerRating
-          .compareTo(bySeller[a]!.first.sellerRating);
-    });
-  return [
-    for (final id in ids.take(max))
-      (
-        id: id,
-        name: bySeller[id]!.first.sellerName,
-        rating: bySeller[id]!.first.sellerRating,
-        verified: bySeller[id]!.any((p) => p.verified),
-        imageUrl: bySeller[id]!
-            .map((p) => p.imageUrl)
-            .firstWhere((u) => u.isNotEmpty, orElse: () => ''),
-        place: bySeller[id]!.first.city.isEmpty
-            ? bySeller[id]!.first.state
-            : '${bySeller[id]!.first.city}, ${bySeller[id]!.first.state}',
-        products: bySeller[id]!.length,
-      ),
-  ];
-}
-
-class _FarmerCard extends StatelessWidget {
-  const _FarmerCard({required this.farmer});
+class FarmerCard extends StatelessWidget {
+  const FarmerCard({super.key, required this.farmer});
 
   final FarmerSummary farmer;
 
@@ -588,13 +537,24 @@ class _FarmerCard extends StatelessWidget {
 
 /// A product in a grid: photo with price over it.
 class ProductTile extends StatelessWidget {
-  const ProductTile({super.key, required this.product});
+  const ProductTile({super.key, required this.product, this.bestPrice = false});
 
   final ProductListing product;
+
+  /// Cheapest of its kind on sale now: shows a "Best price" badge.
+  final bool bestPrice;
 
   @override
   Widget build(BuildContext context) {
     final soldOut = product.availability == ProductAvailability.soldOut;
+    final preOrder = product.availability == ProductAvailability.preOrder;
+    final (badge, badgeColor) = soldOut
+        ? ('Sold out', AppColors.errorRed)
+        : bestPrice
+            ? ('Best price', AppColors.warningOrange)
+            : preOrder
+                ? ('Pre-order', AppColors.infoBlue)
+                : (null, AppColors.gray);
     return GestureDetector(
       onTap: () => context.push('/marketplace/product/${product.id}'),
       child: ClipRRect(
@@ -620,7 +580,7 @@ class ProductTile extends StatelessWidget {
                 ),
               ),
             ),
-            if (soldOut)
+            if (badge != null)
               Positioned(
                 top: 8,
                 left: 8,
@@ -628,10 +588,10 @@ class ProductTile extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                      color: AppColors.errorRed,
+                      color: badgeColor,
                       borderRadius: BorderRadius.circular(8)),
-                  child: const Text('Sold out',
-                      style: TextStyle(
+                  child: Text(badge,
+                      style: const TextStyle(
                           color: Colors.white,
                           fontSize: 11,
                           fontWeight: FontWeight.w700)),
@@ -764,6 +724,17 @@ class _ReviewsTab extends ConsumerWidget {
                   ),
                 ]
               : [
+                  if (topReviewTags(list).isNotEmpty) ...[
+                    Text('Buyers say', style: _sectionStyle(context)),
+                    const SizedBox(height: 8),
+                    ReviewTagChips(
+                      tags: [for (final t in topReviewTags(list)) t.tag],
+                      counts: {
+                        for (final t in topReviewTags(list)) t.tag: t.count
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                   for (final r in list) ...[
                     _ReviewTile(review: r),
                     const Divider(height: 24),
@@ -826,6 +797,10 @@ class _ReviewTile extends StatelessWidget {
         if ((review.review ?? '').isNotEmpty) ...[
           const SizedBox(height: 8),
           Text(review.review!),
+        ],
+        if (review.tags.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          ReviewTagChips(tags: review.tags),
         ],
         if (review.product.isNotEmpty) ...[
           const SizedBox(height: 4),

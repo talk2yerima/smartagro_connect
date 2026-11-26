@@ -211,6 +211,17 @@ class FirestoreService {
             }).toList());
   }
 
+  /// Moves a chat to (or out of) this person's "Archived" list.
+  Future<void> setThreadArchived(String threadId, String uid, bool archived) =>
+      _awaitWrite(
+        _db.collection('chats').doc(threadId).update({
+          'archivedBy': archived
+              ? FieldValue.arrayUnion([uid])
+              : FieldValue.arrayRemove([uid]),
+        }),
+        'setThreadArchived',
+      );
+
   /// Returns the stored role, or `null` if the document does not exist.
   /// Throws on Firestore errors so the caller can distinguish "not found"
   /// from "read failed" and avoid overwriting valid data.
@@ -329,13 +340,16 @@ class FirestoreService {
       );
 
   /// Buyer: one 1-5 rating of the seller, with an optional short review.
-  Future<void> rateOrder(String reference, int rating, String review) {
+  Future<void> rateOrder(String reference, int rating, String review,
+      {List<String> tags = const []}) {
     final text = review.trim();
+    final chosen = reviewTagOptions.where(tags.contains).take(6).toList();
     return _awaitWrite(
       _db.collection('orders').doc(reference).update({
         'rating': rating,
         if (text.isNotEmpty)
           'review': text.length > 500 ? text.substring(0, 500) : text,
+        if (chosen.isNotEmpty) 'reviewTags': chosen,
         'ratedAt': FieldValue.serverTimestamp(),
       }),
       'rateOrder',
@@ -726,6 +740,7 @@ class FirestoreService {
                     DateTime.now(),
                 unread: (unread[uid] as num?)?.toInt() ?? 0,
                 peerLastReadAt: peerLastReadAt,
+                archived: (data['archivedBy'] as List?)?.contains(uid) ?? false,
               );
             }).toList());
   }
@@ -822,6 +837,8 @@ class FirestoreService {
                     ? '📷 Image'
                     : text,
             'updatedAt': FieldValue.serverTimestamp(),
+            // A new message brings the chat back out of "Archived".
+            'archivedBy': <String>[],
             // set() treats a dotted key like 'unreadCounts.uid' as a literal
             // field name, so the counts must be a nested map (merged deeply).
             'unreadCounts': {

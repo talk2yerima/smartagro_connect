@@ -37,9 +37,15 @@ function averageAfter({ ratingSum = 0, ratingCount = 0, ratingCounts = {} }, rat
  * The public review shown on the farmer's profile (reviews/{orderRef}).
  * Only the buyer's first name is shown; never their contact details.
  */
+/** Quick tags a buyer may add (same list as the app and the rules). */
+const REVIEW_TAGS = ['Fresh produce', 'Well packed', 'Fast delivery', 'As described', 'Fair price', 'Friendly seller', 'Late delivery', 'Poor quality', 'Short weight'];
+
 function reviewDoc(orderRef, order, buyerName) {
   const first = String(buyerName || '').trim().split(/\s+/)[0] || 'Buyer';
   const text = String(order.review || '').trim().slice(0, 500);
+  const tags = Array.isArray(order.reviewTags)
+    ? REVIEW_TAGS.filter((t) => order.reviewTags.includes(t)).slice(0, 6)
+    : [];
   return {
     orderRef,
     sellerId: order.sellerId,
@@ -47,6 +53,7 @@ function reviewDoc(orderRef, order, buyerName) {
     buyerName: first.slice(0, 40),
     rating: order.rating,
     ...(text ? { review: text } : {}),
+    ...(tags.length ? { tags } : {}),
     product: String(order.description || '').slice(0, 120),
   };
 }
@@ -73,4 +80,4 @@ async function applyRating({ db, sellerId, rating, review, now }) {
   });
 }
 
-module.exports = { newRating, averageAfter, reviewDoc, applyRating };
+module.exports = { newRating, averageAfter, reviewDoc, applyRating, REVIEW_TAGS };

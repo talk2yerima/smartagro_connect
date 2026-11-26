@@ -258,9 +258,9 @@ class _MainShellState extends ConsumerState<MainShell>
         ),
       _ => const _NavDestination(
           branch: 1,
-          label: 'Market',
-          icon: Icons.candlestick_chart_outlined,
-          activeIcon: Icons.candlestick_chart_rounded,
+          label: 'Explore',
+          icon: Icons.explore_outlined,
+          activeIcon: Icons.explore_rounded,
         ),
     };
   }

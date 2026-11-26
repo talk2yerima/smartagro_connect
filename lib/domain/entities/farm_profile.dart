@@ -104,6 +104,23 @@ const farmCategoryOptions = [
   'Oilseeds',
 ];
 
+/// Quick tags a buyer can add to a rating (the same list is enforced by
+/// firestore.rules and the ratings backend).
+const reviewTagOptions = [
+  'Fresh produce',
+  'Well packed',
+  'Fast delivery',
+  'As described',
+  'Fair price',
+  'Friendly seller',
+  'Late delivery',
+  'Poor quality',
+  'Short weight',
+];
+
+/// Tags that count against a seller (shown in a different colour).
+const negativeReviewTags = {'Late delivery', 'Poor quality', 'Short weight'};
+
 /// Most gallery photos a farm profile keeps.
 const maxGalleryPhotos = 6;
 
@@ -116,6 +133,7 @@ class SellerReview {
     required this.createdAt,
     this.review,
     this.product = '',
+    this.tags = const [],
   });
 
   factory SellerReview.fromMap(String id, Map<String, dynamic> m) =>
@@ -125,6 +143,12 @@ class SellerReview {
         buyerName: (m['buyerName'] as String?) ?? 'Buyer',
         review: m['review'] as String?,
         product: (m['product'] as String?) ?? '',
+        tags: (m['tags'] is List)
+            ? (m['tags'] as List)
+                .whereType<String>()
+                .where(reviewTagOptions.contains)
+                .toList()
+            : const [],
         createdAt: m['createdAt'] is DateTime
             ? m['createdAt'] as DateTime
             : DateTime.now(),
@@ -136,4 +160,19 @@ class SellerReview {
   final String? review;
   final String product;
   final DateTime createdAt;
+  final List<String> tags;
+}
+
+/// The tags buyers chose most often, most first (for "Buyers say").
+List<({String tag, int count})> topReviewTags(List<SellerReview> reviews,
+    {int max = 4}) {
+  final counts = <String, int>{};
+  for (final r in reviews) {
+    for (final t in r.tags) {
+      counts[t] = (counts[t] ?? 0) + 1;
+    }
+  }
+  final list = [for (final e in counts.entries) (tag: e.key, count: e.value)]
+    ..sort((a, b) => b.count.compareTo(a.count));
+  return list.take(max).toList();
 }

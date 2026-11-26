@@ -18,6 +18,7 @@ class MarketOrder extends Equatable {
     this.receivedAt,
     this.rating,
     this.review,
+    this.reviewTags = const [],
     this.quantityKg,
     this.shortfallKg = 0,
   });
@@ -38,6 +39,9 @@ class MarketOrder extends Equatable {
       receivedAt: _date(m['receivedAt']),
       rating: (m['rating'] as num?)?.toInt(),
       review: m['review'] as String?,
+      reviewTags: (m['reviewTags'] is List)
+          ? (m['reviewTags'] as List).whereType<String>().toList()
+          : const [],
       quantityKg: (m['quantityKg'] as num?)?.toInt(),
       shortfallKg: (m['shortfallKg'] as num?)?.toInt() ?? 0,
     );
@@ -72,6 +76,9 @@ class MarketOrder extends Equatable {
   /// The buyer's 1-5 rating of the seller, once given.
   final int? rating;
   final String? review;
+
+  /// Quick tags the buyer added to their rating ("Fresh produce"…).
+  final List<String> reviewTags;
 
   /// How many kg were bought (null on orders from before partial buying).
   final int? quantityKg;

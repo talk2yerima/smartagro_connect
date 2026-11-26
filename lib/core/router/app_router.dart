@@ -17,6 +17,7 @@ import '../../features/chat/chat_room_screen.dart';
 import '../../features/delivery/delivery_screen.dart';
 import '../../features/delivery/jobs_screen.dart';
 import '../../features/delivery/request_transport_screen.dart';
+import '../../features/explore/explore_screen.dart';
 import '../../features/home/dashboard_screen.dart';
 import '../../features/map/map_screen.dart';
 import '../../features/market/commodity_detail_screen.dart';
@@ -185,6 +186,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
                 builder: (context, state) => const _MarketOrJobs(),
                 routes: [
                   GoRoute(
+                    path: 'prices',
+                    builder: (context, state) => const CommodityMarketScreen(),
+                  ),
+                  GoRoute(
                     path: 'trends',
                     builder: (context, state) => const MarketTrendsScreen(),
                   ),
@@ -239,7 +244,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/marketplace',
-        builder: (context, state) => const MarketplaceScreen(),
+        builder: (context, state) =>
+            MarketplaceScreen(initialState: state.uri.queryParameters['state']),
         routes: [
           GoRoute(
             path: 'product/:id',
@@ -361,16 +367,19 @@ extension SmartAgroRouting on BuildContext {
   void goHome() => go('/main/home');
 }
 
-/// The second tab: the produce market for farmers and buyers, the job
-/// board for transporters.
+/// The second tab: Explore for farmers and buyers (prices one tap away),
+/// the job board for transporters, the price editor for admins.
 class _MarketOrJobs extends ConsumerWidget {
   const _MarketOrJobs();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final role = ref.watch(authSessionProvider.select((u) => u?.role));
-    return role == UserRole.transporter
-        ? const JobsScreen()
-        : const CommodityMarketScreen();
+    return switch (role) {
+      UserRole.transporter => const JobsScreen(),
+      // Admins manage prices here.
+      UserRole.admin => const CommodityMarketScreen(),
+      _ => const ExploreScreen(),
+    };
   }
 }

@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/di/auth_providers.dart';
+import '../../core/di/firestore_providers.dart';
 import '../../core/di/repositories_provider.dart';
 import '../../core/errors/friendly_error.dart';
 import '../../domain/entities/chat_models.dart';
@@ -90,6 +92,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
   final _searchController = TextEditingController();
   String _query = '';
   String _activeFilter = 'All';
+  _Box _box = _Box.all;
 
   @override
   void dispose() {
@@ -98,7 +101,11 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
   }
 
   List<ChatThread> _applyFilters(List<ChatThread> threads) {
-    var result = threads;
+    var result = switch (_box) {
+      _Box.all => threads.where((t) => !t.archived).toList(),
+      _Box.unread => threads.where((t) => !t.archived && t.unread > 0).toList(),
+      _Box.archived => threads.where((t) => t.archived).toList(),
+    };
 
     // Apply search query
     if (_query.trim().isNotEmpty) {
@@ -158,11 +165,38 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
         error: (error, _) => _ErrorBody(error: friendlyError(error)),
         data: (threads) {
           final filtered = _applyFilters(threads);
+          final unreadCount =
+              threads.where((t) => !t.archived && t.unread > 0).length;
+          final archivedCount = threads.where((t) => t.archived).length;
           return RefreshIndicator(
             color: AppColors.deepGreen,
             onRefresh: () async => ref.invalidate(chatThreadsProvider),
             child: CustomScrollView(
               slivers: [
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                    child: SegmentedButton<_Box>(
+                      showSelectedIcon: false,
+                      segments: [
+                        const ButtonSegment(
+                            value: _Box.all, label: Text('All')),
+                        ButtonSegment(
+                            value: _Box.unread,
+                            label: Text(unreadCount == 0
+                                ? 'Unread'
+                                : 'Unread ($unreadCount)')),
+                        ButtonSegment(
+                            value: _Box.archived,
+                            label: Text(archivedCount == 0
+                                ? 'Archived'
+                                : 'Archived ($archivedCount)')),
+                      ],
+                      selected: {_box},
+                      onSelectionChanged: (s) => setState(() => _box = s.first),
+                    ),
+                  ),
+                ),
                 SliverToBoxAdapter(
                   child: _SearchAndFilterBar(
                     isDark: isDark,
@@ -174,24 +208,40 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                   ),
                 ),
                 if (filtered.isEmpty)
-                  const SliverFillRemaining(
+                  SliverFillRemaining(
                     hasScrollBody: false,
-                    child: EmptyState(
-                      type: EmptyStateType.chat,
-                      icon: Icons.chat_bubble_outline,
-                      title: 'No messages yet',
-                      subtitle: 'Start a conversation with buyers or sellers',
-                    ),
+                    child: switch (_box) {
+                      _Box.unread => const EmptyState(
+                          icon: Icons.mark_chat_read_outlined,
+                          title: 'All caught up',
+                          subtitle: 'You have read every message.',
+                        ),
+                      _Box.archived => const EmptyState(
+                          icon: Icons.archive_outlined,
+                          title: 'No archived chats',
+                          subtitle: 'Swipe a chat to the left to archive it.',
+                        ),
+                      _Box.all => const EmptyState(
+                          type: EmptyStateType.chat,
+                          icon: Icons.chat_bubble_outline,
+                          title: 'No messages yet',
+                          subtitle:
+                              'Start a conversation with buyers or sellers',
+                        ),
+                    },
                   )
                 else
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate(
-                        (context, i) => _ThreadTile(
+                        (context, i) => _Archivable(
                           thread: filtered[i],
-                          isDark: isDark,
-                          index: i,
+                          child: _ThreadTile(
+                            thread: filtered[i],
+                            isDark: isDark,
+                            index: i,
+                          ),
                         ),
                         childCount: filtered.length,
                       ),
@@ -202,6 +252,61 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
           );
         },
       ),
+    );
+  }
+}
+
+enum _Box { all, unread, archived }
+
+/// Swipe a chat left to archive it (or, under Archived, to bring it back).
+class _Archivable extends ConsumerWidget {
+  const _Archivable({required this.thread, required this.child});
+
+  final ChatThread thread;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final uid = ref.watch(authSessionProvider.select((u) => u?.id));
+    if (uid == null) return child;
+    final archive = !thread.archived;
+    return Dismissible(
+      key: ValueKey('chat-${thread.id}-${thread.archived}'),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 24),
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: archive ? AppColors.gray : AppColors.emerald,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(archive ? Icons.archive_outlined : Icons.unarchive_outlined,
+                color: Colors.white),
+            const SizedBox(width: 6),
+            Text(archive ? 'Archive' : 'Unarchive',
+                style: const TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.w600)),
+          ],
+        ),
+      ),
+      onDismissed: (_) {
+        final db = ref.read(firestoreServiceProvider);
+        db.setThreadArchived(thread.id, uid, archive);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(archive
+              ? 'Chat with ${thread.peerName} archived.'
+              : 'Chat with ${thread.peerName} moved back.'),
+          action: SnackBarAction(
+            label: 'Undo',
+            onPressed: () => db.setThreadArchived(thread.id, uid, !archive),
+          ),
+        ));
+      },
+      child: child,
     );
   }
 }

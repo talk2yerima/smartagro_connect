@@ -155,13 +155,18 @@ service cloud.firestore {
         return resource.data.buyerId == request.auth.uid &&
                resource.data.status == 'received' &&
                !('rating' in resource.data) &&
-               changedKeys().hasOnly(['rating', 'review', 'ratedAt']) &&
+               changedKeys().hasOnly(['rating', 'review', 'reviewTags', 'ratedAt']) &&
                request.resource.data.rating is int &&
                request.resource.data.rating >= 1 &&
                request.resource.data.rating <= 5 &&
                (!('review' in request.resource.data) ||
                 (request.resource.data.review is string &&
                  request.resource.data.review.size() <= 500)) &&
+               (!('reviewTags' in request.resource.data) ||
+                (request.resource.data.reviewTags is list &&
+                 request.resource.data.reviewTags.size() <= 6 &&
+                 request.resource.data.reviewTags.hasOnly([
+                   'Fresh produce', 'Well packed', 'Fast delivery', 'As described', 'Fair price', 'Friendly seller', 'Late delivery', 'Poor quality', 'Short weight']))) &&
                request.resource.data.ratedAt == request.time;
       }
     }

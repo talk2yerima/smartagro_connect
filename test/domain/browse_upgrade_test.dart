@@ -3,8 +3,8 @@ import 'package:smartagro_connect/core/utils/geo.dart';
 import 'package:smartagro_connect/data/mappers/market_mappers.dart';
 import 'package:smartagro_connect/domain/entities/farm_profile.dart';
 import 'package:smartagro_connect/domain/entities/product_listing.dart';
+import 'package:smartagro_connect/domain/farmer_directory.dart';
 import 'package:smartagro_connect/domain/listing_filter.dart';
-import 'package:smartagro_connect/features/marketplace/seller_profile_screen.dart';
 
 ProductListing listing(
   String id, {

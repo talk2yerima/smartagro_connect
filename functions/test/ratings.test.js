@@ -64,6 +64,10 @@ test('a rating publishes one review, with the first name only, once', async () =
   assert.equal(db.store.get('users/s1').ratingCount, 1);
   assert.equal(ratings.reviewDoc('SA-2', order({ rating: 3 }), '').buyerName, 'Buyer');
   assert.equal('review' in ratings.reviewDoc('SA-2', order({ rating: 3 }), 'Ada'), false);
+  const tagged = ratings.reviewDoc('SA-3',
+    order({ rating: 4, reviewTags: ['Fast delivery', 'made up', 'Fresh produce'] }), 'Ada');
+  assert.deepEqual(tagged.tags, ['Fresh produce', 'Fast delivery']);
+  assert.equal('tags' in ratings.reviewDoc('SA-4', order({ rating: 4 }), 'Ada'), false);
 });
 
 test('dispatch tells the buyer the order is on the way', () => {

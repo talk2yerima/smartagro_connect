@@ -409,3 +409,11 @@ test('a seller cannot inflate their own rating totals', async () => {
   await assertFails(setDoc(doc(as('newbie'), 'users/newbie'), { name: 'N', role: 'farmer', ratingCount: 9 }));
   await assertSucceeds(updateDoc(doc(as('alice'), 'users/alice'), { about: 'Mixed farm in Gashua' }));
 });
+
+test('review tags must come from the list, at most six', async () => {
+  const rate = (tags) => ({ rating: 5, reviewTags: tags, ratedAt: serverTimestamp() });
+  await seedOrder({ status: 'received' });
+  await assertFails(updateDoc(doc(as('bob'), 'orders/d1'), rate(['Paid me to say this'])));
+  await assertFails(updateDoc(doc(as('bob'), 'orders/d1'), rate('Fresh produce')));
+  await assertSucceeds(updateDoc(doc(as('bob'), 'orders/d1'), rate(['Fresh produce', 'Fast delivery'])));
+});

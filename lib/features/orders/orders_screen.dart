@@ -13,6 +13,7 @@ import '../../core/errors/friendly_error.dart';
 import '../../core/utils/money_format.dart';
 import '../../data/repositories/transaction_ref_queue.dart';
 import '../../domain/entities/app_user.dart';
+import '../../domain/entities/farm_profile.dart';
 import '../../domain/entities/haulage_job.dart';
 import '../../domain/entities/market_order.dart';
 import '../../shared/widgets/empty_state.dart';
@@ -307,7 +308,10 @@ class _OrderCard extends ConsumerWidget {
           ],
           if (order.rating != null) ...[
             const SizedBox(height: 10),
-            _RatingView(rating: order.rating!, review: order.review),
+            _RatingView(
+                rating: order.rating!,
+                review: order.review,
+                tags: order.reviewTags),
           ],
           _OrderActions(order: order, asSeller: asSeller),
           const Divider(height: 22),
@@ -563,14 +567,16 @@ class _OrderActionsState extends ConsumerState<_OrderActions> {
     }
     if (!widget.asSeller && o.isReceived && o.rating == null) {
       return button('Rate the seller', Icons.star_outline_rounded, () async {
-        final result = await showModalBottomSheet<(int, String)>(
+        final result = await showModalBottomSheet<(int, String, List<String>)>(
           context: context,
           isScrollControlled: true,
           useSafeArea: true,
           builder: (_) => const _RateSheet(),
         );
         if (result == null) return;
-        await _run(() => firestore.rateOrder(o.reference, result.$1, result.$2),
+        await _run(
+            () => firestore.rateOrder(o.reference, result.$1, result.$2,
+                tags: result.$3),
             'Thanks for rating the seller.');
       }, outlined: true);
     }
@@ -579,10 +585,11 @@ class _OrderActionsState extends ConsumerState<_OrderActions> {
 }
 
 class _RatingView extends StatelessWidget {
-  const _RatingView({required this.rating, this.review});
+  const _RatingView({required this.rating, this.review, this.tags = const []});
 
   final int rating;
   final String? review;
+  final List<String> tags;
 
   @override
   Widget build(BuildContext context) {
@@ -606,12 +613,18 @@ class _RatingView extends StatelessWidget {
             child: Text('"$review"',
                 style: const TextStyle(fontStyle: FontStyle.italic)),
           ),
+        if (tags.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: ReviewTagChips(tags: tags),
+          ),
       ],
     );
   }
 }
 
-/// 1-5 stars and an optional short comment. Returns (stars, comment).
+/// 1-5 stars, quick tags and an optional short comment.
+/// Returns (stars, comment, tags).
 class _RateSheet extends StatefulWidget {
   const _RateSheet();
 
@@ -622,6 +635,7 @@ class _RateSheet extends StatefulWidget {
 class _RateSheetState extends State<_RateSheet> {
   int _stars = 0;
   final _review = TextEditingController();
+  final _tags = <String>{};
 
   @override
   void dispose() {
@@ -664,6 +678,31 @@ class _RateSheetState extends State<_RateSheet> {
           ),
           Center(child: Text(_labels[_stars])),
           const SizedBox(height: 12),
+          const Text('What describes it? (optional)',
+              style: TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final t in reviewTagOptions)
+                FilterChip(
+                  label: Text(t),
+                  selected: _tags.contains(t),
+                  selectedColor: negativeReviewTags.contains(t)
+                      ? AppColors.errorRed.withValues(alpha: 0.15)
+                      : AppColors.emerald.withValues(alpha: 0.18),
+                  onSelected: (on) => setState(() {
+                    if (on && _tags.length < 6) {
+                      _tags.add(t);
+                    } else {
+                      _tags.remove(t);
+                    }
+                  }),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
           TextField(
             controller: _review,
             maxLength: 500,
@@ -679,7 +718,11 @@ class _RateSheetState extends State<_RateSheet> {
           FilledButton(
             onPressed: _stars == 0
                 ? null
-                : () => Navigator.pop(context, (_stars, _review.text)),
+                : () => Navigator.pop(context, (
+                      _stars,
+                      _review.text,
+                      reviewTagOptions.where(_tags.contains).toList(),
+                    )),
             child: const Text('Submit rating'),
           ),
         ],
@@ -760,4 +803,43 @@ class _LoadError extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A buyer's quick tags, green for praise and red for complaints.
+class ReviewTagChips extends StatelessWidget {
+  const ReviewTagChips({super.key, required this.tags, this.counts});
+
+  final List<String> tags;
+
+  /// How many buyers chose each tag ("Fresh produce ×5"), if known.
+  final Map<String, int>? counts;
+
+  @override
+  Widget build(BuildContext context) => Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        children: [
+          for (final t in tags)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+              decoration: BoxDecoration(
+                color: (negativeReviewTags.contains(t)
+                        ? AppColors.errorRed
+                        : AppColors.emerald)
+                    .withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                counts?[t] != null && counts![t]! > 1 ? '$t ×${counts![t]}' : t,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: negativeReviewTags.contains(t)
+                      ? AppColors.errorRed
+                      : AppColors.emerald,
+                ),
+              ),
+            ),
+        ],
+      );
 }
