@@ -10,6 +10,7 @@ import '../../core/di/firestore_providers.dart';
 import '../../core/di/haulage_providers.dart';
 import '../../core/di/payment_providers.dart';
 import '../../core/errors/friendly_error.dart';
+import '../../core/i18n/i18n.dart';
 import '../../core/utils/money_format.dart';
 import '../../data/repositories/transaction_ref_queue.dart';
 import '../../domain/entities/app_user.dart';
@@ -37,7 +38,7 @@ class OrdersScreen extends ConsumerWidget {
 
     if (!sells) {
       return Scaffold(
-        appBar: AppBar(title: const Text('My orders')),
+        appBar: AppBar(title: const T('My orders')),
         body: const _BoughtTab(),
       );
     }
@@ -45,7 +46,7 @@ class OrdersScreen extends ConsumerWidget {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Orders'),
+          title: const T('Orders'),
           bottom: const TabBar(
             tabs: [Tab(text: 'Sold'), Tab(text: 'Bought')],
           ),
@@ -72,11 +73,12 @@ class _SoldTab extends ConsumerWidget {
       ),
       data: (list) {
         if (list.isEmpty) {
-          return const EmptyState(
+          return EmptyState(
             icon: Icons.storefront_outlined,
-            title: 'No sales yet',
-            subtitle: 'When a buyer pays for your produce, the order appears '
-                'here with their contact so you can arrange delivery.',
+            title: tr('No sales yet'),
+            subtitle:
+                tr('When a buyer pays for your produce, the order appears '
+                    'here with their contact so you can arrange delivery.'),
           );
         }
         final earned = list.fold<int>(
@@ -120,11 +122,11 @@ class _BoughtTab extends ConsumerWidget {
       ),
       data: (list) {
         if (list.isEmpty && unconfirmed.isEmpty) {
-          return const EmptyState(
+          return EmptyState(
             icon: Icons.shopping_bag_outlined,
-            title: 'No orders yet',
-            subtitle: 'Produce you buy will appear here, with the seller\'s '
-                'contact for delivery.',
+            title: tr('No orders yet'),
+            subtitle: tr('Produce you buy will appear here, with the seller\'s '
+                'contact for delivery.'),
           );
         }
         return RefreshIndicator(
@@ -141,7 +143,7 @@ class _BoughtTab extends ConsumerWidget {
               ],
               if (unconfirmed.isNotEmpty) ...[
                 const SizedBox(height: 8),
-                Text('Payments not completed',
+                T('Payments not completed',
                     style: Theme.of(context).textTheme.titleSmall),
                 const SizedBox(height: 8),
                 for (final a in unconfirmed) ...[
@@ -190,7 +192,7 @@ class _Summary extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 2),
-          Text('Paid to your bank by Paystack after each sale',
+          T('Paid to your bank by Paystack after each sale',
               style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.75), fontSize: 12)),
         ],
@@ -368,7 +370,7 @@ class _DeliveryPanel extends ConsumerWidget {
         alignment: Alignment.centerLeft,
         child: TextButton.icon(
           icon: const Icon(Icons.local_shipping_outlined, size: 18),
-          label: const Text('Delivery details'),
+          label: const T('Delivery details'),
           onPressed: () => context.push('/delivery/${order.reference}'),
         ),
       );
@@ -459,9 +461,9 @@ class _StatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (label, color) = switch (status) {
-      'dispatched' => ('On the way', AppColors.infoBlue),
-      'received' => ('Delivered', AppColors.emerald),
-      _ => ('Paid', AppColors.warmOrange),
+      'dispatched' => (tr('On the way'), AppColors.infoBlue),
+      'received' => (tr('Delivered'), AppColors.emerald),
+      _ => (tr('Paid'), AppColors.warmOrange),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -517,7 +519,7 @@ class _OrderActionsState extends ConsumerState<_OrderActions> {
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(c, false),
-              child: const Text('Not yet')),
+              child: const T('Not yet')),
           FilledButton(
               onPressed: () => Navigator.pop(c, true), child: Text(yes)),
         ],
@@ -616,7 +618,7 @@ class _RatingView extends StatelessWidget {
               Icon(i <= rating ? Icons.star_rounded : Icons.star_border_rounded,
                   size: 18, color: AppColors.golden),
             const SizedBox(width: 6),
-            Text('Buyer rating', style: TextStyle(fontSize: 12, color: sub)),
+            T('Buyer rating', style: TextStyle(fontSize: 12, color: sub)),
           ],
         ),
         if (review != null && review!.isNotEmpty)
@@ -666,10 +668,10 @@ class _RateSheetState extends State<_RateSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('How was this seller?',
+          T('How was this seller?',
               style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 4),
-          const Text('Your rating helps other buyers. You can rate once.'),
+          const T('Your rating helps other buyers. You can rate once.'),
           const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -688,9 +690,9 @@ class _RateSheetState extends State<_RateSheet> {
                 ),
             ],
           ),
-          Center(child: Text(_labels[_stars])),
+          Center(child: Text(tr(_labels[_stars]))),
           const SizedBox(height: 12),
-          const Text('What describes it? (optional)',
+          const T('What describes it? (optional)',
               style: TextStyle(fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
           Wrap(
@@ -699,7 +701,7 @@ class _RateSheetState extends State<_RateSheet> {
             children: [
               for (final t in reviewTagOptions)
                 FilterChip(
-                  label: Text(t),
+                  label: Text(tr(t)),
                   selected: _tags.contains(t),
                   selectedColor: negativeReviewTags.contains(t)
                       ? AppColors.errorRed.withValues(alpha: 0.15)
@@ -721,9 +723,9 @@ class _RateSheetState extends State<_RateSheet> {
             maxLines: 3,
             minLines: 2,
             textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(
-              labelText: 'Comment (optional)',
-              hintText: 'Quality, freshness, delivery…',
+            decoration: InputDecoration(
+              labelText: tr('Comment (optional)'),
+              hintText: tr('Quality, freshness, delivery…'),
             ),
           ),
           const SizedBox(height: 8),
@@ -735,7 +737,7 @@ class _RateSheetState extends State<_RateSheet> {
                       _review.text,
                       reviewTagOptions.where(_tags.contains).toList(),
                     )),
-            child: const Text('Submit rating'),
+            child: const T('Submit rating'),
           ),
         ],
       ),
@@ -809,7 +811,7 @@ class _LoadError extends StatelessWidget {
             Text('Could not load your orders.\n$message',
                 textAlign: TextAlign.center),
             const SizedBox(height: 12),
-            OutlinedButton(onPressed: onRetry, child: const Text('Try again')),
+            OutlinedButton(onPressed: onRetry, child: const T('Try again')),
           ],
         ),
       ),
@@ -842,7 +844,9 @@ class ReviewTagChips extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
-                counts?[t] != null && counts![t]! > 1 ? '$t ×${counts![t]}' : t,
+                counts?[t] != null && counts![t]! > 1
+                    ? '${tr(t)} ×${counts![t]}'
+                    : tr(t),
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,

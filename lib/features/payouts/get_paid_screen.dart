@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/di/payment_providers.dart';
+import '../../core/i18n/i18n.dart';
 import '../../core/utils/money_format.dart';
 import '../../data/services/payments_api.dart';
 import '../../shared/widgets/gradient_button.dart';
@@ -117,7 +118,7 @@ class _GetPaidScreenState extends ConsumerState<GetPaidScreen> {
         _resolvedName = null;
       });
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text("Bank account saved. You'll be paid for your sales.")));
+          content: T("Bank account saved. You'll be paid for your sales.")));
     } on PaymentException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } finally {
@@ -149,12 +150,12 @@ class _GetPaidScreenState extends ConsumerState<GetPaidScreen> {
     final showForm = account == null || _editing;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Get paid')),
+      appBar: AppBar(title: const T('Get paid')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
           children: [
-            Text('Where your sales money goes', style: text.titleLarge),
+            T('Where your sales money goes', style: text.titleLarge),
             const SizedBox(height: 12),
             _FeeExplainer(feePercent: _feePercent, isDark: isDark),
             const SizedBox(height: 20),
@@ -166,12 +167,12 @@ class _GetPaidScreenState extends ConsumerState<GetPaidScreen> {
               OutlinedButton.icon(
                 onPressed: () => setState(() => _editing = true),
                 icon: const Icon(Icons.edit_outlined),
-                label: const Text('Change bank account'),
+                label: const T('Change bank account'),
               ),
             ],
             if (showForm && !current.isLoading) ...[
               if (account == null)
-                Text(
+                T(
                   'Add the bank account you want buyers\' payments sent to. '
                   'Buyers can only pay for your listings once this is set.',
                   style: text.bodyMedium
@@ -192,10 +193,10 @@ class _GetPaidScreenState extends ConsumerState<GetPaidScreen> {
                   keyboardType: TextInputType.number,
                   maxLength: 10,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  decoration: const InputDecoration(
-                    labelText: 'Account number',
-                    hintText: '10 digits',
-                    prefixIcon: Icon(Icons.numbers_rounded),
+                  decoration: InputDecoration(
+                    labelText: tr('Account number'),
+                    hintText: tr('10 digits'),
+                    prefixIcon: const Icon(Icons.numbers_rounded),
                   ),
                 ),
                 if (_checking)
@@ -207,7 +208,7 @@ class _GetPaidScreenState extends ConsumerState<GetPaidScreen> {
                           height: 16,
                           child: CircularProgressIndicator(strokeWidth: 2)),
                       SizedBox(width: 10),
-                      Text('Checking with your bank…'),
+                      T('Checking with your bank…'),
                     ]),
                   ),
                 if (_resolvedName != null)
@@ -229,7 +230,7 @@ class _GetPaidScreenState extends ConsumerState<GetPaidScreen> {
                 if (_editing)
                   TextButton(
                     onPressed: () => setState(() => _editing = false),
-                    child: const Text('Cancel'),
+                    child: const T('Cancel'),
                   ),
               ],
             ],
@@ -336,7 +337,7 @@ class _BankField extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       child: InputDecorator(
         decoration: InputDecoration(
-          labelText: 'Bank',
+          labelText: tr('Bank'),
           prefixIcon: const Icon(Icons.account_balance_outlined),
           suffixIcon: loading
               ? const Padding(
@@ -384,15 +385,15 @@ class _BankPickerState extends State<_BankPicker> {
             child: TextField(
               autofocus: true,
               onChanged: (v) => setState(() => _query = v),
-              decoration: const InputDecoration(
-                hintText: 'Search banks (e.g. Opay, Zenith)',
-                prefixIcon: Icon(Icons.search_rounded),
+              decoration: InputDecoration(
+                hintText: tr('Search banks (e.g. Opay, Zenith)'),
+                prefixIcon: const Icon(Icons.search_rounded),
               ),
             ),
           ),
           Expanded(
             child: shown.isEmpty
-                ? const Center(child: Text('No bank matches that name.'))
+                ? const Center(child: T('No bank matches that name.'))
                 : ListView.builder(
                     controller: controller,
                     itemCount: shown.length,
@@ -431,7 +432,7 @@ class _ResolvedName extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Account name from your bank',
+                T('Account name from your bank',
                     style: TextStyle(
                         fontSize: 12, color: AppColors.subText(isDark))),
                 Text(name,
@@ -467,7 +468,7 @@ class _ErrorBox extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(child: Text(message, style: TextStyle(color: color))),
           if (onRetry != null)
-            TextButton(onPressed: onRetry, child: const Text('Retry')),
+            TextButton(onPressed: onRetry, child: const T('Retry')),
         ],
       ),
     );

@@ -19,6 +19,7 @@ import '../../core/di/firestore_providers.dart';
 import '../../core/di/payment_providers.dart';
 import '../../core/di/repositories_provider.dart';
 import '../../core/errors/friendly_error.dart';
+import '../../core/i18n/i18n.dart';
 import '../../core/services/app_lock.dart';
 import '../../core/utils/app_logger.dart';
 import '../../domain/entities/chat_models.dart';
@@ -186,7 +187,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                 ),
               ),
               error: (e, _) => Center(
-                child: Text(
+                child: T(
                   'Could not load messages',
                   style: TextStyle(
                     color:
@@ -214,7 +215,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                               : AppColors.borderLight,
                         ),
                         const SizedBox(height: 12),
-                        Text(
+                        T(
                           'No messages yet',
                           style: TextStyle(
                             fontFamily: 'Poppins',
@@ -226,7 +227,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Text(
+                        T(
                           'Send a message to start the conversation',
                           style: TextStyle(
                             fontSize: 13,
@@ -447,7 +448,7 @@ class _ChatBubble extends StatelessWidget {
                 children: [
                   Icon(Icons.image_outlined, size: 18, color: textColor),
                   const SizedBox(width: 6),
-                  Text(
+                  T(
                     'Image',
                     style: TextStyle(
                       color: textColor,
@@ -566,7 +567,7 @@ class _TypingIndicator extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
+          T(
             'typing ',
             style: TextStyle(
               fontSize: 11,
@@ -676,7 +677,7 @@ class _InputBarState extends ConsumerState<_InputBar> {
   Future<void> _startVoice() async {
     if (!_canSendLive()) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Voice notes need an internet connection.')));
+          content: T('Voice notes need an internet connection.')));
       return;
     }
     HapticFeedback.mediumImpact();
@@ -692,7 +693,7 @@ class _InputBarState extends ConsumerState<_InputBar> {
     if (!mounted) return;
     if (!started) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Allow microphone access in your phone settings to '
+          content: T('Allow microphone access in your phone settings to '
               'send voice notes.')));
       return;
     }
@@ -811,7 +812,7 @@ class _InputBarState extends ConsumerState<_InputBar> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('Image sending requires a live connection')),
+              content: T('Image sending requires a live connection')),
         );
       }
       return;
@@ -882,7 +883,7 @@ class _InputBarState extends ConsumerState<_InputBar> {
             .read(_localMessagesProvider(widget.threadId).notifier)
             .update((s) => s.where((m) => m.id != localId).toList());
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to send image')),
+          const SnackBar(content: T('Failed to send image')),
         );
       }
     }
@@ -952,7 +953,7 @@ class _InputBarState extends ConsumerState<_InputBar> {
           if (_controller.text.isEmpty) _controller.text = text;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Message not sent. Check your connection and '
+              content: T('Message not sent. Check your connection and '
                   'tap send to try again.'),
             ),
           );
@@ -998,7 +999,7 @@ class _InputBarState extends ConsumerState<_InputBar> {
                             ? AppColors.darkTextSecondary
                             : AppColors.gray,
                       ),
-                      tooltip: 'Send image',
+                      tooltip: tr('Send image'),
                       onPressed: _pickAndSendImage,
                     ),
 
@@ -1018,7 +1019,7 @@ class _InputBarState extends ConsumerState<_InputBar> {
                                 : AppColors.charcoal,
                           ),
                           decoration: InputDecoration(
-                            hintText: 'Type a message…',
+                            hintText: tr('Type a message…'),
                             hintStyle: TextStyle(
                               fontSize: 14,
                               color: isDark
@@ -1099,10 +1100,10 @@ class _InputBarState extends ConsumerState<_InputBar> {
                             )
                           : Tooltip(
                               key: const ValueKey('mic'),
-                              message: 'Record a voice note',
+                              message: tr('Record a voice note'),
                               child: Semantics(
                                 button: true,
-                                label: 'Record a voice note',
+                                label: tr('Record a voice note'),
                                 child: GestureDetector(
                                   onTap: _startVoice,
                                   child: Container(
@@ -1179,7 +1180,7 @@ class _OngoingOrderBanner extends ConsumerWidget {
                       fontSize: 13, fontWeight: FontWeight.w600),
                 ),
               ),
-              const Text('View',
+              const T('View',
                   style: TextStyle(
                       color: AppColors.warningOrange,
                       fontWeight: FontWeight.w700)),

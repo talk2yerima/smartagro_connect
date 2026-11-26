@@ -7,6 +7,8 @@ import '../../core/constants/app_colors.dart';
 import '../../core/di/auth_providers.dart';
 import '../../core/di/initialization_provider.dart';
 
+import '../../core/i18n/i18n.dart';
+
 /// Premium animated splash — first screen every user sees.
 /// Shows for 2 500 ms then routes to /onboarding, /login, or /main/home.
 class SplashScreen extends ConsumerStatefulWidget {
@@ -122,7 +124,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
               const SizedBox(height: 16),
 
               // ── Tagline ───────────────────────────────────────────
-              const Text(
+              const T(
                 "Africa's Agricultural Intelligence Platform",
                 textAlign: TextAlign.center,
                 maxLines: 2,
@@ -190,7 +192,7 @@ class _BrandName extends StatelessWidget {
     return const Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
+        T(
           'SmartAgro',
           textAlign: TextAlign.center,
           maxLines: 1,
@@ -204,7 +206,7 @@ class _BrandName extends StatelessWidget {
             height: 1.1,
           ),
         ),
-        Text(
+        T(
           'Connect',
           textAlign: TextAlign.center,
           maxLines: 1,

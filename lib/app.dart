@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/config/app_env.dart';
 import 'core/di/initialization_provider.dart';
 import 'core/errors/friendly_error.dart';
+import 'core/i18n/i18n.dart';
 import 'core/router/app_router.dart';
 import 'core/services/app_lock.dart';
 import 'core/theme/app_theme.dart';
@@ -57,6 +58,8 @@ class SmartAgroConnectApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final init = ref.watch(initializationProvider);
     final themeMode = ref.watch(themeModeProvider);
+    // Sets the language before the first screen is drawn.
+    ref.watch(languageProvider);
     final isJailbroken =
         ref.watch(jailbreakDetectedProvider).valueOrNull ?? false;
 
@@ -84,7 +87,8 @@ class SmartAgroConnectApp extends ConsumerWidget {
           builder: (context, routed) {
             if (isJailbroken) return const _JailbreakBlocker();
             // Fingerprint / face lock sits over every signed-in screen.
-            final child = AppLockGate(child: routed ?? const SizedBox.shrink());
+            final child = LanguageRefresher(
+                child: AppLockGate(child: routed ?? const SizedBox.shrink()));
             if (!AppEnv.isProd) {
               return Banner(
                 message: AppEnv.isStaging ? 'STAGING' : 'DEV',

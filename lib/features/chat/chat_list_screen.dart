@@ -9,11 +9,11 @@ import '../../core/di/auth_providers.dart';
 import '../../core/di/firestore_providers.dart';
 import '../../core/di/repositories_provider.dart';
 import '../../core/errors/friendly_error.dart';
+import '../../core/i18n/i18n.dart';
 import '../../domain/entities/chat_models.dart';
 import '../../shared/widgets/app_avatar.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/skeleton_list.dart';
-
 // ─── Role colour helper ────────────────────────────────────────────────────
 
 Color _roleColor(String role) {
@@ -142,7 +142,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
         backgroundColor: isDark ? AppColors.darkBg : Colors.white,
         elevation: 0,
         scrolledUnderElevation: 0.5,
-        title: const Text(
+        title: const T(
           'Messages',
           style: TextStyle(
             fontFamily: 'Poppins',
@@ -153,7 +153,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.edit_outlined),
-            tooltip: 'New conversation',
+            tooltip: tr('New conversation'),
             onPressed: () => context.push('/search'),
           ),
           const SizedBox(width: 4),
@@ -179,8 +179,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                     child: SegmentedButton<_Box>(
                       showSelectedIcon: false,
                       segments: [
-                        const ButtonSegment(
-                            value: _Box.all, label: Text('All')),
+                        const ButtonSegment(value: _Box.all, label: T('All')),
                         ButtonSegment(
                             value: _Box.unread,
                             label: Text(unreadCount == 0
@@ -211,22 +210,23 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                   SliverFillRemaining(
                     hasScrollBody: false,
                     child: switch (_box) {
-                      _Box.unread => const EmptyState(
+                      _Box.unread => EmptyState(
                           icon: Icons.mark_chat_read_outlined,
-                          title: 'All caught up',
-                          subtitle: 'You have read every message.',
+                          title: tr('All caught up'),
+                          subtitle: tr('You have read every message.'),
                         ),
-                      _Box.archived => const EmptyState(
+                      _Box.archived => EmptyState(
                           icon: Icons.archive_outlined,
-                          title: 'No archived chats',
-                          subtitle: 'Swipe a chat to the left to archive it.',
+                          title: tr('No archived chats'),
+                          subtitle:
+                              tr('Swipe a chat to the left to archive it.'),
                         ),
-                      _Box.all => const EmptyState(
+                      _Box.all => EmptyState(
                           type: EmptyStateType.chat,
                           icon: Icons.chat_bubble_outline,
-                          title: 'No messages yet',
+                          title: tr('No messages yet'),
                           subtitle:
-                              'Start a conversation with buyers or sellers',
+                              tr('Start a conversation with buyers or sellers'),
                         ),
                     },
                   )
@@ -301,7 +301,7 @@ class _Archivable extends ConsumerWidget {
               ? 'Chat with ${thread.peerName} archived.'
               : 'Chat with ${thread.peerName} moved back.'),
           action: SnackBarAction(
-            label: 'Undo',
+            label: tr('Undo'),
             onPressed: () => db.setThreadArchived(thread.id, uid, !archive),
           ),
         ));
@@ -355,7 +355,7 @@ class _SearchAndFilterBar extends StatelessWidget {
                 color: isDark ? AppColors.darkTextPrimary : AppColors.charcoal,
               ),
               decoration: InputDecoration(
-                hintText: 'Search conversations…',
+                hintText: tr('Search conversations…'),
                 hintStyle: const TextStyle(
                   fontSize: 14,
                   color: AppColors.gray,
@@ -646,7 +646,7 @@ class _ErrorBody extends StatelessWidget {
               color: AppColors.errorRed,
             ),
             const SizedBox(height: 12),
-            const Text(
+            const T(
               'Failed to load messages',
               style: TextStyle(
                 fontFamily: 'Poppins',

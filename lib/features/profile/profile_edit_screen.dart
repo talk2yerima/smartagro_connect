@@ -12,6 +12,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/di/auth_providers.dart';
 import '../../core/errors/friendly_error.dart';
+import '../../core/i18n/i18n.dart';
 import '../../core/services/app_lock.dart';
 import '../../shared/widgets/app_avatar.dart';
 
@@ -62,7 +63,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Profile updated successfully'),
+            content: T('Profile updated successfully'),
             backgroundColor: _green,
             behavior: SnackBarBehavior.floating,
           ),
@@ -131,7 +132,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Profile photo updated'),
+            content: T('Profile photo updated'),
             backgroundColor: _green,
             behavior: SnackBarBehavior.floating,
           ),
@@ -163,7 +164,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
         elevation: 0,
         scrolledUnderElevation: 0.5,
         backgroundColor: isDark ? AppColors.cardDark : Colors.white,
-        title: const Text(
+        title: const T(
           'Edit Profile',
           style: TextStyle(
             fontFamily: 'Poppins',
@@ -182,7 +183,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                       valueColor: AlwaysStoppedAnimation<Color>(_green),
                     ),
                   )
-                : const Text(
+                : const T(
                     'Save',
                     style: TextStyle(
                       fontFamily: 'Poppins',
@@ -280,7 +281,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
 
                     _Field(
                       controller: _nameCtrl,
-                      label: 'Full Name',
+                      label: tr('Full Name'),
                       icon: Icons.person_outline_rounded,
                       isDark: isDark,
                       validator: (v) {
@@ -302,7 +303,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
 
                     _Field(
                       controller: _phoneCtrl,
-                      label: 'Phone Number',
+                      label: tr('Phone Number'),
                       hint: 'e.g. +234 801 234 5678',
                       icon: Icons.phone_outlined,
                       isDark: isDark,
@@ -321,8 +322,8 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
 
                     _Field(
                       controller: _locationCtrl,
-                      label: 'Location',
-                      hint: 'e.g. Kano, Nigeria',
+                      label: tr('Location'),
+                      hint: tr('e.g. Kano, Nigeria'),
                       icon: Icons.location_on_outlined,
                       isDark: isDark,
                     ),
@@ -348,7 +349,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                                 color: Colors.white,
                               ),
                             )
-                          : const Text(
+                          : const T(
                               'Save Changes',
                               style: TextStyle(
                                 fontFamily: 'Poppins',

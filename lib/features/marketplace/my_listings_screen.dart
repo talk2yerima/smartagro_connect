@@ -10,13 +10,13 @@ import '../../core/di/auth_providers.dart';
 import '../../core/di/repositories_provider.dart';
 import '../../core/di/upload_providers.dart';
 import '../../core/errors/friendly_error.dart';
+import '../../core/i18n/i18n.dart';
 import '../../core/services/app_lock.dart';
 import '../../core/utils/money_format.dart' show formatNgn;
 import '../../domain/entities/product_listing.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/produce_image.dart';
 import '../../shared/widgets/skeleton_list.dart';
-
 // ---------------------------------------------------------------------------
 // Card decoration
 // ---------------------------------------------------------------------------
@@ -54,7 +54,7 @@ class MyListingsScreen extends ConsumerWidget {
         elevation: 0,
         scrolledUnderElevation: 0.5,
         backgroundColor: isDark ? AppColors.cardDark : Colors.white,
-        title: const Text(
+        title: const T(
           'My Listings',
           style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700),
         ),
@@ -91,7 +91,7 @@ class MyListingsScreen extends ConsumerWidget {
         backgroundColor: AppColors.deepGreen,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add_rounded),
-        label: const Text(
+        label: const T(
           'New Listing',
           style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700),
         ),
@@ -114,7 +114,7 @@ class MyListingsScreen extends ConsumerWidget {
                 OutlinedButton.icon(
                   onPressed: () => ref.invalidate(myListingsProvider),
                   icon: const Icon(Icons.refresh_rounded, size: 16),
-                  label: const Text('Retry'),
+                  label: const T('Retry'),
                 ),
               ],
             ),
@@ -125,10 +125,10 @@ class MyListingsScreen extends ConsumerWidget {
             return EmptyState(
               type: EmptyStateType.marketplace,
               icon: Icons.storefront_outlined,
-              title: 'No listings yet',
-              subtitle:
-                  'Your produce listings will appear here once you add them.',
-              actionLabel: 'Add your first listing',
+              title: tr('No listings yet'),
+              subtitle: tr(
+                  'Your produce listings will appear here once you add them.'),
+              actionLabel: tr('Add your first listing'),
               onAction: () => context.push('/marketplace/add'),
             );
           }
@@ -186,7 +186,7 @@ class _ListingCard extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text(
+        title: const T(
           'Delete listing?',
           style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700),
         ),
@@ -197,13 +197,12 @@ class _ListingCard extends ConsumerWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+            child: const T('Cancel'),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: AppColors.errorRed),
             onPressed: () => Navigator.pop(ctx, true),
-            child:
-                const Text('Delete', style: TextStyle(fontFamily: 'Poppins')),
+            child: const T('Delete', style: TextStyle(fontFamily: 'Poppins')),
           ),
         ],
       ),
@@ -218,7 +217,7 @@ class _ListingCard extends ConsumerWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Listing deleted'),
+            content: T('Listing deleted'),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -347,13 +346,13 @@ class _ListingCard extends ConsumerWidget {
                 onPressed: () => _showEditSheet(context, ref),
                 icon: const Icon(Icons.edit_outlined, size: 18),
                 color: AppColors.deepGreen,
-                tooltip: 'Edit',
+                tooltip: tr('Edit'),
               ),
               IconButton(
                 onPressed: () => _confirmDelete(context, ref),
                 icon: const Icon(Icons.delete_outline_rounded, size: 18),
                 color: AppColors.errorRed,
-                tooltip: 'Delete',
+                tooltip: tr('Delete'),
               ),
             ],
           ),
@@ -434,7 +433,7 @@ class _EditListingSheetState extends State<_EditListingSheet> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Could not open the camera or gallery.')));
+            content: T('Could not open the camera or gallery.')));
       }
       return;
     }
@@ -513,7 +512,7 @@ class _EditListingSheetState extends State<_EditListingSheet> {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Listing updated'),
+            content: T('Listing updated'),
             backgroundColor: _green,
             behavior: SnackBarBehavior.floating,
           ),
@@ -570,7 +569,7 @@ class _EditListingSheetState extends State<_EditListingSheet> {
                   ),
                 ),
 
-                Text(
+                T(
                   'Edit Listing',
                   style: TextStyle(
                     fontFamily: 'Poppins',
@@ -609,14 +608,14 @@ class _EditListingSheetState extends State<_EditListingSheet> {
                                 ? null
                                 : () => _changePhoto(ImageSource.camera),
                             icon: const Icon(Icons.photo_camera_outlined),
-                            label: const Text('Camera'),
+                            label: const T('Camera'),
                           ),
                           OutlinedButton.icon(
                             onPressed: _uploadProgress != null
                                 ? null
                                 : () => _changePhoto(ImageSource.gallery),
                             icon: const Icon(Icons.photo_library_outlined),
-                            label: const Text('Gallery'),
+                            label: const T('Gallery'),
                           ),
                         ],
                       ),
@@ -713,7 +712,7 @@ class _EditListingSheetState extends State<_EditListingSheet> {
                 const SizedBox(height: 12),
 
                 // Availability chips
-                Text(
+                T(
                   'AVAILABILITY',
                   style: TextStyle(
                     fontFamily: 'Poppins',
@@ -793,7 +792,7 @@ class _EditListingSheetState extends State<_EditListingSheet> {
                           child: CircularProgressIndicator(
                               strokeWidth: 2, color: Colors.white),
                         )
-                      : const Text(
+                      : const T(
                           'Save Changes',
                           style: TextStyle(
                             fontFamily: 'Poppins',

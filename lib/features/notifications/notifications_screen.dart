@@ -6,6 +6,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/di/auth_providers.dart';
 import '../../core/di/firestore_providers.dart';
 import '../../core/di/repositories_provider.dart';
+import '../../core/i18n/i18n.dart';
 import '../../domain/entities/app_notification.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../shell/main_shell.dart' show openAppRoute;
@@ -162,7 +163,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         backgroundColor: isDark ? AppColors.darkBg : Colors.white,
         elevation: 0,
         scrolledUnderElevation: 0.5,
-        title: Text(
+        title: T(
           'Notifications',
           style: TextStyle(
             fontFamily: 'Poppins',
@@ -175,7 +176,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           if (hasAny)
             TextButton(
               onPressed: _markAllRead,
-              child: const Text(
+              child: const T(
                 'Mark all read',
                 style: TextStyle(
                   fontFamily: 'Poppins',
@@ -191,11 +192,11 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           ? const Center(
               child: CircularProgressIndicator(color: AppColors.deepGreen))
           : !hasAny
-              ? const EmptyState(
+              ? EmptyState(
                   icon: Icons.notifications_off_outlined,
-                  title: 'All caught up!',
-                  subtitle:
-                      'You have no notifications right now.\nCheck back later for updates.',
+                  title: tr('All caught up!'),
+                  subtitle: tr(
+                      'You have no notifications right now.\nCheck back later for updates.'),
                 )
               : RefreshIndicator(
                   onRefresh: () async => ref.invalidate(notificationsProvider),

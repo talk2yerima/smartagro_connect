@@ -7,11 +7,11 @@ import '../../core/constants/app_colors.dart';
 import '../../core/di/auth_providers.dart';
 import '../../core/di/payment_providers.dart';
 import '../../core/di/repositories_provider.dart';
+import '../../core/i18n/i18n.dart';
 import '../../domain/entities/app_user.dart';
 import '../../shared/widgets/app_avatar.dart';
 import '../../shared/widgets/section_header.dart';
 import '../../shared/widgets/status_badge.dart';
-
 // ---------------------------------------------------------------------------
 // Profile Screen
 // ---------------------------------------------------------------------------
@@ -30,7 +30,7 @@ class ProfileScreen extends ConsumerWidget {
         elevation: 0,
         scrolledUnderElevation: 0.5,
         backgroundColor: isDark ? AppColors.cardDark : Colors.white,
-        title: const Text(
+        title: const T(
           'Profile',
           style: TextStyle(
             fontFamily: 'Poppins',
@@ -40,12 +40,12 @@ class ProfileScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.edit_outlined),
-            tooltip: 'Edit profile',
+            tooltip: tr('Edit profile'),
             onPressed: () => context.push('/profile/edit'),
           ),
           IconButton(
             icon: const Icon(Icons.settings_outlined),
-            tooltip: 'Settings',
+            tooltip: tr('Settings'),
             onPressed: () => context.push('/settings'),
           ),
         ],
@@ -90,16 +90,17 @@ class ProfileScreen extends ConsumerWidget {
                 // What buyers see: story, hours, photos, reviews.
                 _QuickLinkTile(
                   icon: Icons.agriculture_outlined,
-                  label: 'Farm profile',
-                  subtitle: 'Your story, what you grow, hours and farm photos',
+                  label: tr('Farm profile'),
+                  subtitle:
+                      tr('Your story, what you grow, hours and farm photos'),
                   isDark: isDark,
                   onTap: () => context.push('/profile/farm'),
                 ),
                 const SizedBox(height: 8),
                 _QuickLinkTile(
                   icon: Icons.storefront_outlined,
-                  label: 'See my public page',
-                  subtitle: 'Your profile as buyers see it, with reviews',
+                  label: tr('See my public page'),
+                  subtitle: tr('Your profile as buyers see it, with reviews'),
                   isDark: isDark,
                   onTap: () {
                     final id = user?.id;
@@ -110,7 +111,7 @@ class ProfileScreen extends ConsumerWidget {
                 // Where sales money goes (Paystack split to their bank).
                 _QuickLinkTile(
                   icon: Icons.account_balance_outlined,
-                  label: 'Get paid',
+                  label: tr('Get paid'),
                   subtitle:
                       ref.watch(myPayoutAccountProvider).valueOrNull == null
                           ? 'Add your bank account to receive payments'
@@ -124,8 +125,9 @@ class ProfileScreen extends ConsumerWidget {
               // ── [4.6] Payment History shortcut ────────────────────────────
               _QuickLinkTile(
                 icon: Icons.receipt_long_outlined,
-                label: 'Orders',
-                subtitle: 'Sales and purchases, with buyer and seller contacts',
+                label: tr('Orders'),
+                subtitle:
+                    tr('Sales and purchases, with buyer and seller contacts'),
                 isDark: isDark,
                 onTap: () => context.go('/main/orders'),
               ),
@@ -290,7 +292,7 @@ class _HeroSection extends StatelessWidget {
                 Icon(Icons.verified_rounded,
                     size: 16, color: AppColors.mintGreen),
                 SizedBox(width: 4),
-                Text(
+                T(
                   'Verified Account',
                   style: TextStyle(
                     color: Colors.white,
@@ -385,10 +387,11 @@ class _StatsRow extends ConsumerWidget {
         );
 
     final stats = [
-      _StatItem(value: listingCount, label: 'Listings'),
-      _StatItem(value: rating.toStringAsFixed(1), label: 'Rating'),
-      _StatItem(value: user?.verified == true ? '✓' : '—', label: 'Verified'),
-      _StatItem(value: sinceYear, label: 'Since'),
+      _StatItem(value: listingCount, label: tr('Listings')),
+      _StatItem(value: rating.toStringAsFixed(1), label: tr('Rating')),
+      _StatItem(
+          value: user?.verified == true ? '✓' : '—', label: tr('Verified')),
+      _StatItem(value: sinceYear, label: tr('Since')),
     ];
 
     return Container(
@@ -495,7 +498,7 @@ class _ContactCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionHeader(title: 'Contact Information'),
+        SectionHeader(title: tr('Contact Information')),
         Container(
           margin: const EdgeInsets.symmetric(horizontal: 16),
           decoration: _card,
@@ -511,7 +514,7 @@ class _ContactCard extends StatelessWidget {
                   ),
                   child: Icon(Icons.email_outlined, size: 18, color: iconColor),
                 ),
-                title: Text(
+                title: T(
                   'Email',
                   style: TextStyle(
                     fontSize: 12,
@@ -545,7 +548,7 @@ class _ContactCard extends StatelessWidget {
                   ),
                   child: Icon(Icons.phone_outlined, size: 18, color: iconColor),
                 ),
-                title: Text(
+                title: T(
                   'Phone',
                   style: TextStyle(
                     fontSize: 12,
@@ -581,7 +584,7 @@ class _ContactCard extends StatelessWidget {
                     child: Icon(Icons.location_on_outlined,
                         size: 18, color: iconColor),
                   ),
-                  title: Text(
+                  title: T(
                     'Location',
                     style: TextStyle(fontSize: 12, color: subColor),
                   ),
@@ -648,14 +651,14 @@ class _VerificationCard extends StatelessWidget {
 
     final items = [
       _VerifItem(
-        label: 'Account Verified',
+        label: tr('Account Verified'),
         subtitle: accountVerified ? 'Identity confirmed' : 'Pending review',
         verified: accountVerified,
       ),
       // The number is only typed in, never checked by SMS yet, so say
       // "Added", not "Verified".
       _VerifItem(
-        label: 'Phone Number',
+        label: tr('Phone Number'),
         subtitle: phoneLinked ? user!.phone! : 'Not provided',
         verified: phoneLinked,
         doneLabel: 'Added',
@@ -666,7 +669,7 @@ class _VerificationCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionHeader(title: 'Verification Status'),
+        SectionHeader(title: tr('Verification Status')),
         Container(
           margin: const EdgeInsets.symmetric(horizontal: 16),
           decoration: _card,
@@ -799,7 +802,7 @@ class _MyListingsCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionHeader(title: 'My Listings'),
+        SectionHeader(title: tr('My Listings')),
         Container(
           margin: const EdgeInsets.symmetric(horizontal: 16),
           decoration: _card,
@@ -817,7 +820,7 @@ class _MyListingsCard extends StatelessWidget {
                 color: AppColors.emerald,
               ),
             ),
-            title: Text(
+            title: T(
               'Manage your product listings',
               style: TextStyle(
                 fontWeight: FontWeight.w600,
@@ -825,7 +828,7 @@ class _MyListingsCard extends StatelessWidget {
                 color: isDark ? AppColors.softWhite : AppColors.charcoal,
               ),
             ),
-            subtitle: Text(
+            subtitle: T(
               'Edit, delete or add new listings',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -1021,7 +1024,7 @@ class _RecentActivity extends ConsumerWidget {
             decoration: _card,
             padding: const EdgeInsets.all(20),
             child: Center(
-              child: Text(
+              child: T(
                 'No recent activity yet',
                 style: TextStyle(
                   fontSize: 13,
@@ -1104,7 +1107,7 @@ class _RecentActivity extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionHeader(title: 'Recent Activity'),
+        SectionHeader(title: tr('Recent Activity')),
         body,
       ],
     );
@@ -1156,25 +1159,25 @@ class _DangerZone extends StatelessWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text(
+        title: const T(
           'Sign Out',
           style: TextStyle(
             fontFamily: 'Poppins',
             fontWeight: FontWeight.w700,
           ),
         ),
-        content: const Text('Are you sure you want to sign out of SmartAgro?'),
+        content: const T('Are you sure you want to sign out of SmartAgro?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: const T('Cancel'),
           ),
           TextButton(
             style: TextButton.styleFrom(
               foregroundColor: AppColors.errorRed,
             ),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Sign Out'),
+            child: const T('Sign Out'),
           ),
         ],
       ),
@@ -1191,7 +1194,7 @@ class _DangerZone extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionHeader(title: 'Account'),
+        SectionHeader(title: tr('Account')),
         Container(
           margin: const EdgeInsets.symmetric(horizontal: 16),
           decoration: _card,
@@ -1209,7 +1212,7 @@ class _DangerZone extends StatelessWidget {
                 color: AppColors.errorRed,
               ),
             ),
-            title: const Text(
+            title: const T(
               'Sign Out',
               style: TextStyle(
                 fontWeight: FontWeight.w600,
@@ -1217,7 +1220,7 @@ class _DangerZone extends StatelessWidget {
                 color: AppColors.errorRed,
               ),
             ),
-            subtitle: Text(
+            subtitle: T(
               'You will be returned to the login screen',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,

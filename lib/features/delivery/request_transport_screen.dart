@@ -9,6 +9,7 @@ import '../../core/di/auth_providers.dart';
 import '../../core/di/firestore_providers.dart';
 import '../../core/di/haulage_providers.dart';
 import '../../core/errors/friendly_error.dart';
+import '../../core/i18n/i18n.dart';
 import '../../core/services/app_lock.dart';
 import '../../core/utils/geo.dart';
 import '../../core/utils/money_format.dart';
@@ -132,7 +133,7 @@ class _RequestTransportScreenState
       _snack(p.message,
           action: p.openSettings
               ? SnackBarAction(
-                  label: 'Settings', onPressed: location.openSettings)
+                  label: tr('Settings'), onPressed: location.openSettings)
               : null);
     } finally {
       if (mounted) setState(() => _locating = null);
@@ -201,7 +202,7 @@ class _RequestTransportScreenState
     final km = _roadKm;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Request transport')),
+      appBar: AppBar(title: const T('Request transport')),
       body: Form(
         key: _formKey,
         child: ListView(
@@ -212,8 +213,8 @@ class _RequestTransportScreenState
                 style: TextStyle(fontSize: 12, color: sub)),
             const SizedBox(height: 16),
             _PlaceCard(
-              title: 'Pickup',
-              hint: "Where the produce is (the seller's farm or store)",
+              title: tr('Pickup'),
+              hint: tr("Where the produce is (the seller's farm or store)"),
               icon: Icons.trip_origin_rounded,
               color: AppColors.emerald,
               draft: _pickup,
@@ -224,8 +225,8 @@ class _RequestTransportScreenState
             ),
             const SizedBox(height: 12),
             _PlaceCard(
-              title: 'Drop-off',
-              hint: 'Where the buyer receives it',
+              title: tr('Drop-off'),
+              hint: tr('Where the buyer receives it'),
               icon: Icons.place_rounded,
               color: AppColors.warmOrange,
               draft: _dropoff,
@@ -263,7 +264,7 @@ class _RequestTransportScreenState
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               decoration: InputDecoration(
-                labelText: 'Load (kg)',
+                labelText: tr('Load (kg)'),
                 prefixIcon: const Icon(Icons.scale_outlined),
                 helperText: _weightKg > 0 ? vehicleFor(_weightKg) : null,
               ),
@@ -281,7 +282,7 @@ class _RequestTransportScreenState
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               decoration: InputDecoration(
-                labelText: 'You will pay the transporter (₦)',
+                labelText: tr('You will pay the transporter (₦)'),
                 prefixIcon: const Icon(Icons.payments_outlined),
                 helperText: km != null && _weightKg > 0
                     ? 'Suggested ${formatNgn(suggestedFareNgn(km, _weightKg))} '
@@ -302,14 +303,14 @@ class _RequestTransportScreenState
               maxLength: 500,
               maxLines: 3,
               minLines: 1,
-              decoration: const InputDecoration(
-                labelText: 'Notes for the driver (optional)',
-                hintText: 'e.g. Call when you reach the junction',
-                prefixIcon: Icon(Icons.notes_rounded),
+              decoration: InputDecoration(
+                labelText: tr('Notes for the driver (optional)'),
+                hintText: tr('e.g. Call when you reach the junction'),
+                prefixIcon: const Icon(Icons.notes_rounded),
               ),
             ),
             const SizedBox(height: 8),
-            Text(
+            T(
               'You pay the transporter directly when they deliver. Only you, '
               'the other party on this order and the transporter who accepts '
               'can follow the delivery on the map.',
@@ -404,7 +405,7 @@ class _PlaceCard extends StatelessWidget {
                           height: 16,
                           child: CircularProgressIndicator(strokeWidth: 2))
                       : const Icon(Icons.my_location_rounded, size: 18),
-                  label: const Text('I am here'),
+                  label: const T('I am here'),
                 ),
               ),
               const SizedBox(width: 8),
@@ -422,9 +423,9 @@ class _PlaceCard extends StatelessWidget {
             TextFormField(
               controller: draft.label,
               maxLength: 200,
-              decoration: const InputDecoration(
-                labelText: 'Place name or landmark',
-                hintText: 'e.g. Gashua grain market, gate 2',
+              decoration: InputDecoration(
+                labelText: tr('Place name or landmark'),
+                hintText: tr('e.g. Gashua grain market, gate 2'),
                 isDense: true,
                 counterText: '',
               ),
@@ -439,7 +440,7 @@ class _PlaceCard extends StatelessWidget {
               initialValue: draft.state,
               isExpanded: true,
               decoration:
-                  const InputDecoration(labelText: 'State', isDense: true),
+                  InputDecoration(labelText: tr('State'), isDense: true),
               items: [
                 for (final s in kNigerianStates)
                   DropdownMenuItem(value: s, child: Text(s)),

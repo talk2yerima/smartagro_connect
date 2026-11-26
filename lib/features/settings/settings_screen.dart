@@ -11,6 +11,7 @@ import '../../core/config/app_env.dart';
 import '../../core/di/auth_providers.dart';
 import '../../core/di/firestore_providers.dart';
 import '../../core/di/initialization_provider.dart';
+import '../../core/i18n/i18n.dart';
 import '../../core/services/app_lock.dart';
 
 bool _fcmSupported() => kIsWeb || (!Platform.isWindows && !Platform.isLinux);
@@ -79,15 +80,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       showDialog<void>(
         context: context,
         builder: (_) => AlertDialog(
-          title: const Text('Disable notifications'),
-          content: const Text(
+          title: const T('Disable notifications'),
+          content: const T(
             'To turn off notifications, go to your device Settings'
             ' > Apps > SmartAgro Connect > Notifications.',
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('OK'),
+              child: const T('OK'),
             ),
           ],
         ),
@@ -119,7 +120,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (mounted) {
         setState(() => _priceAlerts = !next);
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text("Couldn't save that. Check your connection.")));
+            content: T("Couldn't save that. Check your connection.")));
       }
       await prefs.setBool(_kPriceAlerts, !next);
     }
@@ -133,12 +134,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         notifAsync.valueOrNull == AuthorizationStatus.provisional;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(title: const T('Settings')),
       body: ListView(
         children: [
           const ListTile(
-            title: Text('Appearance'),
-            subtitle: Text('Switch between light, dark, and system default.'),
+            title: T('Appearance'),
+            subtitle: T('Switch between light, dark, and system default.'),
           ),
           RadioGroup<ThemeMode>(
             groupValue: mode,
@@ -149,15 +150,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               children: [
                 RadioListTile<ThemeMode>(
                   value: ThemeMode.system,
-                  title: Text('System default'),
+                  title: T('System default'),
                 ),
                 RadioListTile<ThemeMode>(
                   value: ThemeMode.light,
-                  title: Text('Light'),
+                  title: T('Light'),
                 ),
                 RadioListTile<ThemeMode>(
                   value: ThemeMode.dark,
-                  title: Text('Dark'),
+                  title: T('Dark'),
                 ),
               ],
             ),
@@ -168,7 +169,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onChanged: notifAsync.isLoading
                 ? null
                 : (_) => _handleNotificationToggle(notifOn),
-            title: const Text('Push notifications'),
+            title: const T('Push notifications'),
             subtitle: Text(
               notifAsync.isLoading
                   ? 'Checking…'
@@ -180,41 +181,51 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           SwitchListTile(
             value: _priceAlerts,
             onChanged: _handlePriceAlertsToggle,
-            title: const Text('Price alerts'),
-            subtitle: const Text(
-                'Notify me when a price I set an alert for is reached'),
+            title: const T('Price alerts'),
+            subtitle:
+                const T('Notify me when a price I set an alert for is reached'),
           ),
           const Divider(),
           SwitchListTile(
             secondary: const Icon(Icons.fingerprint_rounded),
             value: ref.watch(appLockProvider).enabled,
             onChanged: _toggleAppLock,
-            title: const Text('App lock'),
-            subtitle: const Text(
+            title: const T('App lock'),
+            subtitle: const T(
                 'Ask for your fingerprint, face or phone PIN when opening '
                 'SmartAgro'),
           ),
-          const ListTile(
-            leading: Icon(Icons.language_outlined),
-            title: Text('Language'),
-            subtitle: Text('English (Nigeria)'),
+          ListTile(
+            leading: const Icon(Icons.language_outlined),
+            title: const T('Language'),
+            subtitle: Text(ref.watch(languageProvider).nativeName),
+            trailing: SegmentedButton<AppLanguage>(
+              showSelectedIcon: false,
+              segments: const [
+                ButtonSegment(value: AppLanguage.en, label: Text('English')),
+                ButtonSegment(value: AppLanguage.ha, label: Text('Hausa')),
+              ],
+              selected: {ref.watch(languageProvider)},
+              onSelectionChanged: (s) =>
+                  ref.read(languageProvider.notifier).set(s.first),
+            ),
           ),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.privacy_tip_outlined),
-            title: const Text('Privacy policy'),
+            title: const T('Privacy policy'),
             trailing: const Icon(Icons.open_in_new_rounded, size: 18),
             onTap: () => _openPage(AppEnv.privacyPolicyUrl),
           ),
           ListTile(
             leading: const Icon(Icons.gavel_outlined),
-            title: const Text('Terms of use'),
+            title: const T('Terms of use'),
             trailing: const Icon(Icons.open_in_new_rounded, size: 18),
             onTap: () => _openPage(AppEnv.termsUrl),
           ),
           const ListTile(
             leading: Icon(Icons.info_outline),
-            title: Text('Version'),
+            title: T('Version'),
             subtitle: Text(AppEnv.appVersion),
           ),
         ],

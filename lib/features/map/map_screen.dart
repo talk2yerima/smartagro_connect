@@ -6,6 +6,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/di/repositories_provider.dart';
+import '../../core/i18n/i18n.dart';
 import '../../domain/entities/nearby_buyer.dart';
 
 // Approximate centre-points for Nigerian states used by the mock buyers.
@@ -53,7 +54,7 @@ class MapScreen extends ConsumerWidget {
       appBar: AppBar(
         elevation: 0,
         scrolledUnderElevation: 0.5,
-        title: const Text(
+        title: const T(
           'Nearby Buyers',
           style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700),
         ),
@@ -70,7 +71,7 @@ class MapScreen extends ConsumerWidget {
               loading: () => const Center(
                   child: CircularProgressIndicator(color: AppColors.deepGreen)),
               error: (_, __) =>
-                  const Center(child: Text('Could not load buyer locations.')),
+                  const Center(child: T('Could not load buyer locations.')),
               data: (buyers) {
                 final markers = buyers.map((b) {
                   final pos = _latLngForBuyer(b);
@@ -121,13 +122,13 @@ class MapScreen extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const _LegendRow(
+                            _LegendRow(
                                 color: AppColors.mintGreen,
-                                label: 'Verified buyer'),
+                                label: tr('Verified buyer')),
                             const SizedBox(height: 4),
-                            const _LegendRow(
+                            _LegendRow(
                                 color: AppColors.warmOrange,
-                                label: 'Unverified buyer'),
+                                label: tr('Unverified buyer')),
                             const SizedBox(height: 4),
                             Text(
                               '${buyers.length} buyer${buyers.length == 1 ? '' : 's'} shown',
@@ -181,10 +182,10 @@ class _MapUnsupportedPlaceholder extends StatelessWidget {
           Icon(Icons.map_outlined,
               size: 64, color: Theme.of(context).colorScheme.outline),
           const SizedBox(height: 16),
-          Text('Map view is available on Android and iOS.',
+          T('Map view is available on Android and iOS.',
               style: Theme.of(context).textTheme.bodyLarge),
           const SizedBox(height: 8),
-          Text('Run on a mobile device to see nearby buyers.',
+          T('Run on a mobile device to see nearby buyers.',
               style: Theme.of(context).textTheme.bodySmall,
               textAlign: TextAlign.center),
         ],

@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/di/repositories_provider.dart';
 import '../../core/errors/friendly_error.dart';
+import '../../core/i18n/i18n.dart';
 import '../../core/utils/money_format.dart';
 import '../../domain/entities/commodity.dart';
 import '../../shared/widgets/connectivity_banner.dart';
@@ -200,7 +201,7 @@ class _CommodityMarketScreenState extends ConsumerState<CommodityMarketScreen> {
         elevation: 0,
         scrolledUnderElevation: 0.5,
         backgroundColor: isDark ? AppColors.darkBg : Colors.white,
-        title: Text(
+        title: T(
           'Market',
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontFamily: 'Poppins',
@@ -215,7 +216,7 @@ class _CommodityMarketScreenState extends ConsumerState<CommodityMarketScreen> {
               Icons.search_rounded,
               color: isDark ? AppColors.darkTextPrimary : AppColors.charcoal,
             ),
-            tooltip: 'Search',
+            tooltip: tr('Search'),
           ),
         ],
       ),
@@ -235,7 +236,7 @@ class _CommodityMarketScreenState extends ConsumerState<CommodityMarketScreen> {
                           size: 48,
                           color: AppColors.gray.withValues(alpha: 0.5)),
                       const SizedBox(height: 12),
-                      Text(
+                      T(
                         'Failed to load market data',
                         style: TextStyle(
                           fontFamily: 'Poppins',
@@ -258,7 +259,7 @@ class _CommodityMarketScreenState extends ConsumerState<CommodityMarketScreen> {
                       OutlinedButton.icon(
                         onPressed: () => ref.invalidate(commoditiesProvider),
                         icon: const Icon(Icons.refresh_rounded, size: 16),
-                        label: const Text('Retry'),
+                        label: const T('Retry'),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.deepGreen,
                           side: const BorderSide(color: AppColors.deepGreen),
@@ -322,13 +323,13 @@ class _CommodityMarketScreenState extends ConsumerState<CommodityMarketScreen> {
 
                       // ── 4. Commodity list ─────────────────────────────────────
                       filtered.isEmpty
-                          ? const SliverFillRemaining(
+                          ? SliverFillRemaining(
                               child: EmptyState(
                                 type: EmptyStateType.market,
                                 icon: Icons.bar_chart_rounded,
-                                title: 'No commodities found',
+                                title: tr('No commodities found'),
                                 subtitle:
-                                    'Try adjusting your search or filters',
+                                    tr('Try adjusting your search or filters'),
                               ),
                             )
                           : SliverPadding(
@@ -395,7 +396,7 @@ class _SearchBar extends StatelessWidget {
           color: isDark ? AppColors.darkTextPrimary : AppColors.charcoal,
         ),
         decoration: InputDecoration(
-          hintText: 'Search commodities…',
+          hintText: tr('Search commodities…'),
           hintStyle: const TextStyle(
             fontFamily: 'Poppins',
             fontSize: 14,
@@ -415,7 +416,7 @@ class _SearchBar extends StatelessWidget {
               size: 20,
               color: isDark ? AppColors.darkTextSecondary : AppColors.gray,
             ),
-            tooltip: 'Filter',
+            tooltip: tr('Filter'),
           ),
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -618,7 +619,7 @@ class _MarketSummaryStrip extends StatelessWidget {
 
   Widget _divider() => const Padding(
         padding: EdgeInsets.symmetric(horizontal: 8),
-        child: Text(
+        child: T(
           '|',
           style: TextStyle(
             color: Colors.white38,
@@ -815,7 +816,7 @@ class _SortSheet extends StatelessWidget {
                 ),
               ),
             ),
-            Text(
+            T(
               'Sort by',
               style: TextStyle(
                 fontFamily: 'Poppins',

@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/di/repositories_provider.dart';
+import '../../core/i18n/i18n.dart';
 import '../../core/utils/money_format.dart';
 import '../../domain/entities/commodity.dart';
 import '../../domain/entities/nearby_buyer.dart';
@@ -230,7 +231,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
             color: isDark ? AppColors.darkTextPrimary : AppColors.charcoal,
           ),
           decoration: InputDecoration(
-            hintText: 'Search crops, products, buyers…',
+            hintText: tr('Search crops, products, buyers…'),
             hintStyle: GoogleFonts.poppins(
               fontSize: 14,
               color: isDark ? AppColors.darkTextSecondary : AppColors.gray,
@@ -278,16 +279,16 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
         children: [
           const SizedBox(height: 8),
           // ── Recent Searches ──
-          const SectionHeader(
-            title: 'Recent Searches',
+          SectionHeader(
+            title: tr('Recent Searches'),
             icon: Icons.history_rounded,
           ),
           const SizedBox(height: 8),
           _buildRecentSearches(isDark),
           const SizedBox(height: 16),
           // ── Trending Categories ──
-          const SectionHeader(
-            title: 'Trending Categories',
+          SectionHeader(
+            title: tr('Trending Categories'),
             icon: Icons.trending_up_rounded,
           ),
           const SizedBox(height: 8),
@@ -465,7 +466,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
         child: Row(
           children: [
             _FilterChip(
-              label: 'Verified Only',
+              label: tr('Verified Only'),
               icon: Icons.verified_rounded,
               selected: _verifiedOnly,
               isDark: isDark,
@@ -473,7 +474,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
             ),
             const SizedBox(width: 8),
             _FilterChip(
-              label: 'Within 50 km',
+              label: tr('Within 50 km'),
               icon: Icons.location_on_rounded,
               selected: _nearbyOnly,
               isDark: isDark,
@@ -481,7 +482,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
             ),
             const SizedBox(width: 8),
             _FilterChip(
-              label: 'Price: Low-High',
+              label: tr('Price: Low-High'),
               icon: Icons.sort_rounded,
               selected: _priceFilterActive,
               isDark: isDark,
@@ -506,10 +507,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
         commodities.isNotEmpty || products.isNotEmpty || buyers.isNotEmpty;
 
     if (!hasAny) {
-      return const EmptyState(
+      return EmptyState(
         icon: Icons.search_off_rounded,
-        title: 'No results found',
-        subtitle: 'Try different keywords or adjust your filters.',
+        title: tr('No results found'),
+        subtitle: tr('Try different keywords or adjust your filters.'),
       );
     }
 
@@ -525,7 +526,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
           if (commodities.isNotEmpty) ...[
             SliverToBoxAdapter(
               child: SectionHeader(
-                title: 'Commodities',
+                title: tr('Commodities'),
                 actionLabel: commodities.length > 2 ? 'See all' : null,
                 onAction: () => _tabController.animateTo(1),
               ),
@@ -550,7 +551,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
           if (products.isNotEmpty) ...[
             SliverToBoxAdapter(
               child: SectionHeader(
-                title: 'Products',
+                title: tr('Products'),
                 actionLabel: products.length > 2 ? 'See all' : null,
                 onAction: () => _tabController.animateTo(2),
               ),
@@ -578,7 +579,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
           if (buyers.isNotEmpty) ...[
             SliverToBoxAdapter(
               child: SectionHeader(
-                title: 'Buyers',
+                title: tr('Buyers'),
                 actionLabel: buyers.length > 2 ? 'See all' : null,
                 onAction: () => _tabController.animateTo(3),
               ),
@@ -610,10 +611,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
 
   Widget _buildCommoditiesTab(bool isDark, List<Commodity> commodities) {
     if (commodities.isEmpty) {
-      return const EmptyState(
+      return EmptyState(
         icon: Icons.grain,
-        title: 'No commodities found',
-        subtitle: 'Try searching with a different crop or category name.',
+        title: tr('No commodities found'),
+        subtitle: tr('Try searching with a different crop or category name.'),
       );
     }
 
@@ -637,10 +638,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
 
   Widget _buildProductsTab(bool isDark, List<ProductListing> products) {
     if (products.isEmpty) {
-      return const EmptyState(
+      return EmptyState(
         icon: Icons.storefront_rounded,
-        title: 'No products found',
-        subtitle: 'Try searching by crop name, location, or seller.',
+        title: tr('No products found'),
+        subtitle: tr('Try searching by crop name, location, or seller.'),
       );
     }
 
@@ -669,10 +670,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
 
   Widget _buildBuyersTab(bool isDark, List<NearbyBuyer> buyers) {
     if (buyers.isEmpty) {
-      return const EmptyState(
+      return EmptyState(
         icon: Icons.people_alt_rounded,
-        title: 'No buyers found',
-        subtitle: 'Try a different search term or remove filters.',
+        title: tr('No buyers found'),
+        subtitle: tr('Try a different search term or remove filters.'),
       );
     }
 

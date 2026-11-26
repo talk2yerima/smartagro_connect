@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/di/haulage_providers.dart';
+import '../../core/i18n/i18n.dart';
 import '../../core/services/app_lock.dart';
 import '../../core/utils/geo.dart';
 import '../../core/utils/money_format.dart';
@@ -129,14 +130,14 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
           padding: const EdgeInsets.fromLTRB(20, 0, 8, 0),
           child: Row(
             children: [
-              Text('Filters', style: Theme.of(context).textTheme.titleLarge),
+              T('Filters', style: Theme.of(context).textTheme.titleLarge),
               const Spacer(),
               TextButton(
                 onPressed: () => setState(() {
                   _f = ListingFilter.none;
                   _sort = 0;
                 }),
-                child: const Text('Reset'),
+                child: const T('Reset'),
               ),
             ],
           ),
@@ -146,7 +147,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
             shrinkWrap: true,
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
             children: [
-              Text('Sort by', style: title),
+              T('Sort by', style: title),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
@@ -163,7 +164,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
               const SizedBox(height: 20),
               Row(
                 children: [
-                  Text('Price per kg', style: title),
+                  T('Price per kg', style: title),
                   const Spacer(),
                   Text('${formatNgn(lo.round())} – ${formatNgn(hi.round())}',
                       style: const TextStyle(fontWeight: FontWeight.w600)),
@@ -187,7 +188,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  Text('Distance from you', style: title),
+                  T('Distance from you', style: title),
                   const Spacer(),
                   if (_me != null)
                     Text(
@@ -208,7 +209,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                             height: 16,
                             child: CircularProgressIndicator(strokeWidth: 2))
                         : const Icon(Icons.my_location_rounded, size: 18),
-                    label: const Text('Use my location'),
+                    label: const T('Use my location'),
                   ),
                 )
               else
@@ -228,22 +229,22 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                             : distanceSteps[i]);
                   }),
                 ),
-              Text(
+              T(
                 'By road, about. Listings without a town use their state '
                 'capital.',
                 style: TextStyle(fontSize: 11, color: sub),
               ),
               const SizedBox(height: 20),
-              Text('Availability', style: title),
+              T('Availability', style: title),
               const SizedBox(height: 8),
               SegmentedButton<ReadyFilter>(
                 showSelectedIcon: false,
                 segments: const [
-                  ButtonSegment(value: ReadyFilter.any, label: Text('Any')),
+                  ButtonSegment(value: ReadyFilter.any, label: T('Any')),
                   ButtonSegment(
-                      value: ReadyFilter.readyNow, label: Text('Ready now')),
+                      value: ReadyFilter.readyNow, label: T('Ready now')),
                   ButtonSegment(
-                      value: ReadyFilter.preOrder, label: Text('Pre-order')),
+                      value: ReadyFilter.preOrder, label: T('Pre-order')),
                 ],
                 selected: {_f.ready},
                 onSelectionChanged: (s) =>
@@ -254,13 +255,13 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                 key: ValueKey(_f.state),
                 initialValue: _f.state,
                 isExpanded: true,
-                decoration: const InputDecoration(
-                  labelText: 'State',
-                  prefixIcon: Icon(Icons.place_outlined),
+                decoration: InputDecoration(
+                  labelText: tr('State'),
+                  prefixIcon: const Icon(Icons.place_outlined),
                 ),
                 items: [
                   const DropdownMenuItem<String?>(
-                      value: null, child: Text('All states')),
+                      value: null, child: T('All states')),
                   for (final s in widget.states)
                     DropdownMenuItem<String?>(value: s, child: Text(s)),
                 ],
@@ -270,7 +271,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
               const SizedBox(height: 8),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Verified farmers only'),
+                title: const T('Verified farmers only'),
                 secondary: const Icon(Icons.verified_rounded,
                     color: AppColors.infoBlue),
                 value: _f.verifiedOnly,
@@ -279,7 +280,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
               ),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Hide sold out'),
+                title: const T('Hide sold out'),
                 secondary: const Icon(Icons.remove_shopping_cart_outlined),
                 value: _f.hideSoldOut,
                 onChanged: (v) =>

@@ -7,6 +7,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/i18n/i18n.dart';
 import '../../core/services/app_lock.dart';
 import '../../core/utils/geo.dart';
 import '../../domain/entities/haulage_job.dart';
@@ -67,14 +68,15 @@ Set<Marker> jobMarkers(HaulageJob job, {GeoPoint2? truck}) => {
         markerId: const MarkerId('pickup'),
         position: latLng(job.pickup.point),
         icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-        infoWindow: InfoWindow(title: 'Pickup', snippet: placeText(job.pickup)),
+        infoWindow:
+            InfoWindow(title: tr('Pickup'), snippet: placeText(job.pickup)),
       ),
       Marker(
         markerId: const MarkerId('dropoff'),
         position: latLng(job.dropoff.point),
         icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
         infoWindow:
-            InfoWindow(title: 'Drop-off', snippet: placeText(job.dropoff)),
+            InfoWindow(title: tr('Drop-off'), snippet: placeText(job.dropoff)),
       ),
       if (truck != null && truck.isSet)
         Marker(
@@ -195,11 +197,11 @@ class JobStatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (label, color) = switch (status) {
-      'open' => ('Finding transporter', AppColors.warmOrange),
-      'accepted' => ('Driver assigned', AppColors.infoBlue),
-      'picked_up' => ('On the road', AppColors.infoBlue),
-      'delivered' => ('Delivered', AppColors.emerald),
-      _ => ('Cancelled', AppColors.gray),
+      'open' => (tr('Finding transporter'), AppColors.warmOrange),
+      'accepted' => (tr('Driver assigned'), AppColors.infoBlue),
+      'picked_up' => (tr('On the road'), AppColors.infoBlue),
+      'delivered' => (tr('Delivered'), AppColors.emerald),
+      _ => (tr('Cancelled'), AppColors.gray),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),

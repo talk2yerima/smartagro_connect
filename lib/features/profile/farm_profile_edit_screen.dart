@@ -9,6 +9,7 @@ import '../../core/di/farm_providers.dart';
 import '../../core/di/firestore_providers.dart';
 import '../../core/di/upload_providers.dart';
 import '../../core/errors/friendly_error.dart';
+import '../../core/i18n/i18n.dart';
 import '../../core/services/app_lock.dart';
 import '../../domain/entities/farm_profile.dart';
 import '../../shared/widgets/produce_image.dart';
@@ -125,11 +126,11 @@ class _FarmProfileEditScreenState extends ConsumerState<FarmProfileEditScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Farm profile'),
+        title: const T('Farm profile'),
         actions: [
           TextButton(
             onPressed: uid.isEmpty ? null : () => context.push('/seller/$uid'),
-            child: const Text('Preview'),
+            child: const T('Preview'),
           ),
         ],
       ),
@@ -138,10 +139,9 @@ class _FarmProfileEditScreenState extends ConsumerState<FarmProfileEditScreen> {
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: [
-                Text('Cover photo',
-                    style: Theme.of(context).textTheme.titleSmall),
+                T('Cover photo', style: Theme.of(context).textTheme.titleSmall),
                 const SizedBox(height: 4),
-                Text('A wide photo of your farm, field or animals.',
+                T('A wide photo of your farm, field or animals.',
                     style: TextStyle(fontSize: 12, color: sub)),
                 const SizedBox(height: 8),
                 AspectRatio(
@@ -169,7 +169,7 @@ class _FarmProfileEditScreenState extends ConsumerState<FarmProfileEditScreen> {
                                 Icon(Icons.add_photo_alternate_outlined,
                                     size: 40, color: AppColors.emerald),
                                 SizedBox(height: 6),
-                                Text('Add a cover photo'),
+                                T('Add a cover photo'),
                               ],
                             ),
                           if (_uploading == 'cover')
@@ -179,7 +179,7 @@ class _FarmProfileEditScreenState extends ConsumerState<FarmProfileEditScreen> {
                               right: 8,
                               top: 8,
                               child: IconButton.filledTonal(
-                                tooltip: 'Remove cover photo',
+                                tooltip: tr('Remove cover photo'),
                                 icon: const Icon(Icons.close_rounded),
                                 onPressed: () =>
                                     setState(() => _coverUrl = null),
@@ -196,10 +196,10 @@ class _FarmProfileEditScreenState extends ConsumerState<FarmProfileEditScreen> {
                   maxLength: 600,
                   minLines: 3,
                   maxLines: 8,
-                  decoration: const InputDecoration(
-                    labelText: 'About your farm',
-                    hintText: 'e.g. A family farm in Gashua growing rice, '
-                        'beans and pepper since 2010. We harvest twice a year.',
+                  decoration: InputDecoration(
+                    labelText: tr('About your farm'),
+                    hintText: tr('e.g. A family farm in Gashua growing rice, '
+                        'beans and pepper since 2010. We harvest twice a year.'),
                     alignLabelWithHint: true,
                   ),
                 ),
@@ -207,14 +207,14 @@ class _FarmProfileEditScreenState extends ConsumerState<FarmProfileEditScreen> {
                 TextField(
                   controller: _hours,
                   maxLength: 120,
-                  decoration: const InputDecoration(
-                    labelText: 'Opening hours',
-                    hintText: 'e.g. Mon – Sat, 7:00 AM – 6:00 PM',
-                    prefixIcon: Icon(Icons.schedule_rounded),
+                  decoration: InputDecoration(
+                    labelText: tr('Opening hours'),
+                    hintText: tr('e.g. Mon – Sat, 7:00 AM – 6:00 PM'),
+                    prefixIcon: const Icon(Icons.schedule_rounded),
                   ),
                 ),
                 const SizedBox(height: 12),
-                Text('What you produce',
+                T('What you produce',
                     style: Theme.of(context).textTheme.titleSmall),
                 const SizedBox(height: 8),
                 Wrap(
@@ -224,7 +224,7 @@ class _FarmProfileEditScreenState extends ConsumerState<FarmProfileEditScreen> {
                     for (final c in farmCategoryOptions)
                       FilterChip(
                         avatar: Icon(categoryIcon(c), size: 18),
-                        label: Text(c),
+                        label: Text(tr(c)),
                         selected: _categories.contains(c),
                         onSelected: (on) => setState(() =>
                             on ? _categories.add(c) : _categories.remove(c)),
@@ -234,7 +234,7 @@ class _FarmProfileEditScreenState extends ConsumerState<FarmProfileEditScreen> {
                 const SizedBox(height: 20),
                 Row(
                   children: [
-                    Text('Farm gallery',
+                    T('Farm gallery',
                         style: Theme.of(context).textTheme.titleSmall),
                     const Spacer(),
                     Text('${_gallery.length} of $maxGalleryPhotos',
@@ -262,7 +262,7 @@ class _FarmProfileEditScreenState extends ConsumerState<FarmProfileEditScreen> {
                             top: 2,
                             child: IconButton.filledTonal(
                               visualDensity: VisualDensity.compact,
-                              tooltip: 'Remove photo',
+                              tooltip: tr('Remove photo'),
                               icon: const Icon(Icons.close_rounded, size: 16),
                               onPressed: () =>
                                   setState(() => _gallery.removeAt(i)),

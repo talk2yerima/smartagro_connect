@@ -7,6 +7,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/di/auth_providers.dart';
 import '../../core/errors/failures.dart';
 import '../../core/errors/friendly_error.dart';
+import '../../core/i18n/i18n.dart';
 import '../../domain/entities/app_user.dart';
 import '../../shared/widgets/farmland_illustration.dart';
 import '../../shared/widgets/gradient_button.dart';
@@ -209,7 +210,7 @@ class _Header extends StatelessWidget {
                           color: AppColors.deepGreen, size: 26),
                     ),
                     const SizedBox(width: 12),
-                    const Text(
+                    const T(
                       'SmartAgro Connect',
                       style: TextStyle(
                         fontFamily: 'Poppins',
@@ -221,7 +222,7 @@ class _Header extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 28),
-                const Text(
+                const T(
                   'Welcome back',
                   style: TextStyle(
                     fontFamily: 'Poppins',
@@ -232,7 +233,7 @@ class _Header extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 6),
-                Text(
+                T(
                   'Sign in to sell, buy and move produce.',
                   style: TextStyle(
                     fontFamily: 'Inter',
@@ -315,9 +316,9 @@ class _FormSheet extends StatelessWidget {
                   textInputAction: TextInputAction.next,
                   autofillHints: const [AutofillHints.email],
                   onFieldSubmitted: (_) => passwordFocus.requestFocus(),
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    prefixIcon: Icon(Icons.mail_outline_rounded),
+                  decoration: InputDecoration(
+                    labelText: tr('Email'),
+                    prefixIcon: const Icon(Icons.mail_outline_rounded),
                   ),
                   validator: (v) => v == null || !v.contains('@')
                       ? 'Enter a valid email'
@@ -332,7 +333,7 @@ class _FormSheet extends StatelessWidget {
                   autofillHints: const [AutofillHints.password],
                   onFieldSubmitted: (_) => onSubmit(),
                   decoration: InputDecoration(
-                    labelText: 'Password',
+                    labelText: tr('Password'),
                     prefixIcon: const Icon(Icons.lock_outline_rounded),
                     suffixIcon: IconButton(
                       tooltip:
@@ -350,7 +351,7 @@ class _FormSheet extends StatelessWidget {
                   alignment: Alignment.centerRight,
                   child: TextButton(
                     onPressed: () => context.push('/forgot'),
-                    child: const Text('Forgot password?'),
+                    child: const T('Forgot password?'),
                   ),
                 ),
                 if (error != null) ...[
@@ -368,7 +369,7 @@ class _FormSheet extends StatelessWidget {
                     Expanded(child: Divider(color: AppColors.border_(isDark))),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Text('or', style: TextStyle(color: subText)),
+                      child: T('or', style: TextStyle(color: subText)),
                     ),
                     Expanded(child: Divider(color: AppColors.border_(isDark))),
                   ],
@@ -379,7 +380,7 @@ class _FormSheet extends StatelessWidget {
                   child: OutlinedButton.icon(
                     onPressed: busy ? null : () => context.push('/phone'),
                     icon: const Icon(Icons.phone_iphone_rounded),
-                    label: const Text('Continue with phone number'),
+                    label: const T('Continue with phone number'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.text(isDark),
                       side: BorderSide(color: AppColors.border_(isDark)),
@@ -395,7 +396,7 @@ class _FormSheet extends StatelessWidget {
                   child: OutlinedButton.icon(
                     onPressed: busy ? null : onGoogle,
                     icon: const Icon(Icons.g_mobiledata_rounded, size: 30),
-                    label: const Text('Continue with Google'),
+                    label: const T('Continue with Google'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.text(isDark),
                       side: BorderSide(color: AppColors.border_(isDark)),
@@ -415,11 +416,10 @@ class _FormSheet extends StatelessWidget {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text('New to SmartAgro?',
-                          style: TextStyle(color: subText)),
+                      T('New to SmartAgro?', style: TextStyle(color: subText)),
                       TextButton(
                         onPressed: () => context.push('/register'),
-                        child: const Text(
+                        child: const T(
                           'Create account',
                           style: TextStyle(fontWeight: FontWeight.w700),
                         ),
@@ -448,7 +448,7 @@ class _DemoRolePicker extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Demo account', style: Theme.of(context).textTheme.labelLarge),
+        T('Demo account', style: Theme.of(context).textTheme.labelLarge),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,

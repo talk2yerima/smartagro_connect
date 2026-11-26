@@ -7,6 +7,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/di/auth_providers.dart';
 import '../../core/di/farm_providers.dart';
 import '../../core/di/repositories_provider.dart';
+import '../../core/i18n/i18n.dart';
 import '../../core/utils/money_format.dart';
 import '../../domain/entities/farm_profile.dart';
 import '../../domain/entities/product_listing.dart';
@@ -63,7 +64,7 @@ class SellerProfileScreen extends ConsumerWidget {
               actions: [
                 if (isMe)
                   IconButton(
-                    tooltip: 'Edit farm profile',
+                    tooltip: tr('Edit farm profile'),
                     icon: const Icon(Icons.edit_outlined),
                     onPressed: () => context.push('/profile/farm'),
                   )
@@ -339,7 +340,7 @@ class _AboutTab extends StatelessWidget {
           const SizedBox(height: 20),
         ],
         if (profile.categories.isNotEmpty) ...[
-          Text('What we produce', style: _sectionStyle(context)),
+          T('What we produce', style: _sectionStyle(context)),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -348,7 +349,7 @@ class _AboutTab extends StatelessWidget {
               for (final c in profile.categories)
                 Chip(
                   avatar: Icon(categoryIcon(c), size: 18),
-                  label: Text(c),
+                  label: Text(tr(c)),
                   visualDensity: VisualDensity.compact,
                 ),
             ],
@@ -356,7 +357,7 @@ class _AboutTab extends StatelessWidget {
           const SizedBox(height: 20),
         ],
         if (profile.openingHours.isNotEmpty) ...[
-          Text('Opening hours', style: _sectionStyle(context)),
+          T('Opening hours', style: _sectionStyle(context)),
           const SizedBox(height: 6),
           Row(
             children: [
@@ -369,7 +370,7 @@ class _AboutTab extends StatelessWidget {
           const SizedBox(height: 20),
         ],
         if (profile.galleryUrls.isNotEmpty) ...[
-          Text('Farm gallery', style: _sectionStyle(context)),
+          T('Farm gallery', style: _sectionStyle(context)),
           const SizedBox(height: 8),
           GridView.count(
             crossAxisCount: 3,
@@ -447,13 +448,13 @@ class _ProductsTab extends StatelessWidget {
     return CustomScrollView(
       slivers: [
         if (listings.isEmpty)
-          const SliverToBoxAdapter(
+          SliverToBoxAdapter(
             child: Padding(
-              padding: EdgeInsets.only(top: 24),
+              padding: const EdgeInsets.only(top: 24),
               child: EmptyState(
                 icon: Icons.storefront_rounded,
-                title: 'No products right now',
-                subtitle: 'Check back soon, or message the farmer.',
+                title: tr('No products right now'),
+                subtitle: tr('Check back soon, or message the farmer.'),
               ),
             ),
           )
@@ -477,8 +478,8 @@ class _ProductsTab extends StatelessWidget {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Text('Similar farmers near you',
-                  style: _sectionStyle(context)),
+              child:
+                  T('Similar farmers near you', style: _sectionStyle(context)),
             ),
           ),
           SliverToBoxAdapter(
@@ -553,7 +554,9 @@ class FarmerCard extends StatelessWidget {
                     ),
                     Text(
                       '★ ${farmer.rating > 0 ? farmer.rating.toStringAsFixed(1) : 'New'}'
-                      ' · ${farmer.products} product${farmer.products == 1 ? '' : 's'}',
+                      ' · ${farmer.products == 1 ? tr('1 product') : tr('{n} products', {
+                              'n': farmer.products
+                            })}',
                       style: const TextStyle(fontSize: 12),
                     ),
                     Text(farmer.place,
@@ -748,21 +751,20 @@ class _ReviewsTab extends ConsumerWidget {
         const SizedBox(height: 16),
         ...reviews.when(
           loading: () => [const Center(child: CircularProgressIndicator())],
-          error: (_, __) => [
-            Text('Reviews could not be loaded.', style: TextStyle(color: sub))
-          ],
+          error: (_, __) =>
+              [T('Reviews could not be loaded.', style: TextStyle(color: sub))],
           data: (list) => list.isEmpty
               ? [
-                  const EmptyState(
+                  EmptyState(
                     icon: Icons.reviews_outlined,
-                    title: 'No reviews yet',
-                    subtitle: 'Buyers can rate a farmer after their order '
-                        'arrives.',
+                    title: tr('No reviews yet'),
+                    subtitle: tr('Buyers can rate a farmer after their order '
+                        'arrives.'),
                   ),
                 ]
               : [
                   if (topReviewTags(list).isNotEmpty) ...[
-                    Text('Buyers say', style: _sectionStyle(context)),
+                    T('Buyers say', style: _sectionStyle(context)),
                     const SizedBox(height: 8),
                     ReviewTagChips(
                       tags: [for (final t in topReviewTags(list)) t.tag],

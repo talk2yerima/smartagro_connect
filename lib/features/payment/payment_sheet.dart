@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/di/auth_providers.dart';
 import '../../core/di/payment_providers.dart';
+import '../../core/i18n/i18n.dart';
 import '../../core/services/app_lock.dart';
 import '../../core/utils/money_format.dart';
 import '../../data/services/payments_api.dart';
@@ -233,7 +234,7 @@ class _PaymentSheetState extends ConsumerState<PaymentSheet> {
       children: [
         _handle(),
         const SizedBox(height: 20),
-        const Text(
+        const T(
           'Complete Payment',
           style: TextStyle(
               fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 18),
@@ -245,8 +246,8 @@ class _PaymentSheetState extends ConsumerState<PaymentSheet> {
           controller: _emailCtrl,
           keyboardType: TextInputType.emailAddress,
           decoration: InputDecoration(
-            labelText: 'Receipt email',
-            hintText: 'you@example.com',
+            labelText: tr('Receipt email'),
+            hintText: tr('you@example.com'),
             prefixIcon: const Icon(Icons.email_outlined, size: 20),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           ),
@@ -257,7 +258,7 @@ class _PaymentSheetState extends ConsumerState<PaymentSheet> {
             Icon(Icons.lock_outlined, size: 13, color: AppColors.gray),
             SizedBox(width: 4),
             Flexible(
-              child: Text(
+              child: T(
                 'Secured by Paystack · Card, bank transfer & USSD accepted',
                 style: TextStyle(fontSize: 11, color: AppColors.gray),
               ),
@@ -308,14 +309,14 @@ class _PaymentSheetState extends ConsumerState<PaymentSheet> {
               size: 32, color: AppColors.deepGreen),
         ),
         const SizedBox(height: 16),
-        const Text(
+        const T(
           'Payment page opened',
           style: TextStyle(
               fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 17),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 8),
-        const Text(
+        const T(
           'Complete your payment in the browser,\nthen come back and tap the button below.',
           style: TextStyle(color: AppColors.gray, fontSize: 13, height: 1.5),
           textAlign: TextAlign.center,
@@ -328,7 +329,7 @@ class _PaymentSheetState extends ConsumerState<PaymentSheet> {
         _fullButton(
           onPressed: _verify,
           icon: const Icon(Icons.verified_rounded, size: 18),
-          label: "I've completed payment",
+          label: tr("I've completed payment"),
         ),
         const SizedBox(height: 8),
         _cancelButton(),
@@ -347,13 +348,13 @@ class _PaymentSheetState extends ConsumerState<PaymentSheet> {
         const CircularProgressIndicator(
             color: AppColors.deepGreen, strokeWidth: 3),
         const SizedBox(height: 20),
-        const Text(
+        const T(
           'Verifying your payment…',
           style: TextStyle(
               fontFamily: 'Poppins', fontWeight: FontWeight.w600, fontSize: 16),
         ),
         const SizedBox(height: 8),
-        const Text(
+        const T(
           'This usually takes a few seconds.',
           style: TextStyle(color: AppColors.gray, fontSize: 13),
         ),
@@ -434,7 +435,7 @@ class _PaymentSheetState extends ConsumerState<PaymentSheet> {
                 Icon(Icons.inventory_2_outlined,
                     size: 16, color: AppColors.deepGreen),
                 SizedBox(width: 6),
-                Text(
+                T(
                   'ORDER SUMMARY',
                   style: TextStyle(
                     fontFamily: 'Poppins',
@@ -459,7 +460,7 @@ class _PaymentSheetState extends ConsumerState<PaymentSheet> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Total',
+                const T('Total',
                     style: TextStyle(
                         fontWeight: FontWeight.w600,
                         color: AppColors.gray,
@@ -530,7 +531,7 @@ class _PaymentSheetState extends ConsumerState<PaymentSheet> {
         width: double.infinity,
         child: TextButton(
           onPressed: () => Navigator.of(context).pop(PaymentResult.cancelled),
-          child: const Text('Cancel', style: TextStyle(color: AppColors.gray)),
+          child: const T('Cancel', style: TextStyle(color: AppColors.gray)),
         ),
       );
 }

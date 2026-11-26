@@ -7,8 +7,8 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_strings.dart';
 import '../../core/di/initialization_provider.dart';
+import '../../core/i18n/i18n.dart';
 import '../../shared/widgets/gradient_button.dart';
-
 // ─── Page data ────────────────────────────────────────────────────────────────
 
 class _PageData {
@@ -170,7 +170,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     style: TextButton.styleFrom(
                       foregroundColor: Colors.white.withValues(alpha: 0.90),
                     ),
-                    child: const Text(
+                    child: const T(
                       'Skip',
                       style: TextStyle(
                         fontFamily: 'Poppins',
@@ -221,7 +221,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       child: isLast
                           ? PrimaryGradientButton(
                               key: const ValueKey('get-started'),
-                              label: 'Get Started',
+                              label: tr('Get Started'),
                               onPressed: _finish,
                             )
                               .animate()
@@ -233,7 +233,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                               .fadeIn(duration: 200.ms)
                           : PrimaryGradientButton(
                               key: const ValueKey('continue'),
-                              label: 'Continue',
+                              label: tr('Continue'),
                               onPressed: _next,
                             ),
                     ),

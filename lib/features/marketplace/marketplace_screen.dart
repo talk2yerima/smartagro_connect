@@ -14,6 +14,7 @@ import '../../core/di/auth_providers.dart';
 import '../../core/di/haulage_providers.dart';
 import '../../core/di/repositories_provider.dart';
 import '../../core/errors/friendly_error.dart';
+import '../../core/i18n/i18n.dart';
 import '../../core/utils/geo.dart';
 import '../../core/utils/money_format.dart';
 import '../../domain/entities/app_user.dart';
@@ -269,7 +270,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
         elevation: 0,
         scrolledUnderElevation: 0.5,
         backgroundColor: isDark ? AppColors.darkBg : Colors.white,
-        title: Text(
+        title: T(
           'Marketplace',
           style: TextStyle(
             fontFamily: 'Poppins',
@@ -281,7 +282,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
         actions: [
           IconButton(
             onPressed: _showFilterSheet,
-            tooltip: 'Sort & Filter',
+            tooltip: tr('Sort & Filter'),
             icon: Badge(
               isLabelVisible: _filter.activeCount > 0,
               label: Text('${_filter.activeCount}'),
@@ -294,7 +295,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
           if (canAddListing)
             IconButton(
               onPressed: () => context.push('/marketplace/add'),
-              tooltip: 'Add listing',
+              tooltip: tr('Add listing'),
               icon: const Icon(
                 Icons.add_circle_outline_rounded,
                 color: AppColors.deepGreen,
@@ -319,7 +320,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                           size: 48,
                           color: AppColors.gray.withValues(alpha: 0.5)),
                       const SizedBox(height: 12),
-                      Text(
+                      T(
                         'Failed to load listings',
                         style: TextStyle(
                           fontFamily: 'Poppins',
@@ -340,7 +341,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                       OutlinedButton.icon(
                         onPressed: () => ref.invalidate(productsProvider),
                         icon: const Icon(Icons.refresh_rounded, size: 16),
-                        label: const Text('Retry'),
+                        label: const T('Retry'),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.deepGreen,
                           side: const BorderSide(color: AppColors.deepGreen),
@@ -421,10 +422,10 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                                   _searchQuery.isNotEmpty
                               ? EmptyState(
                                   icon: Icons.filter_alt_off_outlined,
-                                  title: 'Nothing matches',
+                                  title: tr('Nothing matches'),
                                   subtitle:
-                                      'Try a wider price range or distance, '
-                                      'or clear the filters.',
+                                      tr('Try a wider price range or distance, '
+                                          'or clear the filters.'),
                                   actionLabel: _filter.activeCount > 0
                                       ? 'Clear filters'
                                       : null,
@@ -434,8 +435,9 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                               : EmptyState(
                                   type: EmptyStateType.marketplace,
                                   icon: Icons.storefront_outlined,
-                                  title: 'No listings',
-                                  subtitle: 'Be the first to list your produce',
+                                  title: tr('No listings'),
+                                  subtitle:
+                                      tr('Be the first to list your produce'),
                                   actionLabel:
                                       canAddListing ? 'Add listing' : null,
                                   onAction: canAddListing
@@ -521,7 +523,7 @@ class _SearchFilterRow extends StatelessWidget {
               color: AppColors.text(isDark),
             ),
             decoration: InputDecoration(
-              hintText: 'Search produce, location…',
+              hintText: tr('Search produce, location…'),
               hintStyle: TextStyle(
                 fontFamily: 'Poppins',
                 fontSize: 13,
@@ -695,7 +697,7 @@ class _SpotlightStrip extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              const Text(
+              const T(
                 'FEATURED',
                 style: TextStyle(
                   fontFamily: 'Poppins',
@@ -806,7 +808,7 @@ class _SpotlightStrip extends StatelessWidget {
                                   Icon(Icons.verified_rounded,
                                       size: 10, color: Colors.white),
                                   SizedBox(width: 3),
-                                  Text(
+                                  T(
                                     'Verified',
                                     style: TextStyle(
                                       fontFamily: 'Poppins',
@@ -954,7 +956,7 @@ class _ProductCard extends ConsumerWidget {
                             Icon(Icons.verified_rounded,
                                 size: 10, color: Colors.white),
                             SizedBox(width: 3),
-                            Text(
+                            T(
                               'Verified',
                               style: TextStyle(
                                 fontFamily: 'Poppins',

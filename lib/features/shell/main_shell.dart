@@ -13,10 +13,10 @@ import '../../core/di/auth_providers.dart';
 import '../../core/di/firestore_providers.dart';
 import '../../core/di/payment_providers.dart';
 import '../../core/di/repositories_provider.dart';
+import '../../core/i18n/i18n.dart';
 import '../../core/services/push_messaging_service.dart';
 import '../../domain/entities/app_user.dart';
 import '../delivery/driver_tracker.dart';
-
 // ---------------------------------------------------------------------------
 // MainShell
 // ---------------------------------------------------------------------------
@@ -86,7 +86,7 @@ class _MainShellState extends ConsumerState<MainShell>
           behavior: SnackBarBehavior.floating,
           action: route != null
               ? SnackBarAction(
-                  label: 'View',
+                  label: tr('View'),
                   onPressed: () => openAppRoute(context, route),
                 )
               : null,
@@ -157,7 +157,7 @@ class _MainShellState extends ConsumerState<MainShell>
       final i = destinations.indexWhere((d) => d.branch == _messagesBranch);
       destinations[i] = _NavDestination(
         branch: _messagesBranch,
-        label: 'Messages',
+        label: tr('Messages'),
         icon: Icons.chat_bubble_outline_rounded,
         activeIcon: Icons.chat_bubble_rounded,
         badgeCount: totalUnread,
@@ -212,30 +212,30 @@ class _MainShellState extends ConsumerState<MainShell>
 
   List<_NavDestination> _buildDestinations(UserRole role, bool isDark) {
     return [
-      const _NavDestination(
+      _NavDestination(
         branch: 0,
-        label: 'Home',
+        label: tr('Home'),
         icon: Icons.home_outlined,
         activeIcon: Icons.home_rounded,
       ),
       _tab1Destination(role),
       // Transporters don't buy or sell; their deliveries live under Jobs.
       if (role != UserRole.transporter)
-        const _NavDestination(
+        _NavDestination(
           branch: _ordersBranch,
-          label: 'Orders',
+          label: tr('Orders'),
           icon: Icons.receipt_long_outlined,
           activeIcon: Icons.receipt_long_rounded,
         ),
-      const _NavDestination(
+      _NavDestination(
         branch: _messagesBranch,
-        label: 'Messages',
+        label: tr('Messages'),
         icon: Icons.chat_bubble_outline_rounded,
         activeIcon: Icons.chat_bubble_rounded,
       ),
-      const _NavDestination(
+      _NavDestination(
         branch: 4,
-        label: 'Profile',
+        label: tr('Profile'),
         icon: Icons.person_outline_rounded,
         activeIcon: Icons.person_rounded,
       ),
@@ -244,21 +244,21 @@ class _MainShellState extends ConsumerState<MainShell>
 
   _NavDestination _tab1Destination(UserRole role) {
     return switch (role) {
-      UserRole.transporter => const _NavDestination(
+      UserRole.transporter => _NavDestination(
           branch: 1,
-          label: 'Jobs',
+          label: tr('Jobs'),
           icon: Icons.local_shipping_outlined,
           activeIcon: Icons.local_shipping_rounded,
         ),
-      UserRole.admin => const _NavDestination(
+      UserRole.admin => _NavDestination(
           branch: 1,
-          label: 'Listings',
+          label: tr('Listings'),
           icon: Icons.list_alt_outlined,
           activeIcon: Icons.list_alt_rounded,
         ),
-      _ => const _NavDestination(
+      _ => _NavDestination(
           branch: 1,
-          label: 'Explore',
+          label: tr('Explore'),
           icon: Icons.explore_outlined,
           activeIcon: Icons.explore_rounded,
         ),
@@ -453,7 +453,7 @@ class _FarmerFab extends StatelessWidget {
       elevation: 4,
       backgroundColor: AppColors.warmOrange, // warmOrange
       foregroundColor: Colors.white,
-      tooltip: 'Add Listing',
+      tooltip: tr('Add Listing'),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: const Icon(Icons.add_rounded, size: 28),
     )
@@ -585,7 +585,7 @@ class _RailFab extends StatelessWidget {
       elevation: 2,
       backgroundColor: AppColors.warmOrange,
       foregroundColor: Colors.white,
-      tooltip: 'Add Listing',
+      tooltip: tr('Add Listing'),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: const Icon(Icons.add_rounded, size: 22),
     );

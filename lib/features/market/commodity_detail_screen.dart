@@ -8,6 +8,7 @@ import '../../core/di/auth_providers.dart';
 import '../../core/di/firestore_providers.dart';
 import '../../core/di/repositories_provider.dart';
 import '../../core/errors/friendly_error.dart';
+import '../../core/i18n/i18n.dart';
 import '../../core/utils/money_format.dart';
 import '../../domain/entities/commodity.dart';
 import '../../domain/entities/price_alert.dart';
@@ -16,7 +17,6 @@ import '../../shared/widgets/section_header.dart';
 import '../../shared/widgets/skeleton_list.dart';
 import '../../shared/widgets/sparkline_chart.dart';
 import '../../shared/widgets/stat_card.dart';
-
 // ─── Local card decoration helper ────────────────────────────────────────────
 
 BoxDecoration _card(bool isDark) => BoxDecoration(
@@ -76,9 +76,9 @@ class CommodityDetailScreen extends ConsumerWidget {
         appBar: _buildAppBar(context, 'Error', null),
         body: EmptyState(
           icon: Icons.error_outline_rounded,
-          title: 'Failed to load',
+          title: tr('Failed to load'),
           subtitle: friendlyError(e),
-          actionLabel: 'Retry',
+          actionLabel: tr('Retry'),
           onAction: () => ref.invalidate(commoditiesProvider),
         ),
       ),
@@ -87,11 +87,11 @@ class CommodityDetailScreen extends ConsumerWidget {
         if (index == -1) {
           return Scaffold(
             appBar: _buildAppBar(context, 'Not Found', null),
-            body: const EmptyState(
+            body: EmptyState(
               icon: Icons.search_off_rounded,
-              title: 'Commodity not found',
-              subtitle:
-                  'We could not find a commodity with that ID. It may have been removed.',
+              title: tr('Commodity not found'),
+              subtitle: tr(
+                  'We could not find a commodity with that ID. It may have been removed.'),
             ),
           );
         }
@@ -163,7 +163,7 @@ class CommodityDetailScreen extends ConsumerWidget {
         if (commodity != null)
           IconButton(
             icon: const Icon(Icons.share_outlined),
-            tooltip: 'Share',
+            tooltip: tr('Share'),
             onPressed: () {
               HapticFeedback.lightImpact();
               final text =
@@ -394,7 +394,7 @@ class _SparklineCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              Text(
+              T(
                 'Latest Price Move',
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
                       fontFamily: 'Poppins',
@@ -484,14 +484,14 @@ class _MarketStatsGrid extends StatelessWidget {
 
     final stats = [
       _StatEntry(
-        label: 'Current Price',
+        label: tr('Current Price'),
         value: formatNgn(commodity.priceNgn),
         icon: Icons.sell_outlined,
         color: AppColors.deepGreen,
         trend: null,
       ),
       _StatEntry(
-        label: 'Latest Change',
+        label: tr('Latest Change'),
         value: '${isUp ? '+' : ''}${commodity.changePct.toStringAsFixed(2)}%',
         icon: Icons.trending_up_rounded,
         color: isUp ? AppColors.mintGreen : AppColors.errorRed,
@@ -499,14 +499,14 @@ class _MarketStatsGrid extends StatelessWidget {
       ),
       // Real field in place of a fixed "2,400 MT" volume shown on every item.
       _StatEntry(
-        label: 'Priced per',
+        label: tr('Priced per'),
         value: commodity.unit,
         icon: Icons.inventory_2_outlined,
         color: AppColors.infoBlue,
         trend: null,
       ),
       _StatEntry(
-        label: 'Market Trend',
+        label: tr('Market Trend'),
         value: commodity.changePct > 0
             ? 'Rising'
             : commodity.changePct < 0
@@ -523,7 +523,7 @@ class _MarketStatsGrid extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.only(bottom: 12),
-          child: Text(
+          child: T(
             'Market Statistics',
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   fontFamily: 'Poppins',
@@ -590,14 +590,14 @@ class _DetailsCard extends StatelessWidget {
     final rows = [
       _DetailRow(
           icon: Icons.category_outlined,
-          label: 'Category',
+          label: tr('Category'),
           value: commodity.category),
       // "Origin" (guessed from category) and "Last Updated" (fixed text,
       // "Today, 09:30 AM") were removed: commodities store neither. Add them
       // back when the price feed provides a source region and timestamp.
       _DetailRow(
           icon: Icons.straighten_outlined,
-          label: 'Unit',
+          label: tr('Unit'),
           value: commodity.unit),
     ];
 
@@ -624,7 +624,7 @@ class _DetailsCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 10),
-                Text(
+                T(
                   'Commodity Details',
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         fontFamily: 'Poppins',
@@ -746,7 +746,7 @@ class _PriceAlertCard extends ConsumerWidget {
               backgroundColor: accent.withValues(alpha: 0.12),
               child: Icon(Icons.notifications_active_outlined, color: accent),
             ),
-            title: const Text('Set Price Alert',
+            title: const T('Set Price Alert',
                 style: TextStyle(fontWeight: FontWeight.w700)),
             subtitle:
                 Text('Get notified when ${commodity.name} reaches your price'),
@@ -780,7 +780,7 @@ class _PriceAlertCard extends ConsumerWidget {
               ),
               subtitle: Text(a.active ? 'Waiting' : 'Reached. You were told.'),
               trailing: IconButton(
-                tooltip: 'Remove alert',
+                tooltip: tr('Remove alert'),
                 icon: const Icon(Icons.delete_outline_rounded),
                 onPressed: () => ref
                     .read(firestoreServiceProvider)
@@ -892,9 +892,9 @@ class _PriceAlertSheetState extends ConsumerState<_PriceAlertSheet> {
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             onChanged: (_) => setState(() => _error = null),
             onSubmitted: (_) => _save(),
-            decoration: const InputDecoration(
-              labelText: 'Tell me when the price reaches (₦)',
-              prefixIcon: Icon(Icons.sell_outlined),
+            decoration: InputDecoration(
+              labelText: tr('Tell me when the price reaches (₦)'),
+              prefixIcon: const Icon(Icons.sell_outlined),
             ),
           ),
           if (hint != null) ...[
@@ -930,8 +930,8 @@ class _RelatedSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionHeader(
-          title: 'Related Commodities',
+        SectionHeader(
+          title: tr('Related Commodities'),
           icon: Icons.grain_rounded,
         ),
         const SizedBox(height: 10),

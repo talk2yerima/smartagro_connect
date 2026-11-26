@@ -13,11 +13,11 @@ import '../../core/di/auth_providers.dart';
 import '../../core/di/haulage_providers.dart';
 import '../../core/di/repositories_provider.dart';
 import '../../core/di/upload_providers.dart';
+import '../../core/i18n/i18n.dart';
 import '../../core/services/app_lock.dart';
 import '../../core/utils/money_format.dart';
 import '../../data/services/location_service.dart';
 import '../../shared/widgets/gradient_button.dart';
-
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const _kCategories = [
@@ -130,7 +130,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
               ListTile(
                 leading: const Icon(Icons.camera_alt_outlined,
                     color: AppColors.deepGreen),
-                title: Text(
+                title: T(
                   'Take a photo',
                   style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
                 ),
@@ -142,7 +142,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
               ListTile(
                 leading: const Icon(Icons.photo_library_outlined,
                     color: AppColors.deepGreen),
-                title: Text(
+                title: T(
                   'Choose from gallery',
                   style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
                 ),
@@ -155,7 +155,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                 ListTile(
                   leading: const Icon(Icons.delete_outline,
                       color: AppColors.errorRed),
-                  title: Text(
+                  title: T(
                     'Remove photo',
                     style: GoogleFonts.poppins(
                       fontWeight: FontWeight.w500,
@@ -192,7 +192,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not access camera/gallery.')),
+          const SnackBar(content: T('Could not access camera/gallery.')),
         );
       }
     }
@@ -359,7 +359,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
               const Icon(Icons.check_circle_outline,
                   color: AppColors.freshGreen, size: 20),
               const SizedBox(width: 10),
-              Text(
+              T(
                 'Listing published!',
                 style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
               ),
@@ -408,9 +408,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
         leading: IconButton(
           icon: const Icon(Icons.close_rounded),
           onPressed: () => Navigator.pop(context),
-          tooltip: 'Close',
+          tooltip: tr('Close'),
         ),
-        title: Text(
+        title: T(
           'New Listing',
           style: GoogleFonts.poppins(
             fontWeight: FontWeight.w700,
@@ -469,7 +469,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                     const Icon(Icons.check_circle_rounded,
                         size: 14, color: AppColors.mintGreen),
                     const SizedBox(width: 5),
-                    Text(
+                    T(
                       'Image uploaded successfully',
                       style: GoogleFonts.poppins(
                         fontSize: 11,
@@ -530,7 +530,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
 
               // [2] Listing details
               _SectionLabel(
-                      label: 'Listing Details',
+                      label: tr('Listing Details'),
                       icon: Icons.edit_note_rounded,
                       isDark: isDark)
                   .animate(delay: 50.ms)
@@ -546,8 +546,8 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                   children: [
                     _buildTextFormField(
                       controller: _titleCtrl,
-                      label: 'Product Title',
-                      hint: 'e.g. Fresh White Maize — Kano 2024',
+                      label: tr('Product Title'),
+                      hint: tr('e.g. Fresh White Maize — Kano 2024'),
                       isDark: isDark,
                       maxLength: 80,
                       validator: (v) => (v == null || v.trim().length < 4)
@@ -559,8 +559,8 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                     const SizedBox(height: 14),
                     _buildTextFormField(
                       controller: _descCtrl,
-                      label: 'Description',
-                      hint: 'Describe quality, harvest date, storage…',
+                      label: tr('Description'),
+                      hint: tr('Describe quality, harvest date, storage…'),
                       isDark: isDark,
                       maxLines: 3,
                       validator: (v) => (v == null || v.trim().length < 10)
@@ -575,7 +575,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
 
               // [3] Pricing & Quantity
               _SectionLabel(
-                      label: 'Pricing & Quantity',
+                      label: tr('Pricing & Quantity'),
                       icon: Icons.sell_outlined,
                       isDark: isDark)
                   .animate(delay: 110.ms)
@@ -597,7 +597,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                             // Per kg: buyers pay price x quantity. Whole naira
                             // only (decimals passed validation, then crashed
                             // the save, and the rules reject them anyway).
-                            label: 'Price per kg',
+                            label: tr('Price per kg'),
                             hint: '0',
                             isDark: isDark,
                             prefixText: '₦ ',
@@ -621,7 +621,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                         Expanded(
                           child: _buildTextFormField(
                             controller: _qtyCtrl,
-                            label: 'Quantity',
+                            label: tr('Quantity'),
                             hint: '0',
                             isDark: isDark,
                             suffixText: ' kg',
@@ -690,7 +690,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
 
               // [4] Location
               _SectionLabel(
-                      label: 'Location',
+                      label: tr('Location'),
                       icon: Icons.location_on_outlined,
                       isDark: isDark)
                   .animate(delay: 170.ms)
@@ -708,8 +708,8 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                     const SizedBox(height: 14),
                     _buildTextFormField(
                       controller: _cityCtrl,
-                      label: 'City / LGA',
-                      hint: 'e.g. Ikeja, Nassarawa, Ungwa Rimi',
+                      label: tr('City / LGA'),
+                      hint: tr('e.g. Ikeja, Nassarawa, Ungwa Rimi'),
                       isDark: isDark,
                       validator: (v) => (v == null || v.trim().isEmpty)
                           ? 'Enter city or LGA'
@@ -777,7 +777,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                     color: AppColors.gray,
                   ),
                   const SizedBox(width: 5),
-                  Text(
+                  T(
                     'Goes live straight away. Edit it any time.',
                     style: GoogleFonts.poppins(
                       fontSize: 12,
@@ -868,7 +868,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
 
     return DropdownButtonFormField<String>(
       initialValue: _selectedCategory,
-      hint: Text(
+      hint: T(
         'Select category',
         style: GoogleFonts.poppins(fontSize: 13, color: textSub),
       ),
@@ -886,7 +886,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
       style: GoogleFonts.poppins(fontSize: 14, color: textPrimary),
       dropdownColor: isDark ? AppColors.cardDark : Colors.white,
       decoration: InputDecoration(
-        labelText: 'Category',
+        labelText: tr('Category'),
         labelStyle: GoogleFonts.poppins(fontSize: 13, color: textSub),
         filled: true,
         fillColor: fillColor,
@@ -922,7 +922,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
       // Re-created when "Use GPS" fills in the state.
       key: ValueKey(_selectedState),
       initialValue: _selectedState,
-      hint: Text(
+      hint: T(
         'Select state',
         style: GoogleFonts.poppins(fontSize: 13, color: textSub),
       ),
@@ -940,7 +940,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
       style: GoogleFonts.poppins(fontSize: 14, color: textPrimary),
       dropdownColor: isDark ? AppColors.cardDark : Colors.white,
       decoration: InputDecoration(
-        labelText: 'State',
+        labelText: tr('State'),
         labelStyle: GoogleFonts.poppins(fontSize: 13, color: textSub),
         filled: true,
         fillColor: fillColor,
@@ -1024,7 +1024,7 @@ class _ImagePickerCard extends StatelessWidget {
                             const Icon(Icons.edit_outlined,
                                 color: Colors.white, size: 14),
                             const SizedBox(width: 4),
-                            Text(
+                            T(
                               'Change',
                               style: GoogleFonts.poppins(
                                   color: Colors.white,
@@ -1064,7 +1064,7 @@ class _DashedEmptyPicker extends StatelessWidget {
               color: AppColors.deepGreen,
             ),
             const SizedBox(height: 8),
-            Text(
+            T(
               'Tap to add photos',
               style: GoogleFonts.poppins(
                 fontSize: 14,
@@ -1073,7 +1073,7 @@ class _DashedEmptyPicker extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
-            Text(
+            T(
               'JPEG / PNG  •  max 5 MB',
               style: GoogleFonts.poppins(
                 fontSize: 11,
@@ -1140,7 +1140,7 @@ class _AvailabilitySegment extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        T(
           'Availability',
           style: GoogleFonts.poppins(
             fontSize: 12,
@@ -1170,17 +1170,17 @@ class _AvailabilitySegment extends StatelessWidget {
           segments: const [
             ButtonSegment(
               value: _Availability.inStock,
-              label: Text('In Stock'),
+              label: T('In Stock'),
               icon: Icon(Icons.check_circle_outline, size: 15),
             ),
             ButtonSegment(
               value: _Availability.limited,
-              label: Text('Limited'),
+              label: T('Limited'),
               icon: Icon(Icons.warning_amber_outlined, size: 15),
             ),
             ButtonSegment(
               value: _Availability.preOrder,
-              label: Text('Pre-order'),
+              label: T('Pre-order'),
               icon: Icon(Icons.event_available_rounded, size: 15),
             ),
           ],

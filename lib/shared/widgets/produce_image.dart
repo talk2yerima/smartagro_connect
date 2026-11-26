@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/i18n/i18n.dart';
 import 'skeleton_list.dart';
 
 /// True when [url] is a real uploaded photo. Empty URLs and the random
@@ -58,7 +59,7 @@ class ProduceImage extends StatelessWidget {
 
   Widget _placeholder(bool isDark) {
     return Semantics(
-      label: 'No photo',
+      label: tr('No photo'),
       child: Container(
         width: width,
         height: height,

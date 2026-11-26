@@ -8,6 +8,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/di/auth_providers.dart';
 import '../../core/errors/failures.dart';
 import '../../core/errors/friendly_error.dart';
+import '../../core/i18n/i18n.dart';
 import '../../domain/entities/app_user.dart';
 import '../../shared/widgets/gradient_button.dart';
 import 'widgets/role_card.dart';
@@ -71,7 +72,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     final text = Theme.of(context).textTheme;
     final errorColor = Theme.of(context).colorScheme.error;
     return Scaffold(
-      appBar: AppBar(title: const Text('Create account')),
+      appBar: AppBar(title: const T('Create account')),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
@@ -80,16 +81,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('Join SmartAgro', style: text.headlineSmall),
+                T('Join SmartAgro', style: text.headlineSmall),
                 const SizedBox(height: 4),
-                Text(
+                T(
                   'Pick how you will use the app. You can sell, buy or '
                   'transport produce.',
                   style: text.bodyMedium
                       ?.copyWith(color: AppColors.subText(isDark)),
                 ),
                 const SizedBox(height: 20),
-                Text('I am a', style: text.labelLarge),
+                T('I am a', style: text.labelLarge),
                 const SizedBox(height: 8),
                 // Big tappable cards instead of a dropdown: easier for
                 // first-time users. Admin is never self-selected (the
@@ -113,9 +114,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   textCapitalization: TextCapitalization.words,
                   textInputAction: TextInputAction.next,
                   autofillHints: const [AutofillHints.name],
-                  decoration: const InputDecoration(
-                    labelText: 'Full name',
-                    prefixIcon: Icon(Icons.person_outline_rounded),
+                  decoration: InputDecoration(
+                    labelText: tr('Full name'),
+                    prefixIcon: const Icon(Icons.person_outline_rounded),
                   ),
                   validator: (v) => v == null || v.trim().length < 2
                       ? 'Enter your name'
@@ -127,9 +128,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.next,
                   autofillHints: const [AutofillHints.email],
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    prefixIcon: Icon(Icons.mail_outline_rounded),
+                  decoration: InputDecoration(
+                    labelText: tr('Email'),
+                    prefixIcon: const Icon(Icons.mail_outline_rounded),
                   ),
                   validator: (v) => v == null || !v.contains('@')
                       ? 'Enter a valid email'
@@ -145,8 +146,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     if (!_busy) _submit();
                   },
                   decoration: InputDecoration(
-                    labelText: 'Password',
-                    helperText: 'At least 6 characters',
+                    labelText: tr('Password'),
+                    helperText: tr('At least 6 characters'),
                     prefixIcon: const Icon(Icons.lock_outline_rounded),
                     suffixIcon: IconButton(
                       tooltip:
@@ -191,15 +192,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   alignment: WrapAlignment.center,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Text('By creating an account, you agree to our ',
+                    T('By creating an account, you agree to our ',
                         style: text.bodySmall
                             ?.copyWith(color: AppColors.subText(isDark))),
                     _LinkText('Terms of Use', AppEnv.termsUrl),
-                    Text(' and ',
+                    T(' and ',
                         style: text.bodySmall
                             ?.copyWith(color: AppColors.subText(isDark))),
                     _LinkText('Privacy Policy', AppEnv.privacyPolicyUrl),
-                    Text('.',
+                    T('.',
                         style: text.bodySmall
                             ?.copyWith(color: AppColors.subText(isDark))),
                   ],
@@ -208,10 +209,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text('Already have an account?'),
+                    const T('Already have an account?'),
                     TextButton(
                       onPressed: () => context.go('/login'),
-                      child: const Text('Sign in'),
+                      child: const T('Sign in'),
                     ),
                   ],
                 ),

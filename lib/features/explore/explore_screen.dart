@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/di/repositories_provider.dart';
 import '../../core/errors/friendly_error.dart';
+import '../../core/i18n/i18n.dart';
 import '../../core/utils/money_format.dart';
 import '../../domain/entities/commodity.dart';
 import '../../domain/farmer_directory.dart';
@@ -26,10 +27,10 @@ class ExploreScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: AppColors.bg(isDark),
       appBar: AppBar(
-        title: const Text('Explore'),
+        title: const T('Explore'),
         actions: [
           IconButton(
-            tooltip: 'All products',
+            tooltip: tr('All products'),
             icon: const Icon(Icons.grid_view_rounded),
             onPressed: () => context.push('/marketplace'),
           ),
@@ -51,9 +52,9 @@ class ExploreScreen extends ConsumerWidget {
               const SizedBox(height: 80),
               EmptyState(
                 icon: Icons.cloud_off_rounded,
-                title: 'Could not load produce',
+                title: tr('Could not load produce'),
                 subtitle: friendlyError(e),
-                actionLabel: 'Retry',
+                actionLabel: tr('Retry'),
                 onAction: () => ref.invalidate(productsProvider),
               ),
             ],
@@ -73,19 +74,19 @@ class ExploreScreen extends ConsumerWidget {
                 if (commodities.isNotEmpty)
                   _PricesStrip(commodities: commodities.take(6).toList()),
                 if (all.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 40),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 40),
                     child: EmptyState(
                       icon: Icons.storefront_outlined,
-                      title: 'No produce listed yet',
-                      subtitle: 'When farmers list produce, you will find '
-                          'them here.',
+                      title: tr('No produce listed yet'),
+                      subtitle: tr('When farmers list produce, you will find '
+                          'them here.'),
                     ),
                   ),
                 if (top.isNotEmpty) ...[
                   _Header(
-                    title: 'Top farmers',
-                    action: 'See all',
+                    title: tr('Top farmers'),
+                    action: tr('See all'),
                     onAction: () => context.push('/marketplace'),
                   ),
                   SizedBox(
@@ -101,8 +102,8 @@ class ExploreScreen extends ConsumerWidget {
                 ],
                 if (trending.isNotEmpty) ...[
                   _Header(
-                    title: 'Trending products',
-                    action: 'See all',
+                    title: tr('Trending products'),
+                    action: tr('See all'),
                     onAction: () => context.push('/marketplace'),
                   ),
                   GridView.builder(
@@ -124,7 +125,7 @@ class ExploreScreen extends ConsumerWidget {
                   ),
                 ],
                 if (states.isNotEmpty) ...[
-                  const _Header(title: 'Explore by state'),
+                  _Header(title: tr('Explore by state')),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Wrap(
@@ -171,7 +172,7 @@ class _SearchBox extends StatelessWidget {
             children: [
               Icon(Icons.search_rounded, color: AppColors.subText(isDark)),
               const SizedBox(width: 10),
-              Text('Search produce or farmers',
+              T('Search produce or farmers',
                   style: TextStyle(color: AppColors.subText(isDark))),
             ],
           ),
@@ -218,8 +219,8 @@ class _PricesStrip extends StatelessWidget {
     return Column(
       children: [
         _Header(
-          title: 'Market prices today',
-          action: 'All prices',
+          title: tr('Market prices today'),
+          action: tr('All prices'),
           onAction: () => context.push('/main/market/prices'),
         ),
         SizedBox(

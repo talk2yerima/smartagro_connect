@@ -9,6 +9,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/di/auth_providers.dart';
 import '../../core/errors/failures.dart';
 import '../../core/errors/friendly_error.dart';
+import '../../core/i18n/i18n.dart';
 import '../../core/utils/phone_number.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../domain/entities/app_user.dart';
@@ -175,10 +176,10 @@ class _PhoneSignInScreenState extends ConsumerState<PhoneSignInScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sign in with phone'),
+        title: const T('Sign in with phone'),
         leading: _step == _Step.code
             ? IconButton(
-                tooltip: 'Change number',
+                tooltip: tr('Change number'),
                 icon: const Icon(Icons.arrow_back_rounded),
                 onPressed: _changeNumber,
               )
@@ -221,10 +222,10 @@ class _PhoneSignInScreenState extends ConsumerState<PhoneSignInScreen> {
           inputFormatters: [
             FilteringTextInputFormatter.allow(RegExp(r'[\d+\s-]')),
           ],
-          decoration: const InputDecoration(
-            labelText: 'Phone number',
+          decoration: InputDecoration(
+            labelText: tr('Phone number'),
             hintText: '0803 123 4567',
-            prefixIcon: Icon(Icons.phone_outlined),
+            prefixIcon: const Icon(Icons.phone_outlined),
           ),
         ),
         const SizedBox(height: 20),
@@ -273,13 +274,13 @@ class _PhoneSignInScreenState extends ConsumerState<PhoneSignInScreen> {
             else
               TextButton(
                 onPressed: _busy ? null : () => _sendCode(resend: true),
-                child: const Text('Send a new code'),
+                child: const T('Send a new code'),
               ),
           ],
         ),
         TextButton(
           onPressed: _busy ? null : _changeNumber,
-          child: const Text('Use a different number'),
+          child: const T('Use a different number'),
         ),
       ];
 
@@ -289,13 +290,13 @@ class _PhoneSignInScreenState extends ConsumerState<PhoneSignInScreen> {
           autofocus: true,
           textCapitalization: TextCapitalization.words,
           autofillHints: const [AutofillHints.name],
-          decoration: const InputDecoration(
-            labelText: 'Full name',
-            prefixIcon: Icon(Icons.person_outline_rounded),
+          decoration: InputDecoration(
+            labelText: tr('Full name'),
+            prefixIcon: const Icon(Icons.person_outline_rounded),
           ),
         ),
         const SizedBox(height: 20),
-        Text('I am a', style: Theme.of(context).textTheme.labelLarge),
+        T('I am a', style: Theme.of(context).textTheme.labelLarge),
         const SizedBox(height: 8),
         for (final role in const [
           UserRole.farmer,

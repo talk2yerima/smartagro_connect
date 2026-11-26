@@ -6,6 +6,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/di/haulage_providers.dart';
+import '../../core/i18n/i18n.dart';
 import '../../core/services/app_lock.dart';
 import '../../core/utils/geo.dart';
 import '../../data/services/location_service.dart';
@@ -75,7 +76,7 @@ class _PlacePickerScreenState extends ConsumerState<PlacePickerScreen> {
         content: Text(p.message),
         action: p.openSettings
             ? SnackBarAction(
-                label: 'Settings',
+                label: tr('Settings'),
                 onPressed: () =>
                     ref.read(locationServiceProvider).openSettings())
             : null,
@@ -126,7 +127,7 @@ class _PlacePickerScreenState extends ConsumerState<PlacePickerScreen> {
             bottom: 170,
             child: FloatingActionButton.small(
               heroTag: 'me',
-              tooltip: 'My location',
+              tooltip: tr('My location'),
               onPressed: _goToMe,
               child: const Icon(Icons.my_location_rounded),
             ),
@@ -178,7 +179,7 @@ class _PlacePickerScreenState extends ConsumerState<PlacePickerScreen> {
                       height: 48,
                       child: FilledButton.icon(
                         icon: const Icon(Icons.check_rounded),
-                        label: const Text('Use this place'),
+                        label: const T('Use this place'),
                         onPressed: () => Navigator.of(context)
                             .pop<PickedPlace>((point: _centre, name: _name)),
                       ),

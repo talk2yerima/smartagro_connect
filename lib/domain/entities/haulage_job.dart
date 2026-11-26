@@ -1,3 +1,4 @@
+import '../../core/i18n/i18n.dart';
 import '../../core/utils/geo.dart';
 
 /// A place on a delivery: a short description and its map position.
@@ -151,11 +152,11 @@ class HaulageJob {
   JobPlace get nextStop => isPickedUp ? dropoff : pickup;
 
   String get statusLabel => switch (status) {
-        'open' => 'Waiting for a transporter',
-        'accepted' => 'Transporter on the way to pickup',
-        'picked_up' => 'On the way to you',
-        'delivered' => 'Delivered',
-        'cancelled' => 'Cancelled',
+        'open' => tr('Waiting for a transporter'),
+        'accepted' => tr('Transporter on the way to pickup'),
+        'picked_up' => tr('On the way to you'),
+        'delivered' => tr('Delivered'),
+        'cancelled' => tr('Cancelled'),
         _ => status,
       };
 }

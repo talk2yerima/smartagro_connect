@@ -10,6 +10,7 @@ import '../../core/di/auth_providers.dart';
 import '../../core/di/firestore_providers.dart';
 import '../../core/di/haulage_providers.dart';
 import '../../core/errors/friendly_error.dart';
+import '../../core/i18n/i18n.dart';
 import '../../core/services/app_lock.dart';
 import '../../core/utils/geo.dart';
 import '../../core/utils/money_format.dart';
@@ -57,7 +58,7 @@ class _JobsScreenState extends ConsumerState<JobsScreen> {
           content: Text(p.message),
           action: p.openSettings
               ? SnackBarAction(
-                  label: 'Settings', onPressed: location.openSettings)
+                  label: tr('Settings'), onPressed: location.openSettings)
               : null,
         ));
       }
@@ -74,10 +75,10 @@ class _JobsScreenState extends ConsumerState<JobsScreen> {
       child: Scaffold(
         backgroundColor: AppColors.bg(isDark),
         appBar: AppBar(
-          title: const Text('Jobs'),
+          title: const T('Jobs'),
           actions: [
             IconButton(
-              tooltip: 'Sort by distance from me',
+              tooltip: tr('Sort by distance from me'),
               onPressed: _locating ? null : _locate,
               icon: _locating
                   ? const SizedBox(
@@ -135,7 +136,7 @@ class _LiveBanner extends ConsumerWidget {
               Icon(Icons.sensors_rounded, color: Colors.white, size: 20),
               SizedBox(width: 10),
               Expanded(
-                child: Text('Delivery under way · sharing your location',
+                child: T('Delivery under way · sharing your location',
                     style: TextStyle(
                         color: Colors.white, fontWeight: FontWeight.w600)),
               ),
@@ -223,13 +224,13 @@ class _OpenJobs extends ConsumerWidget {
               ],
               const SizedBox(height: 12),
               if (shown.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.only(top: 40),
+                Padding(
+                  padding: const EdgeInsets.only(top: 40),
                   child: EmptyState(
                     icon: Icons.local_shipping_outlined,
-                    title: 'No open jobs right now',
-                    subtitle: 'When a buyer or seller asks for transport, '
-                        'the job appears here and you get a notification.',
+                    title: tr('No open jobs right now'),
+                    subtitle: tr('When a buyer or seller asks for transport, '
+                        'the job appears here and you get a notification.'),
                   ),
                 )
               else
@@ -260,11 +261,11 @@ class _MyJobs extends ConsumerWidget {
           onRetry: () => ref.invalidate(myHaulageJobsProvider)),
       data: (jobs) {
         if (jobs.isEmpty) {
-          return const EmptyState(
+          return EmptyState(
             icon: Icons.assignment_outlined,
-            title: 'No jobs yet',
-            subtitle: 'Jobs you accept show here, with the route, contacts '
-                'and live tracking.',
+            title: tr('No jobs yet'),
+            subtitle: tr('Jobs you accept show here, with the route, contacts '
+                'and live tracking.'),
           );
         }
         final active = jobs.where((j) => j.isActive).toList();
@@ -328,7 +329,7 @@ class _JobCardState extends ConsumerState<JobCard> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('Accept this job?'),
+        title: const T('Accept this job?'),
         content: Text(
           '${j.description}\n'
           '${placeText(j.pickup)} → ${placeText(j.dropoff)}\n\n'
@@ -341,10 +342,10 @@ class _JobCardState extends ConsumerState<JobCard> {
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(c, false),
-              child: const Text('Not now')),
+              child: const T('Not now')),
           FilledButton(
               onPressed: () => Navigator.pop(c, true),
-              child: const Text('Accept')),
+              child: const T('Accept')),
         ],
       ),
     );
@@ -360,7 +361,7 @@ class _JobCardState extends ConsumerState<JobCard> {
       // Firestore keeps the write and sends it when the network is back.
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Weak network: your acceptance will be sent when '
+          content: T('Weak network: your acceptance will be sent when '
               'you are back online. Check My jobs.')));
     } catch (e) {
       if (!mounted) return;
@@ -539,7 +540,7 @@ class _Error extends StatelessWidget {
             children: [
               Text(message, textAlign: TextAlign.center),
               const SizedBox(height: 12),
-              OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
+              OutlinedButton(onPressed: onRetry, child: const T('Retry')),
             ],
           ),
         ),

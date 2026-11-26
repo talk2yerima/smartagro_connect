@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/i18n/i18n.dart';
 import '../../core/utils/app_logger.dart';
 
 /// Longest voice note; recording stops and sends itself at this point.
@@ -114,7 +115,7 @@ class RecordingBar extends StatelessWidget {
     return Row(
       children: [
         IconButton(
-          tooltip: 'Cancel voice note',
+          tooltip: tr('Cancel voice note'),
           onPressed: onCancel,
           icon: const Icon(Icons.delete_outline_rounded),
           color: AppColors.errorRed,
@@ -159,7 +160,7 @@ class RecordingBar extends StatelessWidget {
         const SizedBox(width: 8),
         Semantics(
           button: true,
-          label: 'Send voice note',
+          label: tr('Send voice note'),
           child: Material(
             color: AppColors.deepGreen,
             shape: const CircleBorder(),
@@ -278,7 +279,7 @@ class _VoiceNoteBubbleState extends State<VoiceNoteBubble> {
       if (mounted) {
         setState(() => _loading = false);
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text("Couldn't play this voice note. Check your "
+            content: T("Couldn't play this voice note. Check your "
                 'connection and try again.')));
       }
       return null;

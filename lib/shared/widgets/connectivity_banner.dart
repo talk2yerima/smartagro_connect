@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/di/initialization_provider.dart';
 
+import '../../core/i18n/i18n.dart';
+
 /// StreamProvider that emits `true` when at least one interface is online.
 final isOnlineProvider = StreamProvider<bool>((ref) {
   return ref
@@ -34,7 +36,7 @@ class ConnectivityBanner extends ConsumerWidget {
         children: [
           Icon(Icons.wifi_off_rounded, size: 14, color: Colors.white),
           SizedBox(width: 6),
-          Text(
+          T(
             'You\'re offline — showing cached data',
             style: TextStyle(
               fontFamily: 'Poppins',

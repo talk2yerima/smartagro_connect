@@ -9,6 +9,7 @@ import '../../core/di/auth_providers.dart';
 import '../../core/di/haulage_providers.dart';
 import '../../core/di/payment_providers.dart';
 import '../../core/di/repositories_provider.dart';
+import '../../core/i18n/i18n.dart';
 import '../../core/utils/money_format.dart';
 import '../../domain/entities/app_user.dart';
 import '../../domain/entities/commodity.dart';
@@ -24,7 +25,6 @@ import '../../shared/widgets/sparkline_chart.dart';
 import '../../shared/widgets/stat_card.dart';
 import '../../shared/widgets/status_badge.dart';
 import 'farmers_for_you.dart';
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Card decoration helper (spec-compliant, defined locally per file)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -50,9 +50,9 @@ BoxDecoration _card(bool isDark) => BoxDecoration(
 
 String _greeting() {
   final hour = DateTime.now().hour;
-  if (hour < 12) return 'Good morning';
-  if (hour < 17) return 'Good afternoon';
-  return 'Good evening';
+  if (hour < 12) return tr('Good morning');
+  if (hour < 17) return tr('Good afternoon');
+  return tr('Good evening');
 }
 
 String _signed(double v) =>
@@ -104,7 +104,7 @@ class DashboardScreen extends ConsumerWidget {
         elevation: 0,
         scrolledUnderElevation: 0.5,
         backgroundColor: isDark ? AppColors.darkBg : Colors.white,
-        title: Text(
+        title: T(
           'Operations',
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontFamily: 'Poppins',
@@ -113,12 +113,12 @@ class DashboardScreen extends ConsumerWidget {
         ),
         actions: [
           IconButton(
-            tooltip: 'Search',
+            tooltip: tr('Search'),
             onPressed: () => context.push('/search'),
             icon: const Icon(Icons.search_rounded),
           ),
           IconButton(
-            tooltip: 'Notifications',
+            tooltip: tr('Notifications'),
             onPressed: () => context.push('/notifications'),
             icon: const Icon(Icons.notifications_none_rounded),
           ),
@@ -201,8 +201,8 @@ class DashboardScreen extends ConsumerWidget {
                   if (role == UserRole.transporter) ...[
                     // [7] TRANSPORTER WORKSPACE
                     SectionHeader(
-                      title: 'Dispatch Center',
-                      actionLabel: 'Jobs',
+                      title: tr('Dispatch Center'),
+                      actionLabel: tr('Jobs'),
                       onAction: () => context.go('/main/market'),
                       icon: Icons.local_shipping_outlined,
                     ),
@@ -216,8 +216,8 @@ class DashboardScreen extends ConsumerWidget {
                     const SizedBox(height: 16),
 
                     SectionHeader(
-                      title: 'Nearby Hubs',
-                      actionLabel: 'Map',
+                      title: tr('Nearby Hubs'),
+                      actionLabel: tr('Map'),
                       onAction: () => context.push('/map'),
                       icon: Icons.store_mall_directory_outlined,
                     ),
@@ -225,10 +225,10 @@ class DashboardScreen extends ConsumerWidget {
                       data: (list) => list.isEmpty
                           ? EmptyState(
                               icon: Icons.store_mall_directory_outlined,
-                              title: 'No hubs found',
-                              subtitle:
-                                  'Expand your delivery radius to see more hubs.',
-                              actionLabel: 'Open Map',
+                              title: tr('No hubs found'),
+                              subtitle: tr(
+                                  'Expand your delivery radius to see more hubs.'),
+                              actionLabel: tr('Open Map'),
                               onAction: () => context.push('/map'),
                             )
                           : _BuyerPipeline(buyers: list),
@@ -237,7 +237,7 @@ class DashboardScreen extends ConsumerWidget {
                         child: SkeletonList(count: 3),
                       ),
                       error: (e, _) =>
-                          const _InlineError(message: 'Hubs unavailable'),
+                          _InlineError(message: tr('Hubs unavailable')),
                     ),
 
                     const SizedBox(height: 16),
@@ -247,18 +247,18 @@ class DashboardScreen extends ConsumerWidget {
                   ] else ...[
                     // [4] MARKET WATCH
                     SectionHeader(
-                      title: 'Market Watch',
-                      actionLabel: 'See all',
+                      title: tr('Market Watch'),
+                      actionLabel: tr('See all'),
                       onAction: () => context.push('/main/market/prices'),
                       icon: Icons.show_chart_rounded,
                     ),
                     commodities.when(
                       data: (list) => list.isEmpty
-                          ? const EmptyState(
+                          ? EmptyState(
                               icon: Icons.show_chart_rounded,
-                              title: 'No price data',
-                              subtitle:
-                                  'Market prices will appear here once available.',
+                              title: tr('No price data'),
+                              subtitle: tr(
+                                  'Market prices will appear here once available.'),
                             )
                           : _MarketWatch(
                               commodities: list,
@@ -270,15 +270,15 @@ class DashboardScreen extends ConsumerWidget {
                         child: SkeletonList(count: 2),
                       ),
                       error: (e, _) =>
-                          const _InlineError(message: 'Prices unavailable'),
+                          _InlineError(message: tr('Prices unavailable')),
                     ),
 
                     const SizedBox(height: 16),
 
                     // [5] BUYER PIPELINE
                     SectionHeader(
-                      title: 'Active Buyers',
-                      actionLabel: 'Map',
+                      title: tr('Active Buyers'),
+                      actionLabel: tr('Map'),
                       onAction: () => context.push('/map'),
                       icon: Icons.handshake_outlined,
                     ),
@@ -286,10 +286,10 @@ class DashboardScreen extends ConsumerWidget {
                       data: (list) => list.isEmpty
                           ? EmptyState(
                               icon: Icons.handshake_outlined,
-                              title: 'No buyers nearby',
-                              subtitle:
-                                  'Verified buyers will appear once data is loaded.',
-                              actionLabel: 'Open Map',
+                              title: tr('No buyers nearby'),
+                              subtitle: tr(
+                                  'Verified buyers will appear once data is loaded.'),
+                              actionLabel: tr('Open Map'),
                               onAction: () => context.push('/map'),
                             )
                           : _BuyerPipeline(buyers: list),
@@ -298,14 +298,14 @@ class DashboardScreen extends ConsumerWidget {
                         child: SkeletonList(count: 3),
                       ),
                       error: (e, _) =>
-                          const _InlineError(message: 'Buyers unavailable'),
+                          _InlineError(message: tr('Buyers unavailable')),
                     ),
 
                     const SizedBox(height: 16),
 
                     // [6] PRIORITY LISTINGS
                     SectionHeader(
-                      title: 'Listings',
+                      title: tr('Listings'),
                       actionLabel:
                           role == UserRole.farmer ? 'My Listings' : 'View all',
                       onAction: () => context.push(role == UserRole.farmer
@@ -317,10 +317,10 @@ class DashboardScreen extends ConsumerWidget {
                       data: (list) => list.isEmpty
                           ? EmptyState(
                               icon: Icons.inventory_2_outlined,
-                              title: 'No listings yet',
-                              subtitle:
-                                  'Add your first product to start selling.',
-                              actionLabel: 'Add Listing',
+                              title: tr('No listings yet'),
+                              subtitle: tr(
+                                  'Add your first product to start selling.'),
+                              actionLabel: tr('Add Listing'),
                               onAction: () => context.push('/marketplace/add'),
                             )
                           : _PriorityListings(
@@ -333,7 +333,7 @@ class DashboardScreen extends ConsumerWidget {
                         child: SkeletonList(count: 2),
                       ),
                       error: (e, _) =>
-                          const _InlineError(message: 'Listings unavailable'),
+                          _InlineError(message: tr('Listings unavailable')),
                     ),
 
                     const SizedBox(height: 16),
@@ -418,7 +418,13 @@ class _HeroBanner extends StatelessWidget {
                     ),
                     const SizedBox(height: 5),
                     StatusBadge(
-                      label: role.name.toUpperCase(),
+                      label: tr(switch (role) {
+                        UserRole.farmer => 'Farmer',
+                        UserRole.buyer => 'Buyer',
+                        UserRole.transporter => 'Transporter',
+                        UserRole.admin => 'Admin',
+                      })
+                          .toUpperCase(),
                       color: Colors.white,
                       icon: _roleIcon(role),
                     ),
@@ -427,8 +433,8 @@ class _HeroBanner extends StatelessWidget {
               ),
               // White, not green: green on the green banner was hard to read.
               if (verified)
-                const StatusBadge(
-                  label: 'Verified',
+                StatusBadge(
+                  label: tr('Verified'),
                   color: Colors.white,
                   icon: Icons.verified_rounded,
                 ),
@@ -463,12 +469,12 @@ class _HeroBanner extends StatelessWidget {
                     size: 18,
                   ),
                   label: Text(
-                    switch (role) {
+                    tr(switch (role) {
                       UserRole.farmer => 'New Listing',
                       UserRole.buyer => 'Browse Produce',
-                      UserRole.transporter => 'View Routes',
+                      UserRole.transporter => 'Find Jobs',
                       UserRole.admin => 'Admin Console',
-                    },
+                    }),
                     style: const TextStyle(
                       fontFamily: 'Poppins',
                       fontWeight: FontWeight.w700,
@@ -506,11 +512,11 @@ class _HeroBanner extends StatelessWidget {
                     size: 18,
                   ),
                   label: Text(
-                    switch (role) {
+                    tr(switch (role) {
                       UserRole.farmer || UserRole.admin => 'Market Prices',
                       UserRole.buyer => 'Buyer Map',
                       UserRole.transporter => 'Dispatch Chat',
-                    },
+                    }),
                     style: const TextStyle(
                       fontFamily: 'Poppins',
                       fontWeight: FontWeight.w700,
@@ -552,7 +558,7 @@ class _MarketTickerStrip extends StatelessWidget {
       children: [
         const Padding(
           padding: EdgeInsets.only(left: 2, bottom: 8),
-          child: Text(
+          child: T(
             'LIVE PRICES',
             style: TextStyle(
               fontFamily: 'Poppins',
@@ -706,26 +712,26 @@ class _KpiGrid extends StatelessWidget {
 
     final cards = [
       StatCard(
-        label: mine ? 'My Active Listings' : 'Listings on Sale',
+        label: tr(mine ? 'My Active Listings' : 'Listings on Sale'),
         value: activeListings?.toString() ?? '—',
         icon: Icons.inventory_2_outlined,
         color: AppColors.deepGreen,
       ),
       StatCard(
-        label: 'Verified Buyers',
+        label: tr('Verified Buyers'),
         value: verifiedBuyers?.toString() ?? '—',
         icon: Icons.handshake_outlined,
         color: AppColors.infoBlue,
       ),
       StatCard(
-        label: 'Market Move',
+        label: tr('Market Move'),
         value: avgChange == null ? '—' : '${_signed(avgChange)}%',
         icon: Icons.show_chart_rounded,
         color: marketMoveColor,
         trend: avgChange,
       ),
       StatCard(
-        label: mine ? 'My Stock' : 'Produce on Sale',
+        label: tr(mine ? 'My Stock' : 'Produce on Sale'),
         value: stockKg == null ? '—' : _compactKg(stockKg),
         icon: Icons.scale_outlined,
         color: AppColors.warmOrange,
@@ -971,8 +977,8 @@ class _BuyerPipeline extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 if (b.verified) ...[
-                  const StatusBadge(
-                    label: 'Verified',
+                  StatusBadge(
+                    label: tr('Verified'),
                     color: AppColors.mintGreen,
                     icon: Icons.verified_rounded,
                   ),
@@ -1152,7 +1158,7 @@ class _TransporterWorkspace extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          T(
             'Dispatch Stats',
             style: TextStyle(
               fontFamily: 'Poppins',
@@ -1164,7 +1170,7 @@ class _TransporterWorkspace extends ConsumerWidget {
           const SizedBox(height: 14),
           _DispatchRow(
             icon: Icons.local_shipping_outlined,
-            title: 'Open jobs',
+            title: tr('Open jobs'),
             value: openCount != null ? '$openCount' : '—',
             status: 'Waiting for a transporter',
             color: AppColors.deepGreen,
@@ -1175,7 +1181,7 @@ class _TransporterWorkspace extends ConsumerWidget {
           ),
           _DispatchRow(
             icon: Icons.sensors_rounded,
-            title: 'Under way',
+            title: tr('Under way'),
             value: active != null ? '${active.length}' : '—',
             status: active == null || active.isEmpty
                 ? 'No delivery in progress'
@@ -1188,7 +1194,7 @@ class _TransporterWorkspace extends ConsumerWidget {
           ),
           _DispatchRow(
             icon: Icons.task_alt_rounded,
-            title: 'Delivered',
+            title: tr('Delivered'),
             value: delivered != null ? '${delivered.length}' : '—',
             status: earned == null || earned == 0
                 ? 'Completed deliveries'
@@ -1208,7 +1214,7 @@ class _TransporterWorkspace extends ConsumerWidget {
                   ),
                   onPressed: onMap,
                   icon: const Icon(Icons.local_shipping_outlined, size: 18),
-                  label: const Text(
+                  label: const T(
                     'Find Jobs',
                     style: TextStyle(
                       fontFamily: 'Poppins',
@@ -1229,7 +1235,7 @@ class _TransporterWorkspace extends ConsumerWidget {
                   ),
                   onPressed: onMessages,
                   icon: const Icon(Icons.chat_bubble_outline, size: 18),
-                  label: const Text(
+                  label: const T(
                     'Dispatch Chat',
                     style: TextStyle(
                       fontFamily: 'Poppins',
@@ -1340,7 +1346,7 @@ class _QuickActions extends StatelessWidget {
       children: [
         const Padding(
           padding: EdgeInsets.only(left: 2, bottom: 10),
-          child: Text(
+          child: T(
             'QUICK ACTIONS',
             style: TextStyle(
               fontFamily: 'Poppins',
@@ -1369,7 +1375,7 @@ class _QuickActions extends StatelessWidget {
     final settings = FilledButton.tonalIcon(
       onPressed: () => context.push('/settings'),
       icon: const Icon(Icons.tune_outlined, size: 16),
-      label: const Text('Settings',
+      label: const T('Settings',
           style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
     );
 
@@ -1378,21 +1384,21 @@ class _QuickActions extends StatelessWidget {
           FilledButton.tonalIcon(
             onPressed: () => context.push('/marketplace'),
             icon: const Icon(Icons.storefront_outlined, size: 16),
-            label: const Text('Marketplace',
+            label: const T('Marketplace',
                 style: TextStyle(
                     fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
           ),
           FilledButton.tonalIcon(
             onPressed: () => context.push('/marketplace/add'),
             icon: const Icon(Icons.add_box_outlined, size: 16),
-            label: const Text('Add Product',
+            label: const T('Add Product',
                 style: TextStyle(
                     fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
           ),
           FilledButton.tonalIcon(
             onPressed: () => context.push('/main/market/prices'),
             icon: const Icon(Icons.show_chart_rounded, size: 16),
-            label: const Text('Prices',
+            label: const T('Prices',
                 style: TextStyle(
                     fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
           ),
@@ -1402,21 +1408,21 @@ class _QuickActions extends StatelessWidget {
           FilledButton.tonalIcon(
             onPressed: () => context.push('/marketplace'),
             icon: const Icon(Icons.shopping_basket_outlined, size: 16),
-            label: const Text('Source Produce',
+            label: const T('Source Produce',
                 style: TextStyle(
                     fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
           ),
           FilledButton.tonalIcon(
             onPressed: () => context.push('/map'),
             icon: const Icon(Icons.map_outlined, size: 16),
-            label: const Text('Buyer Map',
+            label: const T('Buyer Map',
                 style: TextStyle(
                     fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
           ),
           FilledButton.tonalIcon(
             onPressed: () => context.push('/main/market/prices'),
             icon: const Icon(Icons.show_chart_rounded, size: 16),
-            label: const Text('Market',
+            label: const T('Market',
                 style: TextStyle(
                     fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
           ),
@@ -1426,21 +1432,21 @@ class _QuickActions extends StatelessWidget {
           FilledButton.tonalIcon(
             onPressed: () => context.go('/main/market'),
             icon: const Icon(Icons.local_shipping_outlined, size: 16),
-            label: const Text('Jobs',
+            label: const T('Jobs',
                 style: TextStyle(
                     fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
           ),
           FilledButton.tonalIcon(
             onPressed: () => context.push('/main/messages'),
             icon: const Icon(Icons.chat_bubble_outline, size: 16),
-            label: const Text('Dispatch Chat',
+            label: const T('Dispatch Chat',
                 style: TextStyle(
                     fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
           ),
           FilledButton.tonalIcon(
             onPressed: () => context.push('/marketplace'),
             icon: const Icon(Icons.inventory_2_outlined, size: 16),
-            label: const Text('Cargo Board',
+            label: const T('Cargo Board',
                 style: TextStyle(
                     fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
           ),
@@ -1450,21 +1456,21 @@ class _QuickActions extends StatelessWidget {
           FilledButton.tonalIcon(
             onPressed: () => context.push('/admin'),
             icon: const Icon(Icons.admin_panel_settings_outlined, size: 16),
-            label: const Text('Admin Console',
+            label: const T('Admin Console',
                 style: TextStyle(
                     fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
           ),
           FilledButton.tonalIcon(
             onPressed: () => context.push('/marketplace'),
             icon: const Icon(Icons.storefront_outlined, size: 16),
-            label: const Text('Listings',
+            label: const T('Listings',
                 style: TextStyle(
                     fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
           ),
           FilledButton.tonalIcon(
             onPressed: () => context.push('/main/market/prices'),
             icon: const Icon(Icons.show_chart_rounded, size: 16),
-            label: const Text('Market',
+            label: const T('Market',
                 style: TextStyle(
                     fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
           ),
@@ -1540,12 +1546,12 @@ class _GetPaidPrompt extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Add your bank account',
+                    T('Add your bank account',
                         style: TextStyle(
                             fontWeight: FontWeight.w700,
                             color: AppColors.text(isDark))),
                     const SizedBox(height: 2),
-                    Text(
+                    T(
                       'Buyers can pay for your produce once your bank '
                       'account is set. Takes a minute.',
                       style: TextStyle(

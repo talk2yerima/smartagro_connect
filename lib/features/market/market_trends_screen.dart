@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/di/repositories_provider.dart';
 import '../../core/errors/friendly_error.dart';
+import '../../core/i18n/i18n.dart';
 import '../../core/utils/money_format.dart';
 import '../../domain/entities/commodity.dart';
 import '../../shared/widgets/section_header.dart';
@@ -25,7 +26,7 @@ class MarketTrendsScreen extends ConsumerWidget {
         elevation: 0,
         scrolledUnderElevation: 0.5,
         backgroundColor: isDark ? AppColors.darkBg : Colors.white,
-        title: Text(
+        title: T(
           'Market Trends',
           style: TextStyle(
             fontFamily: 'Poppins',
@@ -45,7 +46,7 @@ class MarketTrendsScreen extends ConsumerWidget {
                 const Icon(Icons.signal_wifi_bad_rounded,
                     size: 48, color: AppColors.errorRed),
                 const SizedBox(height: 12),
-                Text(
+                T(
                   'Failed to load market data',
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
@@ -62,7 +63,7 @@ class MarketTrendsScreen extends ConsumerWidget {
                 FilledButton.icon(
                   onPressed: () => ref.invalidate(commoditiesProvider),
                   icon: const Icon(Icons.refresh_rounded),
-                  label: const Text('Retry'),
+                  label: const T('Retry'),
                 ),
               ],
             ),
@@ -143,7 +144,7 @@ class _TrendsBody extends StatelessWidget {
           const SizedBox(height: 20),
 
           // [2] Top Gainers
-          const SectionHeader(title: 'Top Gainers ▲'),
+          SectionHeader(title: tr('Top Gainers ▲')),
           const SizedBox(height: 8),
           ...topGainers.asMap().entries.map((entry) {
             final i = entry.key;
@@ -158,7 +159,7 @@ class _TrendsBody extends StatelessWidget {
           const SizedBox(height: 20),
 
           // [3] Top Losers
-          const SectionHeader(title: 'Top Losers ▼'),
+          SectionHeader(title: tr('Top Losers ▼')),
           const SizedBox(height: 8),
           ...topLosers.asMap().entries.map((entry) {
             final i = entry.key;
@@ -173,7 +174,7 @@ class _TrendsBody extends StatelessWidget {
           const SizedBox(height: 20),
 
           // [4] Category Performance
-          const SectionHeader(title: 'Category Performance'),
+          SectionHeader(title: tr('Category Performance')),
           const SizedBox(height: 8),
           _CategoryPerformanceCard(
             categories: categoryPerf
@@ -231,7 +232,7 @@ class _SummaryCard extends StatelessWidget {
               const Icon(Icons.bar_chart_rounded,
                   color: Colors.white, size: 20),
               const SizedBox(width: 8),
-              const Text(
+              const T(
                 'Market Summary',
                 style: TextStyle(
                   fontFamily: 'Poppins',
@@ -281,7 +282,7 @@ class _SummaryCard extends StatelessWidget {
               Expanded(
                 child: _StatChip(
                   icon: Icons.trending_up_rounded,
-                  label: 'Gainers',
+                  label: tr('Gainers'),
                   value: '$gainers',
                   chipColor: AppColors.mintGreen,
                 ),
@@ -290,7 +291,7 @@ class _SummaryCard extends StatelessWidget {
               Expanded(
                 child: _StatChip(
                   icon: Icons.trending_down_rounded,
-                  label: 'Losers',
+                  label: tr('Losers'),
                   value: '$losers',
                   chipColor: const Color(0xFFEF9A9A),
                 ),
@@ -299,7 +300,7 @@ class _SummaryCard extends StatelessWidget {
               Expanded(
                 child: _StatChip(
                   icon: Icons.swap_vert_rounded,
-                  label: 'Avg Move',
+                  label: tr('Avg Move'),
                   value: '${avgUp ? '+' : ''}${avgChange.toStringAsFixed(1)}%',
                   chipColor: Colors.white,
                 ),

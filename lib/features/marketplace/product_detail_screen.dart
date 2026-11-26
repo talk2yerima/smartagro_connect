@@ -11,6 +11,7 @@ import '../../core/di/firestore_providers.dart';
 import '../../core/di/payment_providers.dart';
 import '../../core/di/repositories_provider.dart';
 import '../../core/errors/friendly_error.dart';
+import '../../core/i18n/i18n.dart';
 import '../../core/utils/money_format.dart';
 import '../../domain/entities/product_listing.dart';
 import '../../shared/widgets/app_avatar.dart';
@@ -59,7 +60,7 @@ class ProductDetailScreen extends ConsumerWidget {
         appBar: AppBar(
           elevation: 0,
           scrolledUnderElevation: 0.5,
-          title: Text(
+          title: T(
             'Product',
             style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
           ),
@@ -70,7 +71,7 @@ class ProductDetailScreen extends ConsumerWidget {
         appBar: AppBar(
           elevation: 0,
           scrolledUnderElevation: 0.5,
-          title: Text(
+          title: T(
             'Product',
             style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
           ),
@@ -89,12 +90,12 @@ class ProductDetailScreen extends ConsumerWidget {
             appBar: AppBar(
               elevation: 0,
               scrolledUnderElevation: 0.5,
-              title: Text(
+              title: T(
                 'Not Found',
                 style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
               ),
             ),
-            body: const Center(child: Text('Product not found.')),
+            body: const Center(child: T('Product not found.')),
           );
         }
         final product = items[matchIndex];
@@ -178,7 +179,7 @@ class _ProductDetailViewState extends ConsumerState<_ProductDetailView> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                Text(
+                T(
                   'Report Listing',
                   style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
                         fontFamily: 'Poppins',
@@ -186,7 +187,7 @@ class _ProductDetailViewState extends ConsumerState<_ProductDetailView> {
                       ),
                 ),
                 const SizedBox(height: 4),
-                Text(
+                T(
                   'Select a reason for reporting this listing.',
                   style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
                         color: AppColors.gray,
@@ -216,7 +217,7 @@ class _ProductDetailViewState extends ConsumerState<_ProductDetailView> {
                     Expanded(
                       child: OutlinedButton(
                         onPressed: () => Navigator.pop(ctx),
-                        child: const Text('Cancel'),
+                        child: const T('Cancel'),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -241,8 +242,8 @@ class _ProductDetailViewState extends ConsumerState<_ProductDetailView> {
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
-                                        content: Text(
-                                            'Report submitted. Thank you.'),
+                                        content:
+                                            T('Report submitted. Thank you.'),
                                         duration: Duration(seconds: 3),
                                       ),
                                     );
@@ -251,14 +252,14 @@ class _ProductDetailViewState extends ConsumerState<_ProductDetailView> {
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
-                                        content: Text(
+                                        content: T(
                                             'Failed to submit report. Try again.'),
                                       ),
                                     );
                                   }
                                 }
                               },
-                        child: const Text('Submit'),
+                        child: const T('Submit'),
                       ),
                     ),
                   ],
@@ -337,8 +338,8 @@ class _ProductDetailViewState extends ConsumerState<_ProductDetailView> {
 
                     // [5] Similar listings
                     if (widget.similar.isNotEmpty) ...[
-                      const SectionHeader(
-                        title: 'Similar Listings',
+                      SectionHeader(
+                        title: tr('Similar Listings'),
                         icon: Icons.grid_view_rounded,
                       ),
                       _SimilarListingsRow(items: widget.similar, isDark: isDark)
@@ -383,7 +384,7 @@ class _ProductDetailViewState extends ConsumerState<_ProductDetailView> {
         padding: const EdgeInsets.all(8),
         child: _CircleIconButton(
           icon: Icons.arrow_back_rounded,
-          label: 'Back',
+          label: tr('Back'),
           isDark: isDark,
           onTap: () => context.pop(),
         ),
@@ -393,7 +394,7 @@ class _ProductDetailViewState extends ConsumerState<_ProductDetailView> {
           padding: const EdgeInsets.only(right: 4),
           child: _CircleIconButton(
             icon: Icons.share_rounded,
-            label: 'Share listing',
+            label: tr('Share listing'),
             isDark: isDark,
             onTap: () async {
               HapticFeedback.lightImpact();
@@ -410,7 +411,7 @@ class _ProductDetailViewState extends ConsumerState<_ProductDetailView> {
               if (!context.mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Listing details copied. Paste them into '
+                  content: T('Listing details copied. Paste them into '
                       'WhatsApp or SMS to share.'),
                   duration: Duration(seconds: 3),
                 ),
@@ -447,7 +448,7 @@ class _ProductDetailViewState extends ConsumerState<_ProductDetailView> {
           padding: const EdgeInsets.only(right: 8),
           child: _CircleIconButton(
             icon: Icons.flag_outlined,
-            label: 'Report listing',
+            label: tr('Report listing'),
             isDark: isDark,
             onTap: () {
               HapticFeedback.lightImpact();
@@ -855,7 +856,7 @@ class _SellerCard extends ConsumerWidget {
                     );
                   },
                   icon: const Icon(Icons.chat_bubble_rounded, size: 16),
-                  label: const Text('Contact Seller'),
+                  label: const T('Contact Seller'),
                   style: FilledButton.styleFrom(
                     backgroundColor: AppColors.deepGreen,
                     foregroundColor: Colors.white,
@@ -875,7 +876,7 @@ class _SellerCard extends ConsumerWidget {
                 child: OutlinedButton.icon(
                   onPressed: () => context.push('/seller/${product.sellerId}'),
                   icon: const Icon(Icons.person_outline_rounded, size: 16),
-                  label: const Text('View Profile'),
+                  label: const T('View Profile'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.deepGreen,
                     side: const BorderSide(color: AppColors.deepGreen),
@@ -956,22 +957,22 @@ class _DetailsCard extends StatelessWidget {
     final details = <({IconData icon, String label, String value})>[
       (
         icon: Icons.scale_rounded,
-        label: 'Quantity',
+        label: tr('Quantity'),
         value: '${product.quantityKg} kg',
       ),
       (
         icon: Icons.category_rounded,
-        label: 'Category',
+        label: tr('Category'),
         value: _inferCategory(product.title),
       ),
       (
         icon: Icons.location_on_rounded,
-        label: 'Location',
+        label: tr('Location'),
         value: '${product.city}, ${product.state}',
       ),
       (
         icon: Icons.calendar_today_rounded,
-        label: 'Listed',
+        label: tr('Listed'),
         value: 'Recently',
       ),
     ];
@@ -982,7 +983,7 @@ class _DetailsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          T(
             'Product Details',
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   fontFamily: 'Poppins',
@@ -1108,7 +1109,7 @@ class _DescriptionCardState extends State<_DescriptionCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          T(
             'Description',
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   fontFamily: 'Poppins',
@@ -1319,7 +1320,7 @@ class _BottomBarState extends ConsumerState<_BottomBar> {
     if (result == PaymentResult.success) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Payment successful! See it under Orders.'),
+          content: T('Payment successful! See it under Orders.'),
           backgroundColor: AppColors.deepGreen,
           duration: Duration(seconds: 4),
         ),
@@ -1327,7 +1328,7 @@ class _BottomBarState extends ConsumerState<_BottomBar> {
     } else if (result == PaymentResult.failed) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Payment was not completed. Try again.'),
+          content: T('Payment was not completed. Try again.'),
           backgroundColor: AppColors.errorRed,
         ),
       );
@@ -1357,12 +1358,12 @@ class _BottomBarState extends ConsumerState<_BottomBar> {
       action = OutlinedButton.icon(
         onPressed: null,
         icon: const Icon(Icons.storefront_rounded, size: 18),
-        label: const Text('Your Listing'),
+        label: const T('Your Listing'),
       );
     } else if (isSoldOut) {
-      action = const PrimaryGradientButton(label: 'Sold Out', onPressed: null);
+      action = PrimaryGradientButton(label: tr('Sold Out'), onPressed: null);
     } else if (!sellerCanBePaid) {
-      action = Text(
+      action = T(
         "This seller can't receive payments yet. Contact them to arrange "
         'the sale.',
         style: TextStyle(color: sub, fontSize: 13),
@@ -1401,11 +1402,11 @@ class _BottomBarState extends ConsumerState<_BottomBar> {
           if (canBuy) ...[
             Row(
               children: [
-                const Text('How much?',
+                const T('How much?',
                     style: TextStyle(fontWeight: FontWeight.w600)),
                 const Spacer(),
                 IconButton.filledTonal(
-                  tooltip: 'Less',
+                  tooltip: tr('Less'),
                   onPressed: _qty > 1 ? () => _setQty(_qty - 1) : null,
                   icon: const Icon(Icons.remove_rounded),
                 ),
@@ -1434,12 +1435,12 @@ class _BottomBarState extends ConsumerState<_BottomBar> {
                   ),
                 ),
                 IconButton.filledTonal(
-                  tooltip: 'More',
+                  tooltip: tr('More'),
                   onPressed: _qty < _available ? () => _setQty(_qty + 1) : null,
                   icon: const Icon(Icons.add_rounded),
                 ),
                 const SizedBox(width: 4),
-                const Text('kg'),
+                const T('kg'),
               ],
             ),
             Row(

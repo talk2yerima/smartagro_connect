@@ -12,6 +12,7 @@ import '../../core/di/firestore_providers.dart';
 import '../../core/di/haulage_providers.dart';
 import '../../core/di/payment_providers.dart';
 import '../../core/errors/friendly_error.dart';
+import '../../core/i18n/i18n.dart';
 import '../../core/utils/geo.dart';
 import '../../core/utils/money_format.dart';
 import '../../domain/delivery_pricing.dart';
@@ -83,10 +84,10 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
 
     return jobAsync.when(
       loading: () => Scaffold(
-          appBar: AppBar(title: const Text('Delivery')),
+          appBar: AppBar(title: const T('Delivery')),
           body: const Center(child: CircularProgressIndicator())),
       error: (e, _) => Scaffold(
-          appBar: AppBar(title: const Text('Delivery')),
+          appBar: AppBar(title: const T('Delivery')),
           body: Center(
               child: Padding(
                   padding: const EdgeInsets.all(24),
@@ -94,11 +95,11 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
       data: (job) {
         if (job == null) {
           return Scaffold(
-            appBar: AppBar(title: const Text('Delivery')),
+            appBar: AppBar(title: const T('Delivery')),
             body: const Center(
                 child: Padding(
               padding: EdgeInsets.all(24),
-              child: Text(
+              child: T(
                   'No transport was booked through SmartAgro for this order.',
                   textAlign: TextAlign.center),
             )),
@@ -119,7 +120,7 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Delivery'),
+            title: const T('Delivery'),
             actions: [
               Padding(
                 padding: const EdgeInsets.only(right: 12),
@@ -159,7 +160,7 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
                   children: [
                     FloatingActionButton.small(
                       heroTag: 'fit',
-                      tooltip: 'Show the whole route',
+                      tooltip: tr('Show the whole route'),
                       onPressed: () {
                         setState(() => _follow = false);
                         _fit(job, truck);
@@ -170,7 +171,7 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
                       const SizedBox(height: 8),
                       FloatingActionButton.small(
                         heroTag: 'follow',
-                        tooltip: 'Follow the truck',
+                        tooltip: tr('Follow the truck'),
                         backgroundColor: _follow ? AppColors.infoBlue : null,
                         foregroundColor: _follow ? Colors.white : null,
                         onPressed: () {
@@ -345,7 +346,7 @@ class _LiveStatus extends StatelessWidget {
               ],
             )
           else
-            const Text('Distance and arrival show once the driver shares '
+            const T('Distance and arrival show once the driver shares '
                 'their location.'),
           const SizedBox(height: 8),
           Row(
@@ -435,12 +436,12 @@ class _ContactRow extends ConsumerWidget {
         ),
         if (contact?.phone != null)
           IconButton.filledTonal(
-            tooltip: 'Call',
+            tooltip: tr('Call'),
             icon: const Icon(Icons.call_rounded),
             onPressed: () => callPhone(ref, contact!.phone!),
           ),
         IconButton(
-          tooltip: 'Message',
+          tooltip: tr('Message'),
           icon: const Icon(Icons.chat_bubble_outline_rounded),
           onPressed: myId.isEmpty
               ? null
@@ -456,7 +457,7 @@ class _ContactRow extends ConsumerWidget {
   }
 }
 
-mixin _Runs<T extends ConsumerStatefulWidget> on ConsumerState<T> {
+mixin _Runs<W extends ConsumerStatefulWidget> on ConsumerState<W> {
   bool busy = false;
 
   Future<void> run(Future<void> Function() action, String done) async {
@@ -486,7 +487,7 @@ mixin _Runs<T extends ConsumerStatefulWidget> on ConsumerState<T> {
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(c, false),
-              child: const Text('Not yet')),
+              child: const T('Not yet')),
           FilledButton(
               onPressed: () => Navigator.pop(c, true), child: Text(yes)),
         ],
@@ -541,7 +542,7 @@ class _DriverActionsState extends ConsumerState<_DriverActions>
               TextButton(
                 onPressed: () =>
                     ref.read(driverTrackerProvider.notifier).start(j.id),
-                child: const Text('Share'),
+                child: const T('Share'),
               ),
             ],
           ),
@@ -624,7 +625,7 @@ class _DriverActionsState extends ConsumerState<_DriverActions>
                     ref.read(driverTrackerProvider.notifier).stop();
                     if (context.mounted) context.pop();
                   },
-            child: const Text("I can't do this job"),
+            child: const T("I can't do this job"),
           ),
         ],
         const SizedBox(height: 12),
@@ -639,7 +640,7 @@ class _DriverActionsState extends ConsumerState<_DriverActions>
         style: const TextStyle(fontWeight: FontWeight.w600),
       ));
     } else if (j.isCancelled) {
-      children.add(const Text('This delivery was cancelled.'));
+      children.add(const T('This delivery was cancelled.'));
     }
     return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch, children: children);
@@ -672,7 +673,7 @@ class _PartyActionsState extends ConsumerState<_PartyActions>
       ]);
     }
     if (j.isOpen) {
-      children.add(Text(
+      children.add(T(
         'Transporters are being told about this job. You will get a '
         'notification when one accepts.',
         style: TextStyle(
@@ -686,7 +687,7 @@ class _PartyActionsState extends ConsumerState<_PartyActions>
         height: 48,
         child: FilledButton.icon(
           icon: const Icon(Icons.inventory_2_outlined),
-          label: const Text('Confirm on your order'),
+          label: const T('Confirm on your order'),
           onPressed: () => context.go('/main/orders'),
         ),
       ));
@@ -708,12 +709,12 @@ class _PartyActionsState extends ConsumerState<_PartyActions>
                 await run(
                     () => db.cancelHaulageJob(j.id), 'Request cancelled.');
               },
-        child: const Text('Cancel request',
+        child: const T('Cancel request',
             style: TextStyle(color: AppColors.errorRed)),
       ));
     }
     if (j.isCancelled) {
-      children.add(const Text(
+      children.add(const T(
           'Cancelled. You can request transport again from the order.'));
     }
     return Column(
@@ -745,7 +746,7 @@ class _Timeline extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Progress', style: Theme.of(context).textTheme.titleSmall),
+        T('Progress', style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),
         for (var i = 0; i < steps.length; i++)
           Row(
@@ -786,7 +787,7 @@ class _Timeline extends StatelessWidget {
         if (job.isCancelled)
           const Padding(
             padding: EdgeInsets.only(top: 6),
-            child: Text('Cancelled',
+            child: T('Cancelled',
                 style: TextStyle(
                     color: AppColors.errorRed, fontWeight: FontWeight.w600)),
           ),

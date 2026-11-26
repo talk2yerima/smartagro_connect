@@ -6,6 +6,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/di/auth_providers.dart';
 import '../../core/di/farm_providers.dart';
 import '../../core/di/repositories_provider.dart';
+import '../../core/i18n/i18n.dart';
 import '../../domain/farmer_directory.dart';
 import '../../shared/widgets/produce_image.dart';
 import '../marketplace/seller_profile_screen.dart' show FarmerCard;
@@ -86,7 +87,7 @@ class _Title extends StatelessWidget {
                     .copyWith(fontWeight: FontWeight.w700)),
             const Spacer(),
             if (onAll != null)
-              TextButton(onPressed: onAll, child: const Text('Explore')),
+              TextButton(onPressed: onAll, child: const T('Explore')),
           ],
         ),
       );
