@@ -4,8 +4,9 @@
 /// Hausa text for the app, keyed by the English text on screen.
 /// Anything missing is shown in English.
 const haStrings = <String, String>{
-  ' and ': ' da',
-  'A wide photo of your farm, field or animals.': 'Hoto mai faɗi na gonarka, filinka ko dabbobinka.',
+  ' and ': ' da ',
+  'A wide photo of your farm, field or animals.':
+      'Hoto mai faɗi na gonarka, filinka ko dabbobinka.',
   'AVAILABILITY': 'SAMUWA',
   'About your farm': 'Game da gonarka',
   'Accept': 'Karɓa',
@@ -19,55 +20,68 @@ const haStrings = <String, String>{
   'Add Product': 'Saka kaya',
   'Add a cover photo': 'Saka babban hoto',
   'Add listing': 'Saka kaya',
-  'Add the bank account you want buyers\' payments sent to. Buyers can only pay for your listings once this is set.': 'Saka asusun bankin da kake so a tura kuɗin masu saye. Masu saye za su iya biyan kayanka ne kawai bayan ka saka shi.',
+  'Add the bank account you want buyers\' payments sent to. Buyers can only pay for your listings once this is set.':
+      'Saka asusun bankin da kake so a tura kuɗin masu saye. Masu saye za su iya biyan kayanka ne kawai bayan ka saka shi.',
   'Add your bank account': 'Saka asusun bankinka',
   'Add your first listing': 'Saka kayanka na farko',
-  'Add your first product to start selling.': 'Saka kayanka na farko don fara sayarwa.',
+  'Add your first product to start selling.':
+      'Saka kayanka na farko don fara sayarwa.',
   'Admin Console': 'Ɗakin gudanarwa',
-  'Africa\'s Agricultural Intelligence Platform': 'Dandalin bayanan noma na Afirka',
+  'Africa\'s Agricultural Intelligence Platform':
+      'Dandalin bayanan noma na Afirka',
   'All': 'Duka',
   'All caught up': 'Ka karanta duka',
   'All caught up!': 'Ka karanta duka!',
   'All products': 'Duk kaya',
   'All states': 'Duk jihohi',
-  'Allow microphone access in your phone settings to send voice notes.': 'Ba da izinin makirufo a saitunan wayarka don aika saƙon murya.',
+  'Allow microphone access in your phone settings to send voice notes.':
+      'Ba da izinin makirufo a saitunan wayarka don aika saƙon murya.',
   'Already have an account?': 'Kana da asusu tuni?',
   'Any': 'Kowane',
   'App lock': 'Kulle manhaja',
   'Appearance': 'Kamanni',
-  'Are you sure you want to sign out of SmartAgro?': 'Ka tabbata kana so ka fita daga SmartAgro?',
-  'Ask for your fingerprint, face or phone PIN when opening SmartAgro': 'A nemi zanen yatsanka, fuskarka ko lambar sirrin waya lokacin buɗe SmartAgro',
+  'Are you sure you want to sign out of SmartAgro?':
+      'Ka tabbata kana so ka fita daga SmartAgro?',
+  'Ask for your fingerprint, face or phone PIN when opening SmartAgro':
+      'A nemi zanen yatsanka, fuskarka ko lambar sirrin waya lokacin buɗe SmartAgro',
   'At least 6 characters': 'Aƙalla haruffa 6',
   'Availability': 'Samuwa',
   'Avg Move': 'Matsakaicin canji',
   'Back': 'Koma baya',
   'Back to login': 'Koma shiga',
   'Bank': 'Banki',
-  'Bank account saved. You\'ll be paid for your sales.': 'An ajiye asusun banki. Za a biya ka kuɗin kayan da ka sayar.',
-  'Be the first to list your produce': 'Kai ne na farko da zai saka amfanin gonarka',
+  'Bank account saved. You\'ll be paid for your sales.':
+      'An ajiye asusun banki. Za a biya ka kuɗin kayan da ka sayar.',
+  'Be the first to list your produce':
+      'Kai ne na farko da zai saka amfanin gonarka',
   'Buyer Map': 'Taswirar masu saye',
   'Buyer rating': 'Ƙimar mai saye',
   'Buyers': 'Masu saye',
-  'Buyers can pay for your produce once your bank account is set. Takes a minute.': 'Masu saye za su iya biyan amfanin gonarka da zarar ka saka asusun banki. Minti ɗaya kawai.',
-  'Buyers can rate a farmer after their order arrives.': 'Masu saye za su iya ba manomi ƙima bayan odarsu ta iso.',
+  'Buyers can pay for your produce once your bank account is set. Takes a minute.':
+      'Masu saye za su iya biyan amfanin gonarka da zarar ka saka asusun banki. Minti ɗaya kawai.',
+  'Buyers can rate a farmer after their order arrives.':
+      'Masu saye za su iya ba manomi ƙima bayan odarsu ta iso.',
   'Buyers say': 'Masu saye sun ce',
   'Buyers unavailable': 'Ba a samu masu saye ba',
-  'By creating an account, you agree to our ': 'Ta buɗe asusu, ka amince da',
-  'By road, about. Listings without a town use their state capital.': 'Ta hanya, kimanin. Kayan da ba su da gari suna amfani da babban birnin jiharsu.',
+  'By creating an account, you agree to our ': 'Ta buɗe asusu, ka amince da ',
+  'By road, about. Listings without a town use their state capital.':
+      'Ta hanya, kimanin. Kayan da ba su da gari suna amfani da babban birnin jiharsu.',
   'Call': 'Kira',
   'Camera': 'Kyamara',
   'Cancel': 'Soke',
   'Cancel request': 'Soke buƙata',
   'Cancel voice note': 'Soke saƙon murya',
   'Cancelled': 'An soke',
-  'Cancelled. You can request transport again from the order.': 'An soke. Za ka iya sake neman abin hawa daga odar.',
+  'Cancelled. You can request transport again from the order.':
+      'An soke. Za ka iya sake neman abin hawa daga odar.',
   'Cargo Board': 'Allon kaya',
   'Category': 'Rukuni',
   'Category Performance': 'Yanayin rukunoni',
   'Change': 'Canza',
   'Change bank account': 'Canza asusun banki',
   'Change number': 'Canza lamba',
-  'Check back soon, or message the farmer.': 'Ka sake dubawa nan ba da jimawa ba, ko ka aika wa manomin saƙo.',
+  'Check back soon, or message the farmer.':
+      'Ka sake dubawa nan ba da jimawa ba, ko ka aika wa manomin saƙo.',
   'Checking with your bank…': 'Ana dubawa da bankinka…',
   'Choose from gallery': 'Zaɓi daga hotuna',
   'City / LGA': 'Gari / Ƙaramar hukuma',
@@ -77,7 +91,8 @@ const haStrings = <String, String>{
   'Commodity Details': 'Bayanan kaya',
   'Commodity not found': 'Ba a samu kayan ba',
   'Complete Payment': 'Kammala biya',
-  'Complete your payment in the browser,\nthen come back and tap the button below.': 'Kammala biyanka a burauza,\nsannan ka dawo ka taɓa maɓallin da ke ƙasa.',
+  'Complete your payment in the browser,\nthen come back and tap the button below.':
+      'Kammala biyanka a burauza,\nsannan ka dawo ka taɓa maɓallin da ke ƙasa.',
   'Confirm on your order': 'Tabbatar a kan odarka',
   'Connect': 'Haɗa',
   'Contact Information': 'Bayanan tuntuɓa',
@@ -89,9 +104,12 @@ const haStrings = <String, String>{
   'Could not load buyer locations.': 'Ba a iya loda wuraren masu saye ba.',
   'Could not load messages': 'Ba a iya loda saƙonni ba',
   'Could not load produce': 'Ba a iya loda amfanin gona ba',
-  'Could not open the camera or gallery.': 'Ba a iya buɗe kyamara ko hotuna ba.',
-  'Couldn\'t play this voice note. Check your connection and try again.': 'Ba a iya kunna wannan saƙon murya ba. Duba hanyar sadarwarka ka sake gwadawa.',
-  'Couldn\'t save that. Check your connection.': 'Ba a iya ajiye wannan ba. Duba hanyar sadarwarka.',
+  'Could not open the camera or gallery.':
+      'Ba a iya buɗe kyamara ko hotuna ba.',
+  'Couldn\'t play this voice note. Check your connection and try again.':
+      'Ba a iya kunna wannan saƙon murya ba. Duba hanyar sadarwarka ka sake gwadawa.',
+  'Couldn\'t save that. Check your connection.':
+      'Ba a iya ajiye wannan ba. Duba hanyar sadarwarka.',
   'Cover photo': 'Babban hoto',
   'Create account': 'Buɗe asusu',
   'Current Price': 'Farashin yanzu',
@@ -101,15 +119,18 @@ const haStrings = <String, String>{
   'Delivered': 'An isar',
   'Delivery': 'Jigila',
   'Delivery details': 'Bayanan jigila',
-  'Delivery under way · sharing your location': 'Ana kan jigila · ana nuna wurinka',
+  'Delivery under way · sharing your location':
+      'Ana kan jigila · ana nuna wurinka',
   'Demo account': 'Asusun gwaji',
-  'Describe quality, harvest date, storage…': 'Bayyana inganci, ranar girbi, ajiya…',
+  'Describe quality, harvest date, storage…':
+      'Bayyana inganci, ranar girbi, ajiya…',
   'Description': 'Bayani',
   'Disable notifications': 'Kashe sanarwa',
   'Dispatch Center': 'Cibiyar jigila',
   'Dispatch Chat': 'Hira ta jigila',
   'Dispatch Stats': 'Ƙididdigar jigila',
-  'Distance and arrival show once the driver shares their location.': 'Nisa da lokacin isowa za su bayyana da zarar direba ya nuna wurinsa.',
+  'Distance and arrival show once the driver shares their location.':
+      'Nisa da lokacin isowa za su bayyana da zarar direba ya nuna wurinsa.',
   'Distance from you': 'Nisa daga gare ka',
   'Drop-off': 'Wurin sauke',
   'Edit': 'Gyara',
@@ -121,14 +142,16 @@ const haStrings = <String, String>{
   'Email': 'Imel',
   'Explore': 'Bincika',
   'Explore by state': 'Bincika ta jiha',
-  'Expand your delivery radius to see more hubs.': 'Faɗaɗa iyakar jigilarka don ganin ƙarin cibiyoyi.',
+  'Expand your delivery radius to see more hubs.':
+      'Faɗaɗa iyakar jigilarka don ganin ƙarin cibiyoyi.',
   'FEATURED': 'ZAƁAƁƁU',
   'Failed to load': 'Ba a iya lodawa ba',
   'Failed to load listings': 'Ba a iya loda kaya ba',
   'Failed to load market data': 'Ba a iya loda bayanan kasuwa ba',
   'Failed to load messages': 'Ba a iya loda saƙonni ba',
   'Failed to send image': 'Ba a iya aika hoto ba',
-  'Failed to submit report. Try again.': 'Ba a iya aika rahoto ba. Sake gwadawa.',
+  'Failed to submit report. Try again.':
+      'Ba a iya aika rahoto ba. Sake gwadawa.',
   'Farm gallery': 'Hotunan gona',
   'Farm profile': 'Bayanan gona',
   'Filter': 'Tace',
@@ -143,7 +166,8 @@ const haStrings = <String, String>{
   'Gallery': 'Hotuna',
   'Get Started': 'Fara',
   'Get paid': 'Karɓi kuɗinka',
-  'Goes live straight away. Edit it any time.': 'Zai bayyana nan take. Za ka iya gyara shi kowane lokaci.',
+  'Goes live straight away. Edit it any time.':
+      'Zai bayyana nan take. Za ka iya gyara shi kowane lokaci.',
   'Hide sold out': 'Ɓoye waɗanda aka sayar duka',
   'Home': 'Gida',
   'How much?': 'Nawa?',
@@ -159,7 +183,8 @@ const haStrings = <String, String>{
   'In Stock': 'Akwai',
   'JPEG / PNG  •  max 5 MB': 'JPEG / PNG  •  mafi girma 5 MB',
   'Jobs': 'Ayyuka',
-  'Jobs you accept show here, with the route, contacts and live tracking.': 'Ayyukan da ka karɓa za su bayyana a nan, tare da hanya, lambobin tuntuɓa da bin diddigi kai tsaye.',
+  'Jobs you accept show here, with the route, contacts and live tracking.':
+      'Ayyukan da ka karɓa za su bayyana a nan, tare da hanya, lambobin tuntuɓa da bin diddigi kai tsaye.',
   'Join SmartAgro': 'Shiga SmartAgro',
   'LIVE PRICES': 'FARASHIN YANZU',
   'Language': 'Harshe',
@@ -171,7 +196,8 @@ const haStrings = <String, String>{
   'Listed': 'An saka',
   'Listing Details': 'Bayanan kaya',
   'Listing deleted': 'An goge kaya',
-  'Listing details copied. Paste them into WhatsApp or SMS to share.': 'An kwafi bayanan kaya. Liƙa su a WhatsApp ko SMS don rabawa.',
+  'Listing details copied. Paste them into WhatsApp or SMS to share.':
+      'An kwafi bayanan kaya. Liƙa su a WhatsApp ko SMS don rabawa.',
   'Listing published!': 'An saka kaya!',
   'Listing updated': 'An sabunta kaya',
   'Listings': 'Kaya',
@@ -181,7 +207,8 @@ const haStrings = <String, String>{
   'Losers': 'Masu faɗuwa',
   'Manage your product listings': 'Sarrafa kayanka',
   'Map': 'Taswira',
-  'Map view is available on Android and iOS.': 'Ana iya ganin taswira a Android da iOS.',
+  'Map view is available on Android and iOS.':
+      'Ana iya ganin taswira a Android da iOS.',
   'Mark all read': 'Yi alamar an karanta duka',
   'Market': 'Kasuwa',
   'Market Move': 'Canjin kasuwa',
@@ -191,10 +218,12 @@ const haStrings = <String, String>{
   'Market Trends': 'Yanayin kasuwa',
   'Market Watch': 'Kallon kasuwa',
   'Market prices today': 'Farashin kasuwa na yau',
-  'Market prices will appear here once available.': 'Farashin kasuwa zai bayyana a nan da zarar ya samu.',
+  'Market prices will appear here once available.':
+      'Farashin kasuwa zai bayyana a nan da zarar ya samu.',
   'Marketplace': 'Kasuwa',
   'Message': 'Saƙo',
-  'Message not sent. Check your connection and tap send to try again.': 'Ba a aika saƙo ba. Duba hanyar sadarwarka ka taɓa aika don sake gwadawa.',
+  'Message not sent. Check your connection and tap send to try again.':
+      'Ba a aika saƙo ba. Duba hanyar sadarwarka ka taɓa aika don sake gwadawa.',
   'Messages': 'Saƙonni',
   'More': 'Ƙari',
   'My Listings': 'Kayana',
@@ -226,14 +255,16 @@ const haStrings = <String, String>{
   'No results found': 'Ba a samu sakamako ba',
   'No reviews yet': 'Babu sharhi tukuna',
   'No sales yet': 'Babu sayarwa tukuna',
-  'No transport was booked through SmartAgro for this order.': 'Ba a nemi abin hawa ta SmartAgro don wannan oda ba.',
+  'No transport was booked through SmartAgro for this order.':
+      'Ba a nemi abin hawa ta SmartAgro don wannan oda ba.',
   'Not Found': 'Ba a samu ba',
   'Not now': 'Ba yanzu ba',
   'Not yet': 'Tukuna ba',
   'Notes for the driver (optional)': 'Saƙo ga direba (ba dole ba)',
   'Nothing matches': 'Babu abin da ya dace',
   'Notifications': 'Sanarwa',
-  'Notify me when a price I set an alert for is reached': 'Sanar da ni lokacin da farashin da na saita ya kai',
+  'Notify me when a price I set an alert for is reached':
+      'Sanar da ni lokacin da farashin da na saita ya kai',
   'OK': 'To',
   'ORDER SUMMARY': 'TAƘAITACCEN ODA',
   'Open Map': 'Buɗe taswira',
@@ -241,16 +272,19 @@ const haStrings = <String, String>{
   'Opening hours': 'Lokutan buɗewa',
   'Operations': 'Ayyuka',
   'Orders': 'Oda',
-  'Paid to your bank by Paystack after each sale': 'Paystack zai biya bankinka bayan kowace sayarwa',
+  'Paid to your bank by Paystack after each sale':
+      'Paystack zai biya bankinka bayan kowace sayarwa',
   'Password': 'Kalmar sirri',
   'Payment page opened': 'An buɗe shafin biya',
   'Payment successful! See it under Orders.': 'An biya! Duba ta a cikin Oda.',
-  'Payment was not completed. Try again.': 'Ba a kammala biya ba. Sake gwadawa.',
+  'Payment was not completed. Try again.':
+      'Ba a kammala biya ba. Sake gwadawa.',
   'Payments not completed': 'Biyan da ba a kammala ba',
   'Phone': 'Waya',
   'Phone Number': 'Lambar waya',
   'Phone number': 'Lambar waya',
-  'Pick how you will use the app. You can sell, buy or transport produce.': 'Zaɓi yadda za ka yi amfani da manhajar. Za ka iya sayarwa, saye ko jigilar amfanin gona.',
+  'Pick how you will use the app. You can sell, buy or transport produce.':
+      'Zaɓi yadda za ka yi amfani da manhajar. Za ka iya sayarwa, saye ko jigilar amfanin gona.',
   'Pickup': 'Wurin ɗauka',
   'Place name or landmark': 'Sunan wuri ko alama',
   'Pre-order': 'Oda kafin girbi',
@@ -263,7 +297,8 @@ const haStrings = <String, String>{
   'Prices unavailable': 'Ba a samu farashi ba',
   'Pricing & Quantity': 'Farashi da yawa',
   'Privacy policy': 'Manufar sirri',
-  'Produce you buy will appear here, with the seller\'s contact for delivery.': 'Amfanin gonar da ka saya zai bayyana a nan, tare da lambar mai sayarwa don jigila.',
+  'Produce you buy will appear here, with the seller\'s contact for delivery.':
+      'Amfanin gonar da ka saya zai bayyana a nan, tare da lambar mai sayarwa don jigila.',
   'Product': 'Kaya',
   'Product Details': 'Bayanan kaya',
   'Product Title': 'Sunan kaya',
@@ -294,8 +329,10 @@ const haStrings = <String, String>{
   'Reset': 'Sake saitawa',
   'Retry': 'Sake gwadawa',
   'Reviews could not be loaded.': 'Ba a iya loda sharhi ba.',
-  'Run on a mobile device to see nearby buyers.': 'Yi amfani da waya don ganin masu saye na kusa.',
-  'Sales and purchases, with buyer and seller contacts': 'Sayarwa da saye, tare da lambobin masu saye da masu sayarwa',
+  'Run on a mobile device to see nearby buyers.':
+      'Yi amfani da waya don ganin masu saye na kusa.',
+  'Sales and purchases, with buyer and seller contacts':
+      'Sayarwa da saye, tare da lambobin masu saye da masu sayarwa',
   'Save': 'Ajiye',
   'Save Changes': 'Ajiye canje-canje',
   'Search': 'Nema',
@@ -305,10 +342,12 @@ const haStrings = <String, String>{
   'Search crops, products, buyers…': 'Nemi amfanin gona, kaya, masu saye…',
   'Search produce or farmers': 'Nemi amfanin gona ko manoma',
   'Search produce, location…': 'Nemi amfanin gona, wuri…',
-  'Secured by Paystack · Card, bank transfer & USSD accepted': 'Paystack ne ke tsaro · Ana karɓar kati, tura kuɗi ta banki da USSD',
+  'Secured by Paystack · Card, bank transfer & USSD accepted':
+      'Paystack ne ke tsaro · Ana karɓar kati, tura kuɗi ta banki da USSD',
   'See all': 'Duba duka',
   'See my public page': 'Duba shafina na jama\'a',
-  'Select a reason for reporting this listing.': 'Zaɓi dalilin kai rahoton wannan kaya.',
+  'Select a reason for reporting this listing.':
+      'Zaɓi dalilin kai rahoton wannan kaya.',
   'Select category': 'Zaɓi rukuni',
   'Select state': 'Zaɓi jiha',
   'Send a message to start the conversation': 'Aika saƙo don fara hira',
@@ -322,7 +361,8 @@ const haStrings = <String, String>{
   'Show the whole route': 'Nuna dukan hanyar',
   'Sign Out': 'Fita',
   'Sign in': 'Shiga',
-  'Sign in to sell, buy and move produce.': 'Shiga don sayarwa, saye da jigilar amfanin gona.',
+  'Sign in to sell, buy and move produce.':
+      'Shiga don sayarwa, saye da jigilar amfanin gona.',
   'Sign in with phone': 'Shiga da waya',
   'Similar Listings': 'Kaya masu kama',
   'Similar farmers near you': 'Manoma masu kama a kusa da kai',
@@ -333,35 +373,46 @@ const haStrings = <String, String>{
   'Sort by': 'Tsara ta',
   'Sort by distance from me': 'Tsara ta nisa daga gare ni',
   'Source Produce': 'Nemi amfanin gona',
-  'Start a conversation with buyers or sellers': 'Fara hira da masu saye ko masu sayarwa',
+  'Start a conversation with buyers or sellers':
+      'Fara hira da masu saye ko masu sayarwa',
   'State': 'Jiha',
   'Submit': 'Aika',
   'Submit rating': 'Aika ƙima',
   'Swipe a chat to the left to archive it.': 'Ja hira zuwa hagu don ajiye ta.',
-  'Switch between light, dark, and system default.': 'Canza tsakanin haske, duhu da yadda wayarka take.',
+  'Switch between light, dark, and system default.':
+      'Canza tsakanin haske, duhu da yadda wayarka take.',
   'System default': 'Yadda wayarka take',
   'Take a photo': 'Ɗauki hoto',
   'Tap to add photos': 'Taɓa don saka hotuna',
   'Tell me when the price reaches (₦)': 'Sanar da ni idan farashi ya kai (₦)',
   'Terms of use': 'Sharuɗɗan amfani',
   'This delivery was cancelled.': 'An soke wannan jigila.',
-  'This seller can\'t receive payments yet. Contact them to arrange the sale.': 'Wannan mai sayarwa ba zai iya karɓar kuɗi ba tukuna. Tuntuɓe shi don shirya sayarwa.',
-  'This usually takes a few seconds.': 'Wannan yawanci yana ɗaukar \'yan daƙiƙa.',
-  'To turn off notifications, go to your device Settings > Apps > SmartAgro Connect > Notifications.': 'Don kashe sanarwa, je Saitunan wayarka > Manhajoji > SmartAgro Connect > Sanarwa.',
+  'This seller can\'t receive payments yet. Contact them to arrange the sale.':
+      'Wannan mai sayarwa ba zai iya karɓar kuɗi ba tukuna. Tuntuɓe shi don shirya sayarwa.',
+  'This usually takes a few seconds.':
+      'Wannan yawanci yana ɗaukar \'yan daƙiƙa.',
+  'To turn off notifications, go to your device Settings > Apps > SmartAgro Connect > Notifications.':
+      'Don kashe sanarwa, je Saitunan wayarka > Manhajoji > SmartAgro Connect > Sanarwa.',
   'Top Gainers ▲': 'Mafi hauhawa ▲',
   'Top Losers ▼': 'Mafi faɗuwa ▼',
   'Top farmers': 'Manyan manoma',
   'Total': 'Jimilla',
-  'Transporters are being told about this job. You will get a notification when one accepts.': 'Ana sanar da masu jigila game da wannan aiki. Za ka samu sanarwa idan ɗaya ya karɓa.',
+  'Transporters are being told about this job. You will get a notification when one accepts.':
+      'Ana sanar da masu jigila game da wannan aiki. Za ka samu sanarwa idan ɗaya ya karɓa.',
   'Trending Categories': 'Rukunoni masu tashe',
   'Trending products': 'Kaya masu tashe',
-  'Try a different search term or remove filters.': 'Gwada wata kalmar nema ko cire tacewa.',
-  'Try a wider price range or distance, or clear the filters.': 'Gwada farashi ko nisa mafi faɗi, ko share tacewa.',
+  'Try a different search term or remove filters.':
+      'Gwada wata kalmar nema ko cire tacewa.',
+  'Try a wider price range or distance, or clear the filters.':
+      'Gwada farashi ko nisa mafi faɗi, ko share tacewa.',
   'Try adjusting your search or filters': 'Gwada canza nemanka ko tacewa',
   'Try again': 'Sake gwadawa',
-  'Try different keywords or adjust your filters.': 'Gwada wasu kalmomi ko canza tacewa.',
-  'Try searching by crop name, location, or seller.': 'Gwada nema da sunan amfanin gona, wuri ko mai sayarwa.',
-  'Try searching with a different crop or category name.': 'Gwada nema da wani amfanin gona ko rukuni.',
+  'Try different keywords or adjust your filters.':
+      'Gwada wasu kalmomi ko canza tacewa.',
+  'Try searching by crop name, location, or seller.':
+      'Gwada nema da sunan amfanin gona, wuri ko mai sayarwa.',
+  'Try searching with a different crop or category name.':
+      'Gwada nema da wani amfanin gona ko rukuni.',
   'Type a message…': 'Rubuta saƙo…',
   'Under way': 'Ana kan hanya',
   'Undo': 'Mayar',
@@ -376,46 +427,65 @@ const haStrings = <String, String>{
   'Verified Buyers': 'Masu saye da aka tabbatar',
   'Verified Only': 'Waɗanda aka tabbatar kawai',
   'Verified buyer': 'Mai saye da aka tabbatar',
-  'Verified buyers will appear once data is loaded.': 'Masu saye da aka tabbatar za su bayyana da zarar bayanai sun loda.',
+  'Verified buyers will appear once data is loaded.':
+      'Masu saye da aka tabbatar za su bayyana da zarar bayanai sun loda.',
   'Verified farmers only': 'Manoma da aka tabbatar kawai',
   'Verifying your payment…': 'Ana tabbatar da biyanka…',
   'Version': 'Siga',
   'View': 'Duba',
   'View Profile': 'Duba bayanai',
-  'Voice notes need an internet connection.': 'Saƙon murya yana buƙatar intanet.',
-  'We could not find a commodity with that ID. It may have been removed.': 'Ba mu samu kaya da wannan lamba ba. Wataƙila an cire shi.',
-  'Weak network: your acceptance will be sent when you are back online. Check My jobs.': 'Intanet ba ta da ƙarfi: za a aika karɓarka idan ka dawo kan intanet. Duba Ayyukana.',
+  'Voice notes need an internet connection.':
+      'Saƙon murya yana buƙatar intanet.',
+  'We could not find a commodity with that ID. It may have been removed.':
+      'Ba mu samu kaya da wannan lamba ba. Wataƙila an cire shi.',
+  'Weak network: your acceptance will be sent when you are back online. Check My jobs.':
+      'Intanet ba ta da ƙarfi: za a aika karɓarka idan ka dawo kan intanet. Duba Ayyukana.',
   'Welcome back': 'Barka da dawowa',
   'What describes it? (optional)': 'Me ya fi bayyana shi? (ba dole ba)',
   'What we produce': 'Abin da muke nomawa',
   'What you produce': 'Abin da kake nomawa',
-  'When a buyer or seller asks for transport, the job appears here and you get a notification.': 'Idan mai saye ko mai sayarwa ya nemi abin hawa, aikin zai bayyana a nan kuma za ka samu sanarwa.',
-  'When a buyer pays for your produce, the order appears here with their contact so you can arrange delivery.': 'Idan mai saye ya biya amfanin gonarka, odar za ta bayyana a nan tare da lambarsa don ku shirya jigila.',
-  'When farmers list produce, you will find them here.': 'Idan manoma sun saka amfanin gona, za ka same su a nan.',
+  'When a buyer or seller asks for transport, the job appears here and you get a notification.':
+      'Idan mai saye ko mai sayarwa ya nemi abin hawa, aikin zai bayyana a nan kuma za ka samu sanarwa.',
+  'When a buyer pays for your produce, the order appears here with their contact so you can arrange delivery.':
+      'Idan mai saye ya biya amfanin gonarka, odar za ta bayyana a nan tare da lambarsa don ku shirya jigila.',
+  'When farmers list produce, you will find them here.':
+      'Idan manoma sun saka amfanin gona, za ka same su a nan.',
   'Where the buyer receives it': 'Inda mai saye zai karɓa',
-  'Where the produce is (the seller\'s farm or store)': 'Inda amfanin gonar yake (gonar mai sayarwa ko rumbunsa)',
+  'Where the produce is (the seller\'s farm or store)':
+      'Inda amfanin gonar yake (gonar mai sayarwa ko rumbunsa)',
   'Where your sales money goes': 'Inda kuɗin sayarwarka ke zuwa',
   'Within 50 km': 'Cikin kilomita 50',
-  'You have no notifications right now.\nCheck back later for updates.': 'Ba ka da sanarwa yanzu.\nKa sake dubawa daga baya.',
+  'You have no notifications right now.\nCheck back later for updates.':
+      'Ba ka da sanarwa yanzu.\nKa sake dubawa daga baya.',
   'You have read every message.': 'Ka karanta duk saƙonni.',
-  'You pay the transporter directly when they deliver. Only you, the other party on this order and the transporter who accepts can follow the delivery on the map.': 'Kai ne za ka biya mai jigila kai tsaye idan ya isar. Kai, ɗayan ɓangaren odar da mai jigilar da ya karɓa ne kawai za ku iya bin jigilar a taswira.',
+  'You pay the transporter directly when they deliver. Only you, the other party on this order and the transporter who accepts can follow the delivery on the map.':
+      'Kai ne za ka biya mai jigila kai tsaye idan ya isar. Kai, ɗayan ɓangaren odar da mai jigilar da ya karɓa ne kawai za ku iya bin jigilar a taswira.',
   'You will be returned to the login screen': 'Za a mayar da kai shafin shiga',
   'You will pay the transporter (₦)': 'Za ka biya mai jigila (₦)',
-  'You\'re offline — showing cached data': 'Ba ka kan intanet — ana nuna bayanan da aka ajiye',
+  'You\'re offline — showing cached data':
+      'Ba ka kan intanet — ana nuna bayanan da aka ajiye',
   'Your Listing': 'Kayanka',
-  'Your produce listings will appear here once you add them.': 'Kayanka za su bayyana a nan da zarar ka saka su.',
-  'Your profile as buyers see it, with reviews': 'Bayananka yadda masu saye ke ganinsu, tare da sharhi',
-  'Your rating helps other buyers. You can rate once.': 'Ƙimarka tana taimaka wa sauran masu saye. Sau ɗaya kawai za ka iya bayarwa.',
-  'Your story, what you grow, hours and farm photos': 'Labarinka, abin da kake nomawa, lokuta da hotunan gona',
-  'e.g. A family farm in Gashua growing rice, beans and pepper since 2010. We harvest twice a year.': 'misali Gonar iyali a Gashua da ke noma shinkafa, wake da barkono tun 2010. Muna girbi sau biyu a shekara.',
-  'e.g. Call when you reach the junction': 'misali Kira ni idan ka kai mahaɗar hanya',
+  'Your produce listings will appear here once you add them.':
+      'Kayanka za su bayyana a nan da zarar ka saka su.',
+  'Your profile as buyers see it, with reviews':
+      'Bayananka yadda masu saye ke ganinsu, tare da sharhi',
+  'Your rating helps other buyers. You can rate once.':
+      'Ƙimarka tana taimaka wa sauran masu saye. Sau ɗaya kawai za ka iya bayarwa.',
+  'Your story, what you grow, hours and farm photos':
+      'Labarinka, abin da kake nomawa, lokuta da hotunan gona',
+  'e.g. A family farm in Gashua growing rice, beans and pepper since 2010. We harvest twice a year.':
+      'misali Gonar iyali a Gashua da ke noma shinkafa, wake da barkono tun 2010. Muna girbi sau biyu a shekara.',
+  'e.g. Call when you reach the junction':
+      'misali Kira ni idan ka kai mahaɗar hanya',
   'e.g. Fresh White Maize — Kano 2024': 'misali Sabon farin masara — Kano 2024',
-  'e.g. Gashua grain market, gate 2': 'misali Kasuwar hatsi ta Gashua, ƙofa ta 2',
+  'e.g. Gashua grain market, gate 2':
+      'misali Kasuwar hatsi ta Gashua, ƙofa ta 2',
   'e.g. Ikeja, Nassarawa, Ungwa Rimi': 'misali Ikeja, Nassarawa, Ungwar Rimi',
   'e.g. Kano, Nigeria': 'misali Kano, Najeriya',
-  'e.g. Mon – Sat, 7:00 AM – 6:00 PM': 'misali Lit – Asa, 7:00 na safe – 6:00 na yamma',
+  'e.g. Mon – Sat, 7:00 AM – 6:00 PM':
+      'misali Lit – Asa, 7:00 na safe – 6:00 na yamma',
   'or': 'ko',
-  'typing ': 'yana rubutu',
+  'typing ': 'yana rubutu ',
   '10 digits': 'lambobi 10',
   'Finding transporter': 'Ana neman mai jigila',
   'Driver assigned': 'An samu direba',

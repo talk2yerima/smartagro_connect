@@ -11,12 +11,18 @@ import os
 
 rows = []
 for line in open('tool/i18n/ha.tsv', encoding='utf-8'):
-    line = line.rstrip('\n')
+    # Windows line endings must not end up inside the Hausa text.
+    line = line.rstrip('\r\n')
     if not line.strip() or line.startswith('#'):
         continue
     en, _, ha = line.partition('\t')
     if not ha.strip():
         continue
+    # Editors often drop trailing spaces; phrases joined to other text
+    # (" and ", "typing ") need the same spacing as the English.
+    lead = en[:len(en) - len(en.lstrip(' '))]
+    trail = en[len(en.rstrip(' ')):]
+    ha = lead + ha.strip(' ') + trail
     rows.append((en, ha))
 
 
