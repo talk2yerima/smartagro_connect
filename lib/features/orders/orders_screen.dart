@@ -360,8 +360,20 @@ class _DeliveryPanel extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final job = ref.watch(haulageJobProvider(order.reference)).valueOrNull;
     final canRequest = order.isPaid || order.isDispatched;
+    // Received orders keep a link to their delivery without a live
+    // listener each (a seller can have dozens of past orders).
+    if (!canRequest) {
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          icon: const Icon(Icons.local_shipping_outlined, size: 18),
+          label: const Text('Delivery details'),
+          onPressed: () => context.push('/delivery/${order.reference}'),
+        ),
+      );
+    }
+    final job = ref.watch(haulageJobProvider(order.reference)).valueOrNull;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     void request([HaulageJob? previous]) => context.push('/delivery-request',

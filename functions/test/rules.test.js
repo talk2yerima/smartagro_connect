@@ -375,6 +375,7 @@ test('only the assigned transporter shares location and moves the job on, in ord
 });
 
 test('a transporter can hand a job back before pickup; parties can cancel and repost', async () => {
+  await seedOrder();
   await seedDrivers();
   await seedJob({ status: 'accepted', transporterId: 'tunde', transporterName: 'Tunde', acceptedAt: new Date() });
   const handBack = {
@@ -416,4 +417,18 @@ test('review tags must come from the list, at most six', async () => {
   await assertFails(updateDoc(doc(as('bob'), 'orders/d1'), rate(['Paid me to say this'])));
   await assertFails(updateDoc(doc(as('bob'), 'orders/d1'), rate('Fresh produce')));
   await assertSucceeds(updateDoc(doc(as('bob'), 'orders/d1'), rate(['Fresh produce', 'Fast delivery'])));
+});
+
+test('sellers cannot give their listings a higher star rating than they have', async () => {
+  // alice has no rating yet.
+  await assertFails(setDoc(doc(as('alice'), 'products/fake5'), listing('alice', { sellerRating: 5 })));
+  await assertSucceeds(setDoc(doc(as('alice'), 'products/honest'), listing('alice', { sellerRating: 0 })));
+  await assertFails(updateDoc(doc(as('alice'), 'products/p1'), { sellerRating: 5 }));
+  await assertSucceeds(updateDoc(doc(as('admin'), 'products/p1'), { sellerRating: 4.2 }));
+});
+
+test('a cancelled delivery cannot be reposted once the order is received', async () => {
+  await seedOrder({ status: 'received' });
+  await seedJob({ status: 'cancelled', cancelledAt: new Date() });
+  await assertFails(setDoc(doc(as('bob'), 'haulageJobs/d1'), newJob('bob')));
 });

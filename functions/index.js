@@ -329,7 +329,9 @@ exports.onHaulageJobWritten = onDocumentWritten(
       const snap = await db.collection('users')
         .where('role', '==', 'transporter').limit(500).get();
       const transporters = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      for (const t of haulage.transportersToAlert(after, transporters)) {
+      // Not the transporter who just handed this job back.
+      const exclude = before && before.transporterId;
+      for (const t of haulage.transportersToAlert(after, transporters, { exclude })) {
         await notifications.deliver(haulage.newJobAlert(jobId, after, t.id), deps);
       }
     }

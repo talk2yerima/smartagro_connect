@@ -56,6 +56,8 @@ test('new jobs alert transporters in the pickup state, else everyone', () => {
   assert.deepEqual(h.transportersToAlert(job(), ts).map((t) => t.id), ['t1']);
   const elsewhere = job({ pickup: { label: 'Jos', state: 'Plateau', lat: 9.9, lng: 8.9 } });
   assert.deepEqual(h.transportersToAlert(elsewhere, ts).map((t) => t.id), ['t1', 't2']);
+  // The transporter who handed the job back isn't alerted about it again.
+  assert.deepEqual(h.transportersToAlert(job(), ts, { exclude: 't1' }).map((t) => t.id), ['t2']);
   const many = Array.from({ length: 150 }, (_, i) => ({ id: `t${i}`, location: 'Yobe' }));
   assert.equal(h.transportersToAlert(job(), many).length, h.MAX_TRANSPORTER_ALERTS);
 });

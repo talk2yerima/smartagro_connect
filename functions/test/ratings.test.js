@@ -63,6 +63,10 @@ test('a rating publishes one review, with the first name only, once', async () =
   assert.equal(again, null);
   assert.equal(db.store.get('users/s1').ratingCount, 1);
   assert.equal(ratings.reviewDoc('SA-2', order({ rating: 3 }), '').buyerName, 'Buyer');
+  // Never publish an email or a phone number typed into the name field.
+  assert.equal(ratings.reviewDoc('SA-5', order({ rating: 3 }), 'testbuyer@gmail.com').buyerName, 'Buyer');
+  assert.equal(ratings.reviewDoc('SA-6', order({ rating: 3 }), '+2348012345678').buyerName, 'Buyer');
+  assert.equal(ratings.reviewDoc('SA-7', order({ rating: 3 }), '08012345678 Musa').buyerName, 'Buyer');
   assert.equal('review' in ratings.reviewDoc('SA-2', order({ rating: 3 }), 'Ada'), false);
   const tagged = ratings.reviewDoc('SA-3',
     order({ rating: 4, reviewTags: ['Fast delivery', 'made up', 'Fresh produce'] }), 'Ada');

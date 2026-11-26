@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -354,6 +356,12 @@ class _JobCardState extends ConsumerState<JobCard> {
           .acceptHaulageJob(j.id, me.id, me.name);
       await ref.read(driverTrackerProvider.notifier).start(j.id);
       if (mounted) context.push('/delivery/${j.id}');
+    } on TimeoutException {
+      // Firestore keeps the write and sends it when the network is back.
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Weak network: your acceptance will be sent when '
+              'you are back online. Check My jobs.')));
     } catch (e) {
       if (!mounted) return;
       final taken = e.toString().contains('permission-denied');

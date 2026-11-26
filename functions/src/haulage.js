@@ -80,10 +80,10 @@ function jobNotifications(jobId, before, after) {
  * Transporters to alert about a new open job: those whose profile location
  * mentions the pickup state; if nobody does, every transporter (capped).
  */
-function transportersToAlert(job, transporters) {
+function transportersToAlert(job, transporters, { exclude } = {}) {
   const state = String((job.pickup && job.pickup.state) || '').trim().toLowerCase();
   const eligible = transporters.filter((t) =>
-    t.id !== job.buyerId && t.id !== job.sellerId && !t.banned);
+    t.id !== job.buyerId && t.id !== job.sellerId && t.id !== exclude && !t.banned);
   const nearby = state
     ? eligible.filter((t) => String(t.location || '').toLowerCase().includes(state))
     : [];

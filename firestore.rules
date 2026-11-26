@@ -87,6 +87,10 @@ service cloud.firestore {
                        validListingNumbers(request.resource.data) &&
                        (request.resource.data.get('verified', false) == false ||
                         isUserVerified()) &&
+                       // The star rating shown on cards can't be higher than
+                       // the seller's real one (set only by the backend).
+                       request.resource.data.get('sellerRating', 0) <=
+                         userDoc().data.get('rating', 0) &&
                        request.resource.data.get('availability', 'in_stock') != 'sold_out';
 
       // Seller edits their own listing but cannot hand it to someone else or
@@ -94,7 +98,7 @@ service cloud.firestore {
       allow update: if isAdmin() ||
                        (isSignedIn() &&
                         resource.data.sellerId == request.auth.uid &&
-                        !changedKeys().hasAny(['sellerId', 'verified']) &&
+                        !changedKeys().hasAny(['sellerId', 'verified', 'sellerRating']) &&
                         validListingNumbers(request.resource.data));
 
       allow delete: if isSignedIn() &&
@@ -305,8 +309,10 @@ service cloud.firestore {
       // ...and may post it again later, as a fresh open job.
       function partyReposts() {
         let d = request.resource.data;
+        let order = get(/databases/$(database)/documents/orders/$(orderId)).data;
         return isJobParty() &&
                resource.data.status == 'cancelled' &&
+               order.status in ['paid', 'dispatched'] &&
                d.orderId == resource.data.orderId &&
                d.buyerId == resource.data.buyerId &&
                d.sellerId == resource.data.sellerId &&

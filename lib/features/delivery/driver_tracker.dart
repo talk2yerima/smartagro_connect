@@ -76,11 +76,12 @@ class DriverTracker extends Notifier<TrackerState> {
     ref.onDispose(_cancel);
     if (user != null && user.role == UserRole.transporter) {
       // After build returns: _sync reads and sets this notifier's state.
-      ref.listen<AsyncValue<List<HaulageJob>>>(
-          myHaulageJobsProvider,
-          (_, next) =>
-              Future.microtask(() => _sync(next.valueOrNull ?? const [])),
-          fireImmediately: true);
+      ref.listen<AsyncValue<List<HaulageJob>>>(myHaulageJobsProvider,
+          (_, next) {
+        // Only real data: an error or a reload must not stop sharing.
+        if (next is! AsyncData<List<HaulageJob>>) return;
+        Future.microtask(() => _sync(next.value));
+      }, fireImmediately: true);
     }
     return const TrackerState();
   }

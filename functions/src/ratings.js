@@ -41,7 +41,10 @@ function averageAfter({ ratingSum = 0, ratingCount = 0, ratingCounts = {} }, rat
 const REVIEW_TAGS = ['Fresh produce', 'Well packed', 'Fast delivery', 'As described', 'Fair price', 'Friendly seller', 'Late delivery', 'Poor quality', 'Short weight'];
 
 function reviewDoc(orderRef, order, buyerName) {
-  const first = String(buyerName || '').trim().split(/\s+/)[0] || 'Buyer';
+  const word = String(buyerName || '').trim().split(/\s+/)[0] || '';
+  // An email or phone number in the name field must never be published.
+  const looksPrivate = word.includes('@') || /^[+\d][\d\s-]{5,}$/.test(word);
+  const first = !word || looksPrivate ? 'Buyer' : word;
   const text = String(order.review || '').trim().slice(0, 500);
   const tags = Array.isArray(order.reviewTags)
     ? REVIEW_TAGS.filter((t) => order.reviewTags.includes(t)).slice(0, 6)

@@ -96,7 +96,12 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
           return Scaffold(
             appBar: AppBar(title: const Text('Delivery')),
             body: const Center(
-                child: Text('This delivery is no longer available.')),
+                child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Text(
+                  'No transport was booked through SmartAgro for this order.',
+                  textAlign: TextAlign.center),
+            )),
           );
         }
         final isDriver = job.transporterId == myId && myId.isNotEmpty;
