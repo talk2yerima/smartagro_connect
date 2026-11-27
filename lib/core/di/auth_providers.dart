@@ -81,6 +81,13 @@ class AuthSessionNotifier extends StateNotifier<AppUser?> {
           final persisted = repo.currentSessionUser;
           if (persisted != null && persisted.id == fbUser.uid) {
             state = persisted;
+            // Then pick up anything changed on the server since.
+            try {
+              final fresh = await repo.refreshSessionUser();
+              if (mounted && fresh != null) state = fresh;
+            } catch (_) {
+              // Offline: keep the saved copy.
+            }
           }
           // If IDs don't match (e.g. different device) the next explicit
           // login will call setUser() and persist the correct user.

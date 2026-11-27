@@ -661,7 +661,10 @@ class _RateSheetState extends State<_RateSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    // Scrollable: with the quick tags the sheet can be taller than the
+    // space above the keyboard, and a button drawn past the sheet's edge
+    // can't be tapped (Submit did nothing on smaller phones).
+    return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(
           24, 20, 24, 24 + MediaQuery.viewInsetsOf(context).bottom),
       child: Column(

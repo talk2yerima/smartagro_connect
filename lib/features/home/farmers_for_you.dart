@@ -80,7 +80,7 @@ class _Title extends StatelessWidget {
         padding: const EdgeInsets.only(bottom: 8),
         child: Row(
           children: [
-            Text(text,
+            Text(tr(text),
                 style: Theme.of(context)
                     .textTheme
                     .titleMedium!

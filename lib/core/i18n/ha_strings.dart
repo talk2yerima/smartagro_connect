@@ -534,4 +534,7 @@ const haStrings = <String, String>{
   'All prices': 'Duk farashi',
   '1 product': 'kaya 1',
   '{n} products': 'kaya {n}',
+  'Recommended farmers': 'Manoma da aka ba da shawara',
+  'Recently viewed farmers': 'Manoman da ka duba kwanan nan',
+  'No rating yet': 'Babu ƙima tukuna',
 };

@@ -77,6 +77,39 @@ class AuthRepository {
     }
   }
 
+  /// Reloads the signed-in person's profile from the server, so changes
+  /// made elsewhere (an admin verifying them, a new role, a name changed on
+  /// another phone) reach this phone without signing out. Returns the
+  /// updated user, or null when nothing could be loaded. Signs out a
+  /// suspended account.
+  Future<AppUser?> refreshSessionUser() async {
+    final fbUser = _auth.currentUser;
+    final current = _cachedUser;
+    if (fbUser == null || current == null || current.id != fbUser.uid) {
+      return null;
+    }
+    final profile = await _firestore.fetchUserProfile(fbUser.uid);
+    if (profile == null) return null;
+    if (profile['banned'] == true) {
+      await logout();
+      return null;
+    }
+    final fresh = _buildUserFromFirebase(fbUser,
+        fallbackRole: current.role, profile: profile);
+    if (fresh == current &&
+        fresh.name == current.name &&
+        fresh.role == current.role &&
+        fresh.verified == current.verified &&
+        fresh.location == current.location &&
+        fresh.avatarUrl == current.avatarUrl &&
+        fresh.rating == current.rating &&
+        fresh.phone == current.phone) {
+      return current;
+    }
+    await _persistLocal(fresh);
+    return fresh;
+  }
+
   Future<AppUser> loginWithEmail({
     required String email,
     required String password,
