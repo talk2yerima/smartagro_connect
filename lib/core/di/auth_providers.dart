@@ -28,7 +28,6 @@ final loadedSharedPreferencesProvider = Provider<SharedPreferences>((ref) {
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return AuthRepository(
     secure: ref.watch(secureTokenStoreProvider),
-    prefs: ref.watch(loadedSharedPreferencesProvider),
     firestore: ref.watch(firestoreServiceProvider),
   );
 });
@@ -46,11 +45,22 @@ class AuthSessionNotifier extends StateNotifier<AppUser?> {
 
   final Ref _ref;
   StreamSubscription<fb.User?>? _firebaseSub;
+  final _restored = Completer<void>();
 
-  void _init() {
-    // Restore any previously persisted session first (instant on cold start).
-    final repo = _ref.read(authRepositoryProvider);
-    state = repo.currentSessionUser;
+  /// Completes once the saved sign-in has been read from secure storage.
+  /// Until then [state] is null even for a signed-in person, so anything
+  /// that routes on sign-in at start-up (the splash) must await this.
+  Future<void> get restored => _restored.future;
+
+  Future<void> _init() async {
+    try {
+      // Warm the in-memory cache from secure storage, then expose the user.
+      final repo = _ref.read(authRepositoryProvider);
+      await repo.initSession();
+      if (mounted) state = repo.currentSessionUser;
+    } finally {
+      if (!_restored.isCompleted) _restored.complete();
+    }
 
     // If Firebase is ready, let its auth stream drive session state.
     // This means signing in/out on another device will update this device too.
@@ -71,6 +81,13 @@ class AuthSessionNotifier extends StateNotifier<AppUser?> {
           final persisted = repo.currentSessionUser;
           if (persisted != null && persisted.id == fbUser.uid) {
             state = persisted;
+            // Then pick up anything changed on the server since.
+            try {
+              final fresh = await repo.refreshSessionUser();
+              if (mounted && fresh != null) state = fresh;
+            } catch (_) {
+              // Offline: keep the saved copy.
+            }
           }
           // If IDs don't match (e.g. different device) the next explicit
           // login will call setUser() and persist the correct user.
@@ -88,6 +105,24 @@ class AuthSessionNotifier extends StateNotifier<AppUser?> {
   }
 
   void setUser(AppUser user) => state = user;
+
+  Future<void> updateProfile({
+    required String name,
+    String? phone,
+    String? location,
+    String? avatarUrl,
+  }) async {
+    final user = state;
+    if (user == null) return;
+    final updated = await _ref.read(authRepositoryProvider).updateProfile(
+          userId: user.id,
+          name: name,
+          phone: phone,
+          location: location,
+          avatarUrl: avatarUrl,
+        );
+    state = updated;
+  }
 
   Future<void> logout() async {
     await _ref.read(authRepositoryProvider).logout();

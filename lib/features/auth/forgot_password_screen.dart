@@ -4,13 +4,16 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/di/auth_providers.dart';
 import '../../core/errors/failures.dart';
+import '../../core/errors/friendly_error.dart';
+import '../../core/i18n/i18n.dart';
 import '../../shared/widgets/gradient_button.dart';
 
 class ForgotPasswordScreen extends ConsumerStatefulWidget {
   const ForgotPasswordScreen({super.key});
 
   @override
-  ConsumerState<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+  ConsumerState<ForgotPasswordScreen> createState() =>
+      _ForgotPasswordScreenState();
 }
 
 class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
@@ -35,12 +38,14 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       _error = null;
     });
     try {
-      await ref.read(authRepositoryProvider).sendPasswordReset(_email.text.trim());
+      await ref
+          .read(authRepositoryProvider)
+          .sendPasswordReset(_email.text.trim());
       setState(() => _sent = true);
     } on Failure catch (e) {
       setState(() => _error = e.message);
     } catch (e) {
-      setState(() => _error = e.toString());
+      setState(() => _error = friendlyError(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -49,7 +54,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Forgot password')),
+      appBar: AppBar(title: const T('Forgot password')),
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -65,11 +70,12 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
             TextField(
               controller: _email,
               keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(labelText: 'Email'),
+              decoration: InputDecoration(labelText: tr('Email')),
             ),
             if (_error != null) ...[
               const SizedBox(height: 8),
-              Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              Text(_error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error)),
             ],
             const SizedBox(height: 16),
             PrimaryGradientButton(
@@ -79,7 +85,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
             const Spacer(),
             TextButton(
               onPressed: () => context.pop(),
-              child: const Text('Back to login'),
+              child: const T('Back to login'),
             ),
           ],
         ),

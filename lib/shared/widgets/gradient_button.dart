@@ -83,8 +83,7 @@ class PrimaryGradientButton extends StatelessWidget {
                       height: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2.5,
-                        valueColor:
-                            AlwaysStoppedAnimation<Color>(Colors.white),
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                       ),
                     ),
                   ] else ...[
@@ -175,8 +174,7 @@ class SecondaryGradientButton extends StatelessWidget {
                       height: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2.5,
-                        valueColor:
-                            AlwaysStoppedAnimation<Color>(Colors.white),
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                       ),
                     ),
                   ] else ...[
@@ -236,10 +234,8 @@ class GhostButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final borderColor =
-        isDark ? AppColors.freshGreen : AppColors.deepGreen;
-    final textColor =
-        isDark ? AppColors.freshGreen : AppColors.deepGreen;
+    final borderColor = isDark ? AppColors.freshGreen : AppColors.deepGreen;
+    final textColor = isDark ? AppColors.freshGreen : AppColors.deepGreen;
     final isDisabled = onPressed == null;
 
     final textStyle = GoogleFonts.poppins(
@@ -274,8 +270,7 @@ class GhostButton extends StatelessWidget {
                       height: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2.5,
-                        valueColor:
-                            AlwaysStoppedAnimation<Color>(textColor),
+                        valueColor: AlwaysStoppedAnimation<Color>(textColor),
                       ),
                     ),
                   ] else ...[

@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:smartagro_connect/core/errors/failures.dart';
 import 'package:smartagro_connect/data/repositories/auth_repository.dart';
 import 'package:smartagro_connect/data/services/firestore_service.dart';
@@ -8,25 +7,26 @@ import 'package:smartagro_connect/data/services/secure_token_store.dart';
 import 'package:smartagro_connect/domain/entities/app_user.dart';
 
 class MockSecureTokenStore extends Mock implements SecureTokenStore {}
+
 class MockFirestoreService extends Mock implements FirestoreService {}
 
 void main() {
   late MockSecureTokenStore tokenStore;
   late MockFirestoreService firestore;
-  late SharedPreferences prefs;
   late AuthRepository repo;
 
   setUp(() async {
-    SharedPreferences.setMockInitialValues({});
-    prefs = await SharedPreferences.getInstance();
     tokenStore = MockSecureTokenStore();
     firestore = MockFirestoreService();
 
     when(() => tokenStore.writeTokens(access: any(named: 'access')))
         .thenAnswer((_) async {});
     when(() => tokenStore.clear()).thenAnswer((_) async {});
+    when(() => tokenStore.writeValue(any(), any())).thenAnswer((_) async {});
+    when(() => tokenStore.readValue(any())).thenAnswer((_) async => null);
+    when(() => tokenStore.removeValue(any())).thenAnswer((_) async {});
 
-    repo = AuthRepository(secure: tokenStore, prefs: prefs, firestore: firestore);
+    repo = AuthRepository(secure: tokenStore, firestore: firestore);
   });
 
   // ── currentSessionUser ──────────────────────────────────────────────────────
@@ -84,14 +84,16 @@ void main() {
           .called(1);
     });
 
-    test('persists user to SharedPreferences', () async {
+    test('persists user to secure storage', () async {
       await repo.loginWithEmail(email: 'a@b.ng', password: 'longenough');
-      expect(prefs.getString('session_user_json'), isNotNull);
+      verify(() => tokenStore.writeValue('session_user_json', any())).called(1);
     });
 
     test('different emails produce different user ids', () async {
-      final a = await repo.loginWithEmail(email: 'aaa@b.ng', password: 'pass1234');
-      final b = await repo.loginWithEmail(email: 'bbb@b.ng', password: 'pass1234');
+      final a =
+          await repo.loginWithEmail(email: 'aaa@b.ng', password: 'pass1234');
+      final b =
+          await repo.loginWithEmail(email: 'bbb@b.ng', password: 'pass1234');
       expect(a.id, isNot(equals(b.id)));
     });
   });
@@ -120,23 +122,23 @@ void main() {
       expect(user.verified, isFalse);
     });
 
-    test('persists user to SharedPreferences', () async {
+    test('persists user to secure storage', () async {
       await repo.registerWithEmail(
         name: 'Tola',
         email: 'tola@t.ng',
         password: 'pass1234',
         role: UserRole.farmer,
       );
-      expect(prefs.getString('session_user_json'), isNotNull);
+      verify(() => tokenStore.writeValue('session_user_json', any())).called(1);
     });
   });
 
   // ── logout ──────────────────────────────────────────────────────────────────
   group('logout', () {
-    test('clears session from SharedPreferences', () async {
+    test('clears session user from secure storage', () async {
       await repo.loginWithEmail(email: 'a@b.ng', password: 'pass1234');
       await repo.logout();
-      expect(prefs.getString('session_user_json'), isNull);
+      verify(() => tokenStore.removeValue('session_user_json')).called(1);
     });
 
     test('clears token store', () async {
@@ -168,9 +170,9 @@ void main() {
       expect(user.role, UserRole.buyer);
     });
 
-    test('persists user to SharedPreferences', () async {
+    test('persists user to secure storage', () async {
       await repo.googleSignIn();
-      expect(prefs.getString('session_user_json'), isNotNull);
+      verify(() => tokenStore.writeValue('session_user_json', any())).called(1);
     });
   });
 }

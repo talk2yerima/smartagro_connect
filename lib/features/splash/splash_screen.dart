@@ -7,6 +7,8 @@ import '../../core/constants/app_colors.dart';
 import '../../core/di/auth_providers.dart';
 import '../../core/di/initialization_provider.dart';
 
+import '../../core/i18n/i18n.dart';
+
 /// Premium animated splash — first screen every user sees.
 /// Shows for 2 500 ms then routes to /onboarding, /login, or /main/home.
 class SplashScreen extends ConsumerStatefulWidget {
@@ -36,17 +38,21 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       vsync: this,
       duration: const Duration(milliseconds: 600),
     );
-    Future<void>.delayed(const Duration(milliseconds: 200),
-        () => _dot2.repeat(reverse: true));
+    Future<void>.delayed(const Duration(milliseconds: 200), () {
+      if (mounted) _dot2.repeat(reverse: true);
+    });
 
     _dot3 = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
     );
-    Future<void>.delayed(const Duration(milliseconds: 400),
-        () => _dot3.repeat(reverse: true));
+    Future<void>.delayed(const Duration(milliseconds: 400), () {
+      if (mounted) _dot3.repeat(reverse: true);
+    });
 
-    Future<void>.delayed(const Duration(milliseconds: 2500), _routeNext);
+    // Start-up work is already finished before this screen mounts, so this
+    // is only a short brand moment, not a wait for loading.
+    Future<void>.delayed(const Duration(milliseconds: 800), _routeNext);
   }
 
   @override
@@ -58,6 +64,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   }
 
   Future<void> _routeNext() async {
+    if (!mounted) return;
+    // Wait for the saved sign-in to load (reading secure storage can take
+    // a second on a cold start); otherwise signed-in people land on Sign in.
+    await ref
+        .read(authSessionProvider.notifier)
+        .restored
+        .timeout(const Duration(seconds: 5), onTimeout: () {});
     if (!mounted) return;
     final prefs = await ref.read(sharedPreferencesProvider.future);
     final onboarded = prefs.getBool('onboarding_completed') ?? false;
@@ -111,7 +124,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
               const SizedBox(height: 16),
 
               // ── Tagline ───────────────────────────────────────────
-              const Text(
+              const T(
                 "Africa's Agricultural Intelligence Platform",
                 textAlign: TextAlign.center,
                 maxLines: 2,
@@ -179,7 +192,7 @@ class _BrandName extends StatelessWidget {
     return const Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
+        T(
           'SmartAgro',
           textAlign: TextAlign.center,
           maxLines: 1,
@@ -193,7 +206,7 @@ class _BrandName extends StatelessWidget {
             height: 1.1,
           ),
         ),
-        Text(
+        T(
           'Connect',
           textAlign: TextAlign.center,
           maxLines: 1,

@@ -4,22 +4,26 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/di/auth_providers.dart';
+import '../../core/di/firestore_providers.dart';
 import '../../core/di/repositories_provider.dart';
+import '../../core/errors/friendly_error.dart';
+import '../../core/i18n/i18n.dart';
 import '../../core/utils/money_format.dart';
 import '../../domain/entities/commodity.dart';
+import '../../domain/entities/price_alert.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/section_header.dart';
 import '../../shared/widgets/skeleton_list.dart';
 import '../../shared/widgets/sparkline_chart.dart';
 import '../../shared/widgets/stat_card.dart';
-
 // ─── Local card decoration helper ────────────────────────────────────────────
 
 BoxDecoration _card(bool isDark) => BoxDecoration(
-      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      color: isDark ? AppColors.cardDark : Colors.white,
       borderRadius: BorderRadius.circular(12),
       border: Border.all(
-        color: isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0),
+        color: isDark ? AppColors.darkBorder : AppColors.borderLight,
       ),
       boxShadow: [
         BoxShadow(
@@ -72,9 +76,9 @@ class CommodityDetailScreen extends ConsumerWidget {
         appBar: _buildAppBar(context, 'Error', null),
         body: EmptyState(
           icon: Icons.error_outline_rounded,
-          title: 'Failed to load',
-          subtitle: e.toString(),
-          actionLabel: 'Retry',
+          title: tr('Failed to load'),
+          subtitle: friendlyError(e),
+          actionLabel: tr('Retry'),
           onAction: () => ref.invalidate(commoditiesProvider),
         ),
       ),
@@ -83,11 +87,11 @@ class CommodityDetailScreen extends ConsumerWidget {
         if (index == -1) {
           return Scaffold(
             appBar: _buildAppBar(context, 'Not Found', null),
-            body: const EmptyState(
+            body: EmptyState(
               icon: Icons.search_off_rounded,
-              title: 'Commodity not found',
-              subtitle:
-                  'We could not find a commodity with that ID. It may have been removed.',
+              title: tr('Commodity not found'),
+              subtitle: tr(
+                  'We could not find a commodity with that ID. It may have been removed.'),
             ),
           );
         }
@@ -99,10 +103,9 @@ class CommodityDetailScreen extends ConsumerWidget {
             .toList();
 
         return Scaffold(
-          backgroundColor:
-              Theme.of(context).brightness == Brightness.dark
-                  ? AppColors.darkBg
-                  : AppColors.softWhite,
+          backgroundColor: Theme.of(context).brightness == Brightness.dark
+              ? AppColors.darkBg
+              : AppColors.softWhite,
           appBar: _buildAppBar(context, c.name, c),
           body: RefreshIndicator(
             color: AppColors.deepGreen,
@@ -160,7 +163,7 @@ class CommodityDetailScreen extends ConsumerWidget {
         if (commodity != null)
           IconButton(
             icon: const Icon(Icons.share_outlined),
-            tooltip: 'Share',
+            tooltip: tr('Share'),
             onPressed: () {
               HapticFeedback.lightImpact();
               final text =
@@ -189,8 +192,7 @@ class _HeroPriceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isUp = commodity.changePct >= 0;
-    final trendColor =
-        isUp ? AppColors.mintGreen : AppColors.errorRed;
+    final trendColor = isUp ? AppColors.mintGreen : AppColors.errorRed;
     final signLabel =
         '${isUp ? '+' : ''}${commodity.changePct.toStringAsFixed(2)}%';
 
@@ -199,14 +201,14 @@ class _HeroPriceCard extends StatelessWidget {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF1B5E20), Color(0xFF2E7D32)],
+          colors: [AppColors.deepGreen, AppColors.emerald],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF1B5E20).withValues(alpha: 0.38),
+            color: AppColors.deepGreen.withValues(alpha: 0.38),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -278,13 +280,11 @@ class _HeroPriceCard extends StatelessWidget {
             children: [
               // Trend badge
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: trendColor.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                      color: trendColor.withValues(alpha: 0.5)),
+                  border: Border.all(color: trendColor.withValues(alpha: 0.5)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -331,7 +331,7 @@ class _HeroPriceCard extends StatelessWidget {
           const SizedBox(height: 4),
 
           Text(
-            'Origin: ${_resolveOrigin(commodity)}',
+            'Category: ${commodity.category}',
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.60),
               fontSize: 12,
@@ -350,22 +350,6 @@ class _HeroPriceCard extends StatelessWidget {
         )
         .fadeIn(duration: 380.ms);
   }
-
-  String _resolveOrigin(Commodity c) {
-    // Commodity entity has no origin field — derive a plausible one from
-    // category so the UI is never blank.
-    const map = {
-      'Grains': 'Kano, Nigeria',
-      'Tubers': 'Benue, Nigeria',
-      'Vegetables': 'Plateau, Nigeria',
-      'Fruits': 'Ogun, Nigeria',
-      'Livestock': 'Sokoto, Nigeria',
-      'Poultry': 'Oyo, Nigeria',
-      'Fisheries': 'Lagos, Nigeria',
-      'Cash Crops': 'Ondo, Nigeria',
-    };
-    return map[c.category] ?? 'West Africa';
-  }
 }
 
 // ─── [2] Sparkline Chart Card ─────────────────────────────────────────────────
@@ -375,14 +359,18 @@ class _SparklineCard extends StatelessWidget {
 
   final Commodity commodity;
 
-  static const _dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isUp = commodity.changePct >= 0;
     final trendColor = isUp ? AppColors.mintGreen : AppColors.errorRed;
-    final sparkData = mockSparklineFromChange(commodity.changePct);
+    final sparkData =
+        trendFromChange(commodity.changePct, current: commodity.priceNgn);
+    final trendWord = commodity.changePct > 0
+        ? 'Rising'
+        : commodity.changePct < 0
+            ? 'Falling'
+            : 'Steady';
 
     return Container(
       decoration: _card(isDark),
@@ -406,8 +394,8 @@ class _SparklineCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              Text(
-                '7-Day Price Trend',
+              T(
+                'Latest Price Move',
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
                       fontFamily: 'Poppins',
                       fontWeight: FontWeight.w700,
@@ -418,14 +406,13 @@ class _SparklineCard extends StatelessWidget {
               ),
               const Spacer(),
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: trendColor.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  isUp ? 'Uptrend' : 'Downtrend',
+                  trendWord,
                   style: TextStyle(
                     color: trendColor,
                     fontSize: 11,
@@ -455,19 +442,21 @@ class _SparklineCard extends StatelessWidget {
 
           const SizedBox(height: 8),
 
-          // ── X-axis day labels ──
+          // ── End-point labels: the two real prices behind the line ──
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: _dayLabels
+            children: [
+              'Previous ${formatNgn(sparkData.first.round())}',
+              'Now ${formatNgn(commodity.priceNgn)}',
+            ]
                 .map(
                   (d) => Text(
                     d,
                     style: TextStyle(
-                      fontSize: 10,
+                      fontSize: 12,
                       fontWeight: FontWeight.w500,
-                      color: isDark
-                          ? AppColors.darkTextSecondary
-                          : AppColors.gray,
+                      color:
+                          isDark ? AppColors.darkTextSecondary : AppColors.gray,
                     ),
                   ),
                 )
@@ -495,34 +484,35 @@ class _MarketStatsGrid extends StatelessWidget {
 
     final stats = [
       _StatEntry(
-        label: 'Current Price',
+        label: tr('Current Price'),
         value: formatNgn(commodity.priceNgn),
-        icon: Icons.monetization_on_outlined,
+        icon: Icons.sell_outlined,
         color: AppColors.deepGreen,
         trend: null,
       ),
       _StatEntry(
-        label: '7-Day Change',
-        value:
-            '${isUp ? '+' : ''}${commodity.changePct.toStringAsFixed(2)}%',
+        label: tr('Latest Change'),
+        value: '${isUp ? '+' : ''}${commodity.changePct.toStringAsFixed(2)}%',
         icon: Icons.trending_up_rounded,
         color: isUp ? AppColors.mintGreen : AppColors.errorRed,
         trend: commodity.changePct,
       ),
-      const _StatEntry(
-        label: 'Volume',
-        value: '2,400',
+      // Real field in place of a fixed "2,400 MT" volume shown on every item.
+      _StatEntry(
+        label: tr('Priced per'),
+        value: commodity.unit,
         icon: Icons.inventory_2_outlined,
         color: AppColors.infoBlue,
-        unit: 'MT',
         trend: null,
       ),
       _StatEntry(
-        label: 'Market Trend',
-        value: isUp ? 'Bullish' : 'Bearish',
-        icon: isUp
-            ? Icons.arrow_upward_rounded
-            : Icons.arrow_downward_rounded,
+        label: tr('Market Trend'),
+        value: commodity.changePct > 0
+            ? 'Rising'
+            : commodity.changePct < 0
+                ? 'Falling'
+                : 'Steady',
+        icon: isUp ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
         color: isUp ? AppColors.mintGreen : AppColors.errorRed,
         trend: null,
       ),
@@ -533,15 +523,14 @@ class _MarketStatsGrid extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.only(bottom: 12),
-          child: Text(
+          child: T(
             'Market Statistics',
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   fontFamily: 'Poppins',
                   fontWeight: FontWeight.w700,
-                  color:
-                      Theme.of(context).brightness == Brightness.dark
-                          ? AppColors.darkTextPrimary
-                          : AppColors.charcoal,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? AppColors.darkTextPrimary
+                      : AppColors.charcoal,
                 ),
           ),
         ),
@@ -563,7 +552,6 @@ class _MarketStatsGrid extends StatelessWidget {
               icon: s.icon,
               color: s.color,
               trend: s.trend,
-              unit: s.unit,
             ).animate(delay: (50 * i).ms).fadeIn().slideY(begin: 0.04);
           },
         ),
@@ -579,7 +567,6 @@ class _StatEntry {
     required this.icon,
     required this.color,
     required this.trend,
-    this.unit,
   });
 
   final String label;
@@ -587,7 +574,6 @@ class _StatEntry {
   final IconData icon;
   final Color color;
   final double? trend;
-  final String? unit;
 }
 
 // ─── [4] Details Card ────────────────────────────────────────────────────────
@@ -604,20 +590,15 @@ class _DetailsCard extends StatelessWidget {
     final rows = [
       _DetailRow(
           icon: Icons.category_outlined,
-          label: 'Category',
+          label: tr('Category'),
           value: commodity.category),
-      _DetailRow(
-          icon: Icons.location_on_outlined,
-          label: 'Origin',
-          value: _originFor(commodity)),
+      // "Origin" (guessed from category) and "Last Updated" (fixed text,
+      // "Today, 09:30 AM") were removed: commodities store neither. Add them
+      // back when the price feed provides a source region and timestamp.
       _DetailRow(
           icon: Icons.straighten_outlined,
-          label: 'Unit',
+          label: tr('Unit'),
           value: commodity.unit),
-      const _DetailRow(
-          icon: Icons.update_rounded,
-          label: 'Last Updated',
-          value: 'Today, 09:30 AM'),
     ];
 
     return Container(
@@ -643,7 +624,7 @@ class _DetailsCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 10),
-                Text(
+                T(
                   'Commodity Details',
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         fontFamily: 'Poppins',
@@ -695,9 +676,7 @@ class _DetailsCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
-                  color: isDark
-                      ? AppColors.darkTextSecondary
-                      : AppColors.gray,
+                  color: isDark ? AppColors.darkTextSecondary : AppColors.gray,
                 ),
               ),
               const Spacer(),
@@ -706,9 +685,8 @@ class _DetailsCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: isDark
-                      ? AppColors.darkTextPrimary
-                      : AppColors.charcoal,
+                  color:
+                      isDark ? AppColors.darkTextPrimary : AppColors.charcoal,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -720,26 +698,10 @@ class _DetailsCard extends StatelessWidget {
           Divider(
             height: 1,
             thickness: 1,
-            color: isDark
-                ? const Color(0xFF2E3C2E)
-                : AppColors.borderLight,
+            color: isDark ? AppColors.darkBorder : AppColors.borderLight,
           ),
       ],
     );
-  }
-
-  String _originFor(Commodity c) {
-    const map = {
-      'Grains': 'Kano, Nigeria',
-      'Tubers': 'Benue, Nigeria',
-      'Vegetables': 'Plateau, Nigeria',
-      'Fruits': 'Ogun, Nigeria',
-      'Livestock': 'Sokoto, Nigeria',
-      'Poultry': 'Oyo, Nigeria',
-      'Fisheries': 'Lagos, Nigeria',
-      'Cash Crops': 'Ondo, Nigeria',
-    };
-    return map[c.category] ?? 'West Africa';
   }
 }
 
@@ -754,107 +716,105 @@ class _DetailRow {
 
 // ─── [5] Price Alerts Card ────────────────────────────────────────────────────
 
-class _PriceAlertCard extends StatelessWidget {
+/// "Set Price Alert" plus the person's alerts for this commodity. Alerts are
+/// saved to Firestore; the backend notifies once when a price change crosses
+/// the target, then marks the alert as used.
+class _PriceAlertCard extends ConsumerWidget {
   const _PriceAlertCard({required this.commodity});
 
   final Commodity commodity;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final alerts =
+        ref.watch(priceAlertsProvider(commodity.id)).valueOrNull ?? const [];
+    final accent = isDark ? AppColors.lightGreen : AppColors.deepGreen;
 
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        showModalBottomSheet<void>(
-          context: context,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.card(isDark),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border_(isDark)),
+      ),
+      child: Column(
+        children: [
+          ListTile(
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            leading: CircleAvatar(
+              backgroundColor: accent.withValues(alpha: 0.12),
+              child: Icon(Icons.notifications_active_outlined, color: accent),
+            ),
+            title: const T('Set Price Alert',
+                style: TextStyle(fontWeight: FontWeight.w700)),
+            subtitle:
+                Text('Get notified when ${commodity.name} reaches your price'),
+            trailing: Icon(Icons.chevron_right_rounded, color: accent),
+            onTap: () {
+              HapticFeedback.lightImpact();
+              showModalBottomSheet<void>(
+                context: context,
+                isScrollControlled: true,
+                useSafeArea: true,
+                builder: (_) => _PriceAlertSheet(commodity: commodity),
+              );
+            },
           ),
-          backgroundColor:
-              isDark ? AppColors.cardDark : Colors.white,
-          builder: (_) => _PriceAlertSheet(commodity: commodity),
-        );
-      },
-      child: Container(
-        decoration: _card(isDark),
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: AppColors.deepGreen.withValues(alpha: 0.10),
-                shape: BoxShape.circle,
+          for (final a in alerts) ...[
+            Divider(height: 1, color: AppColors.border_(isDark)),
+            ListTile(
+              dense: true,
+              leading: Icon(
+                a.above
+                    ? Icons.trending_up_rounded
+                    : Icons.trending_down_rounded,
+                color: a.active ? accent : AppColors.subText(isDark),
               ),
-              child: const Icon(
-                Icons.notifications_active_outlined,
-                color: AppColors.deepGreen,
-                size: 22,
+              title: Text(
+                '${a.above ? 'Rises above' : 'Falls below'} '
+                '${formatNgn(a.targetNgn)}',
+                style: TextStyle(
+                  decoration: a.active ? null : TextDecoration.lineThrough,
+                ),
               ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Set Price Alert',
-                    style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                      color: isDark
-                          ? AppColors.darkTextPrimary
-                          : AppColors.charcoal,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Get notified when ${commodity.name} hits your target price',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isDark
-                          ? AppColors.darkTextSecondary
-                          : AppColors.gray,
-                      height: 1.4,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+              subtitle: Text(a.active ? 'Waiting' : 'Reached. You were told.'),
+              trailing: IconButton(
+                tooltip: tr('Remove alert'),
+                icon: const Icon(Icons.delete_outline_rounded),
+                onPressed: () => ref
+                    .read(firestoreServiceProvider)
+                    .deletePriceAlert(a.id)
+                    .catchError((Object e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(friendlyError(e))));
+                  }
+                }),
               ),
-            ),
-            const SizedBox(width: 8),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: AppColors.deepGreen,
-              size: 24,
             ),
           ],
-        ),
+        ],
       ),
-    )
-        .animate(delay: 160.ms)
-        .fadeIn(duration: 380.ms)
-        .slideY(begin: 0.04, curve: Curves.easeOut);
+    );
   }
 }
 
-class _PriceAlertSheet extends StatefulWidget {
+class _PriceAlertSheet extends ConsumerStatefulWidget {
   const _PriceAlertSheet({required this.commodity});
 
   final Commodity commodity;
 
   @override
-  State<_PriceAlertSheet> createState() => _PriceAlertSheetState();
+  ConsumerState<_PriceAlertSheet> createState() => _PriceAlertSheetState();
 }
 
-class _PriceAlertSheetState extends State<_PriceAlertSheet> {
+class _PriceAlertSheetState extends ConsumerState<_PriceAlertSheet> {
   final _controller = TextEditingController();
+  bool _saving = false;
+  String? _error;
+
+  int? get _target => int.tryParse(_controller.text.trim());
 
   @override
   void dispose() {
@@ -862,106 +822,95 @@ class _PriceAlertSheetState extends State<_PriceAlertSheet> {
     super.dispose();
   }
 
+  Future<void> _save() async {
+    final c = widget.commodity;
+    final target = _target;
+    final uid = ref.read(authSessionProvider)?.id;
+    if (target == null || target <= 0) {
+      setState(() => _error = 'Enter a price in naira, for example 30000.');
+      return;
+    }
+    if (target == c.priceNgn) {
+      setState(() => _error = "That's today's price. Choose a higher or "
+          'lower price to be told about.');
+      return;
+    }
+    if (uid == null) return;
+    final above = PriceAlert.directionFor(target: target, current: c.priceNgn);
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await ref.read(firestoreServiceProvider).createPriceAlert(
+            uid: uid,
+            commodityId: c.id,
+            commodityName: c.name,
+            unit: c.unit,
+            targetNgn: target,
+            above: above,
+          );
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text("Alert set. We'll tell you when ${c.name} "
+            '${above ? 'rises above' : 'falls below'} ${formatNgn(target)}.'),
+      ));
+    } catch (e) {
+      if (mounted) setState(() => _error = friendlyError(e));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = widget.commodity;
+    final target = _target;
+    final hint = target == null || target <= 0 || target == c.priceNgn
+        ? null
+        : PriceAlert.directionFor(target: target, current: c.priceNgn)
+            ? "You'll be told when it rises to ${formatNgn(target)} or more."
+            : "You'll be told when it falls to ${formatNgn(target)} or less.";
+
     return Padding(
-      padding: EdgeInsets.only(
-        left: 24,
-        right: 24,
-        top: 24,
-        bottom: MediaQuery.viewInsetsOf(context).bottom + 24,
-      ),
+      padding: EdgeInsets.fromLTRB(
+          24, 20, 24, MediaQuery.viewInsetsOf(context).bottom + 24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: (isDark ? Colors.white : Colors.black)
-                    .withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          Text(
-            'Set Alert — ${widget.commodity.name}',
-            style: const TextStyle(
-              fontFamily: 'Poppins',
-              fontWeight: FontWeight.w700,
-              fontSize: 16,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
+          Text('Price alert: ${c.name}',
+              style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 4),
-          Text(
-            'Current: ${formatNgn(widget.commodity.priceNgn)} / ${widget.commodity.unit}',
-            style: const TextStyle(
-              fontSize: 13,
-              color: AppColors.gray,
-            ),
-          ),
+          Text('Today: ${formatNgn(c.priceNgn)} per ${c.unit}'),
           const SizedBox(height: 16),
           TextField(
             controller: _controller,
+            autofocus: true,
             keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            onChanged: (_) => setState(() => _error = null),
+            onSubmitted: (_) => _save(),
             decoration: InputDecoration(
-              labelText: 'Target price (₦)',
-              prefixIcon:
-                  const Icon(Icons.monetization_on_outlined, size: 20),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(
-                    color: AppColors.deepGreen, width: 1.8),
-              ),
+              labelText: tr('Tell me when the price reaches (₦)'),
+              prefixIcon: const Icon(Icons.sell_outlined),
             ),
           ),
+          if (hint != null) ...[
+            const SizedBox(height: 8),
+            Text(hint),
+          ],
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(_error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error)),
+          ],
           const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF1B5E20), Color(0xFF2E7D32)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: TextButton(
-                onPressed: () {
-                  HapticFeedback.mediumImpact();
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Alert set for ${widget.commodity.name} at '
-                        '${_controller.text.isEmpty ? '[no price]' : '₦${_controller.text}'}',
-                      ),
-                      duration: const Duration(seconds: 2),
-                    ),
-                  );
-                },
-                child: const Text(
-                  'Set Alert',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontFamily: 'Poppins',
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15,
-                  ),
-                ),
-              ),
-            ),
+          FilledButton.icon(
+            onPressed: _saving ? null : _save,
+            icon: const Icon(Icons.notifications_active_outlined),
+            label: Text(_saving ? 'Saving…' : 'Set alert'),
           ),
         ],
       ),
@@ -981,8 +930,8 @@ class _RelatedSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionHeader(
-          title: 'Related Commodities',
+        SectionHeader(
+          title: tr('Related Commodities'),
           icon: Icons.grain_rounded,
         ),
         const SizedBox(height: 10),
@@ -1023,8 +972,7 @@ class _RelatedCard extends StatelessWidget {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute<void>(
-            builder: (_) =>
-                CommodityDetailScreen(id: commodity.id),
+            builder: (_) => CommodityDetailScreen(id: commodity.id),
           ),
         );
       },
@@ -1045,9 +993,7 @@ class _RelatedCard extends StatelessWidget {
                 fontFamily: 'Poppins',
                 fontWeight: FontWeight.w700,
                 fontSize: 13,
-                color: isDark
-                    ? AppColors.darkTextPrimary
-                    : AppColors.charcoal,
+                color: isDark ? AppColors.darkTextPrimary : AppColors.charcoal,
               ),
             ),
 

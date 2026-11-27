@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../core/constants/app_colors.dart';
 
 /// Adaptive metric card — switches to compact horizontal layout on small grids.
 class StatCard extends StatelessWidget {
@@ -21,10 +22,10 @@ class StatCard extends StatelessWidget {
   final String? unit;
 
   static BoxDecoration _card(bool isDark) => BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        color: isDark ? AppColors.cardDark : Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0),
+          color: isDark ? AppColors.darkBorder : AppColors.borderLight,
         ),
         boxShadow: [
           BoxShadow(
@@ -37,7 +38,7 @@ class StatCard extends StatelessWidget {
 
   Widget _trendChip() {
     final up = trend! >= 0;
-    final chipColor = up ? const Color(0xFF00C853) : const Color(0xFFC62828);
+    final chipColor = up ? AppColors.mintGreen : AppColors.errorRed;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
       decoration: BoxDecoration(
@@ -70,13 +71,13 @@ class StatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textTheme = Theme.of(context).textTheme;
-    final grayColor = const Color(0xFF6B7280);
-    final textColor = isDark ? Colors.white : const Color(0xFF1F2937);
+    final grayColor = AppColors.gray;
+    final textColor = isDark ? Colors.white : AppColors.charcoal;
 
     return LayoutBuilder(
       builder: (context, constraints) {
         // Compact mode: height too small for vertical layout
-        final compact = constraints.maxHeight < 88;
+        final compact = constraints.maxHeight < 116;
         final pad = compact ? 10.0 : 14.0;
         final iconSize = compact ? 28.0 : 36.0;
 
@@ -121,8 +122,8 @@ class StatCard extends StatelessWidget {
                             const SizedBox(width: 3),
                             Text(
                               unit!,
-                              style: textTheme.bodySmall?.copyWith(
-                                  color: grayColor, fontSize: 10),
+                              style: textTheme.bodySmall
+                                  ?.copyWith(color: grayColor, fontSize: 10),
                               maxLines: 1,
                             ),
                           ],
@@ -130,8 +131,8 @@ class StatCard extends StatelessWidget {
                       ),
                       Text(
                         label,
-                        style: textTheme.bodySmall?.copyWith(
-                            color: grayColor, fontSize: 10),
+                        style: textTheme.bodySmall
+                            ?.copyWith(color: grayColor, fontSize: 10),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -194,8 +195,8 @@ class StatCard extends StatelessWidget {
                       padding: const EdgeInsets.only(bottom: 2),
                       child: Text(
                         unit!,
-                        style: textTheme.bodySmall
-                            ?.copyWith(color: grayColor, fontWeight: FontWeight.w500),
+                        style: textTheme.bodySmall?.copyWith(
+                            color: grayColor, fontWeight: FontWeight.w500),
                         maxLines: 1,
                       ),
                     ),

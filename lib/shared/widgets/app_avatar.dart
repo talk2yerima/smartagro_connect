@@ -18,7 +18,8 @@ class AppAvatar extends StatelessWidget {
   String _initials() {
     final trimmed = name.trim();
     if (trimmed.isEmpty) return '?';
-    final parts = trimmed.split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    final parts =
+        trimmed.split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
     if (parts.length >= 2) {
       return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
     }

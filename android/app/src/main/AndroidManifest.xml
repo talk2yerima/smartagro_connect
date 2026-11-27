@@ -2,14 +2,22 @@
     <!-- Location for nearby buyers / markets (runtime permission requested in-app). -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- Live delivery tracking keeps sharing the driver's location while they
+         navigate in Google Maps (a visible "sharing location" notification). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Fingerprint / face unlock (Settings > Security) -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <!-- Voice notes in chat -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <application
         android:name="${applicationName}"
         android:icon="@drawable/ic_launcher_legacy"
         android:label="SmartAgro Connect"
-        android:usesCleartextTraffic="true">
+        android:usesCleartextTraffic="false">
         <!-- Replace with your Maps SDK key for production. -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
@@ -29,6 +37,31 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!--
+              Android App Links — HTTPS deep links.
+              Requires hosting /.well-known/assetlinks.json on smartagro.ng
+              and staging-api.smartagro.ng with the app's SHA-256 fingerprint.
+              Verify with: adb shell pm verify-app-links - -package com.smartagro.connect
+            -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="smartagro.ng" />
+            </intent-filter>
+
+            <!-- Custom URI scheme fallback: smartagro://app/marketplace/product/... -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="smartagro"
+                    android:host="app" />
             </intent-filter>
         </activity>
         <meta-data

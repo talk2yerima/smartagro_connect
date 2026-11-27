@@ -25,7 +25,8 @@ void main() {
     });
 
     test('null phone serialises as null', () {
-      const noPhone = AppUser(id: 'u2', name: 'X', email: 'x@y.ng', role: UserRole.buyer);
+      const noPhone =
+          AppUser(id: 'u2', name: 'X', email: 'x@y.ng', role: UserRole.buyer);
       expect(noPhone.toJson()['phone'], isNull);
     });
   });
@@ -62,14 +63,22 @@ void main() {
 
   group('AppUser equality', () {
     test('same id+email+role equals', () {
-      const a = AppUser(id: 'u1', name: 'A', email: 'emeka@farm.ng', role: UserRole.farmer);
-      const b = AppUser(id: 'u1', name: 'B', email: 'emeka@farm.ng', role: UserRole.farmer, rating: 5.0);
+      const a = AppUser(
+          id: 'u1', name: 'A', email: 'emeka@farm.ng', role: UserRole.farmer);
+      const b = AppUser(
+          id: 'u1',
+          name: 'B',
+          email: 'emeka@farm.ng',
+          role: UserRole.farmer,
+          rating: 5.0);
       expect(a, equals(b));
     });
 
     test('different id not equal', () {
-      const a = AppUser(id: 'u1', name: 'A', email: 'a@b.ng', role: UserRole.farmer);
-      const b = AppUser(id: 'u2', name: 'A', email: 'a@b.ng', role: UserRole.farmer);
+      const a =
+          AppUser(id: 'u1', name: 'A', email: 'a@b.ng', role: UserRole.farmer);
+      const b =
+          AppUser(id: 'u2', name: 'A', email: 'a@b.ng', role: UserRole.farmer);
       expect(a, isNot(equals(b)));
     });
   });

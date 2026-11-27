@@ -5,12 +5,15 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/di/auth_providers.dart';
+import '../../core/di/firestore_providers.dart';
 import '../../core/di/repositories_provider.dart';
+import '../../core/errors/friendly_error.dart';
+import '../../core/i18n/i18n.dart';
 import '../../domain/entities/chat_models.dart';
 import '../../shared/widgets/app_avatar.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/skeleton_list.dart';
-
 // ─── Role colour helper ────────────────────────────────────────────────────
 
 Color _roleColor(String role) {
@@ -30,9 +33,9 @@ Color _roleColor(String role) {
 
 BoxDecoration _card(bool isDark) => isDark
     ? BoxDecoration(
-        color: const Color(0xFF1E1E1E),
+        color: AppColors.cardDark,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF2E3C2E)),
+        border: Border.all(color: AppColors.darkBorder),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.22),
@@ -44,7 +47,7 @@ BoxDecoration _card(bool isDark) => isDark
     : BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2EAE0)),
+        border: Border.all(color: AppColors.borderLight),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
@@ -89,6 +92,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
   final _searchController = TextEditingController();
   String _query = '';
   String _activeFilter = 'All';
+  _Box _box = _Box.all;
 
   @override
   void dispose() {
@@ -97,7 +101,11 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
   }
 
   List<ChatThread> _applyFilters(List<ChatThread> threads) {
-    var result = threads;
+    var result = switch (_box) {
+      _Box.all => threads.where((t) => !t.archived).toList(),
+      _Box.unread => threads.where((t) => !t.archived && t.unread > 0).toList(),
+      _Box.archived => threads.where((t) => t.archived).toList(),
+    };
 
     // Apply search query
     if (_query.trim().isNotEmpty) {
@@ -129,13 +137,12 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
     final async = ref.watch(chatThreadsProvider);
 
     return Scaffold(
-      backgroundColor:
-          isDark ? AppColors.darkBg : AppColors.softWhite,
+      backgroundColor: isDark ? AppColors.darkBg : AppColors.softWhite,
       appBar: AppBar(
         backgroundColor: isDark ? AppColors.darkBg : Colors.white,
         elevation: 0,
         scrolledUnderElevation: 0.5,
-        title: const Text(
+        title: const T(
           'Messages',
           style: TextStyle(
             fontFamily: 'Poppins',
@@ -146,24 +153,49 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.edit_outlined),
-            tooltip: 'New conversation',
-            onPressed: () {
-              // Navigate to new conversation / contact picker
-            },
+            tooltip: tr('New conversation'),
+            onPressed: () => context.push('/search'),
           ),
           const SizedBox(width: 4),
         ],
       ),
       body: async.when(
-        loading: () => const SkeletonList(count: 5, showAvatar: true, height: 72),
-        error: (error, _) => _ErrorBody(error: error.toString()),
+        loading: () =>
+            const SkeletonList(count: 5, showAvatar: true, height: 72),
+        error: (error, _) => _ErrorBody(error: friendlyError(error)),
         data: (threads) {
           final filtered = _applyFilters(threads);
+          final unreadCount =
+              threads.where((t) => !t.archived && t.unread > 0).length;
+          final archivedCount = threads.where((t) => t.archived).length;
           return RefreshIndicator(
             color: AppColors.deepGreen,
-            onRefresh: () => ref.refresh(chatThreadsProvider.future),
+            onRefresh: () async => ref.invalidate(chatThreadsProvider),
             child: CustomScrollView(
               slivers: [
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                    child: SegmentedButton<_Box>(
+                      showSelectedIcon: false,
+                      segments: [
+                        const ButtonSegment(value: _Box.all, label: T('All')),
+                        ButtonSegment(
+                            value: _Box.unread,
+                            label: Text(unreadCount == 0
+                                ? 'Unread'
+                                : 'Unread ($unreadCount)')),
+                        ButtonSegment(
+                            value: _Box.archived,
+                            label: Text(archivedCount == 0
+                                ? 'Archived'
+                                : 'Archived ($archivedCount)')),
+                      ],
+                      selected: {_box},
+                      onSelectionChanged: (s) => setState(() => _box = s.first),
+                    ),
+                  ),
+                ),
                 SliverToBoxAdapter(
                   child: _SearchAndFilterBar(
                     isDark: isDark,
@@ -175,24 +207,41 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                   ),
                 ),
                 if (filtered.isEmpty)
-                  const SliverFillRemaining(
+                  SliverFillRemaining(
                     hasScrollBody: false,
-                    child: EmptyState(
-                      icon: Icons.chat_bubble_outline,
-                      title: 'No messages yet',
-                      subtitle:
-                          'Start a conversation with buyers or sellers',
-                    ),
+                    child: switch (_box) {
+                      _Box.unread => EmptyState(
+                          icon: Icons.mark_chat_read_outlined,
+                          title: tr('All caught up'),
+                          subtitle: tr('You have read every message.'),
+                        ),
+                      _Box.archived => EmptyState(
+                          icon: Icons.archive_outlined,
+                          title: tr('No archived chats'),
+                          subtitle:
+                              tr('Swipe a chat to the left to archive it.'),
+                        ),
+                      _Box.all => EmptyState(
+                          type: EmptyStateType.chat,
+                          icon: Icons.chat_bubble_outline,
+                          title: tr('No messages yet'),
+                          subtitle:
+                              tr('Start a conversation with buyers or sellers'),
+                        ),
+                    },
                   )
                 else
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate(
-                        (context, i) => _ThreadTile(
+                        (context, i) => _Archivable(
                           thread: filtered[i],
-                          isDark: isDark,
-                          index: i,
+                          child: _ThreadTile(
+                            thread: filtered[i],
+                            isDark: isDark,
+                            index: i,
+                          ),
                         ),
                         childCount: filtered.length,
                       ),
@@ -203,6 +252,61 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
           );
         },
       ),
+    );
+  }
+}
+
+enum _Box { all, unread, archived }
+
+/// Swipe a chat left to archive it (or, under Archived, to bring it back).
+class _Archivable extends ConsumerWidget {
+  const _Archivable({required this.thread, required this.child});
+
+  final ChatThread thread;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final uid = ref.watch(authSessionProvider.select((u) => u?.id));
+    if (uid == null) return child;
+    final archive = !thread.archived;
+    return Dismissible(
+      key: ValueKey('chat-${thread.id}-${thread.archived}'),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 24),
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: archive ? AppColors.gray : AppColors.emerald,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(archive ? Icons.archive_outlined : Icons.unarchive_outlined,
+                color: Colors.white),
+            const SizedBox(width: 6),
+            Text(archive ? 'Archive' : 'Unarchive',
+                style: const TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.w600)),
+          ],
+        ),
+      ),
+      onDismissed: (_) {
+        final db = ref.read(firestoreServiceProvider);
+        db.setThreadArchived(thread.id, uid, archive);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(archive
+              ? 'Chat with ${thread.peerName} archived.'
+              : 'Chat with ${thread.peerName} moved back.'),
+          action: SnackBarAction(
+            label: tr('Undo'),
+            onPressed: () => db.setThreadArchived(thread.id, uid, !archive),
+          ),
+        ));
+      },
+      child: child,
     );
   }
 }
@@ -240,9 +344,7 @@ class _SearchAndFilterBar extends StatelessWidget {
               color: isDark ? AppColors.cardDark : Colors.white,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: isDark
-                    ? AppColors.darkBorder
-                    : AppColors.borderLight,
+                color: isDark ? AppColors.darkBorder : AppColors.borderLight,
               ),
             ),
             child: TextField(
@@ -253,7 +355,7 @@ class _SearchAndFilterBar extends StatelessWidget {
                 color: isDark ? AppColors.darkTextPrimary : AppColors.charcoal,
               ),
               decoration: InputDecoration(
-                hintText: 'Search conversations…',
+                hintText: tr('Search conversations…'),
                 hintStyle: const TextStyle(
                   fontSize: 14,
                   color: AppColors.gray,
@@ -274,8 +376,7 @@ class _SearchAndFilterBar extends StatelessWidget {
                       )
                     : null,
                 border: InputBorder.none,
-                contentPadding:
-                    const EdgeInsets.symmetric(vertical: 12),
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
               ),
             ),
           ),
@@ -403,7 +504,7 @@ class _ThreadTile extends StatelessWidget {
                       color: AppColors.mintGreen,
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                        color: isDark ? AppColors.cardDark : Colors.white,
                         width: 2,
                       ),
                     ),
@@ -429,9 +530,8 @@ class _ThreadTile extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontFamily: 'Poppins',
-                            fontWeight: hasUnread
-                                ? FontWeight.w700
-                                : FontWeight.w600,
+                            fontWeight:
+                                hasUnread ? FontWeight.w700 : FontWeight.w600,
                             fontSize: 14,
                             color: isDark
                                 ? AppColors.darkTextPrimary
@@ -444,12 +544,10 @@ class _ThreadTile extends StatelessWidget {
                         _formatTime(thread.updatedAt),
                         style: TextStyle(
                           fontSize: 11,
-                          color: hasUnread
-                              ? AppColors.deepGreen
-                              : AppColors.gray,
-                          fontWeight: hasUnread
-                              ? FontWeight.w600
-                              : FontWeight.w400,
+                          color:
+                              hasUnread ? AppColors.deepGreen : AppColors.gray,
+                          fontWeight:
+                              hasUnread ? FontWeight.w600 : FontWeight.w400,
                         ),
                       ),
                     ],
@@ -472,9 +570,8 @@ class _ThreadTile extends StatelessWidget {
                                     ? AppColors.darkTextSecondary
                                     : AppColors.charcoal)
                                 : AppColors.gray,
-                            fontWeight: hasUnread
-                                ? FontWeight.w500
-                                : FontWeight.w400,
+                            fontWeight:
+                                hasUnread ? FontWeight.w500 : FontWeight.w400,
                           ),
                         ),
                       ),
@@ -549,7 +646,7 @@ class _ErrorBody extends StatelessWidget {
               color: AppColors.errorRed,
             ),
             const SizedBox(height: 12),
-            const Text(
+            const T(
               'Failed to load messages',
               style: TextStyle(
                 fontFamily: 'Poppins',

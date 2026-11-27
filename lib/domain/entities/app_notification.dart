@@ -8,6 +8,7 @@ class AppNotification extends Equatable {
     required this.createdAt,
     required this.type,
     this.read = false,
+    this.route,
   });
 
   final String id;
@@ -16,6 +17,9 @@ class AppNotification extends Equatable {
   final DateTime createdAt;
   final String type;
   final bool read;
+
+  /// Screen to open when tapped, e.g. '/orders'. Null for info-only.
+  final String? route;
 
   @override
   List<Object?> get props => [id];

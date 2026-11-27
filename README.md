@@ -65,7 +65,7 @@ Set `MAPS_API_KEY` when building:
 flutter build apk --dart-define=MAPS_API_KEY=YOUR_KEY
 ```
 
-Or add `MAPS_API_KEY=...` to `android/gradle.properties`.
+Or add `MAPS_API_KEY=...` to `android/local.properties` (not committed). CI reads the `MAPS_API_KEY` secret.
 
 ### Backend base URL
 
@@ -75,13 +75,45 @@ flutter run --dart-define=API_BASE=https://api.yourdomain.com
 
 Default is `https://api.smartagro.connect` (placeholder). Point it to your REST gateway; keep mock JSON for demos.
 
+## Payments (Paystack) — secure setup
+
+Payments run through the Cloud Functions backend in `functions/`. **The Paystack
+secret key is never put in the app** (it can be extracted from any APK).
+
+- The app sends only the product id. The server prices the order from Firestore,
+  starts the Paystack checkout, and confirms it with Paystack.
+- A payment counts as paid only when Paystack confirms it **and** the amount and
+  currency match. Underpayments are flagged `amount_mismatch`.
+- `payments/` and `orders/` can only be written by the backend (see `firestore.rules`).
+- The `paystackWebhook` function checks Paystack's HMAC signature, so payments
+  complete even if the buyer never returns to the app.
+
+Deploy once:
+
+```bash
+firebase functions:secrets:set PAYSTACK_SECRET_KEY
+firebase deploy --only functions,firestore:rules,firestore:indexes
+```
+
+Then in the Paystack dashboard (Settings → API Keys & Webhooks) set the webhook
+URL to `https://us-central1-<project-id>.cloudfunctions.net/paystackWebhook`.
+
+Tests:
+
+```bash
+cd functions && npm ci && npm test        # payment logic
+npm run test:rules                        # Firestore rules (needs Java 21 + firebase-tools)
+```
+
 ## Running
 
 ```bash
 flutter run
 ```
 
-Demo credentials (offline demo mode when Firebase is not configured):
+Demo credentials (offline demo mode when Firebase is not configured — dev and
+staging builds only; production builds with `--dart-define=FLAVOR=prod` never
+fall back to demo login):
 
 - Email: `farmer@demo.ng`
 - Password: any **6+** characters

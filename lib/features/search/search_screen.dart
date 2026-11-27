@@ -1,18 +1,20 @@
 import 'dart:async';
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/di/repositories_provider.dart';
+import '../../core/i18n/i18n.dart';
 import '../../core/utils/money_format.dart';
 import '../../domain/entities/commodity.dart';
 import '../../domain/entities/nearby_buyer.dart';
 import '../../domain/entities/product_listing.dart';
 import '../../shared/widgets/empty_state.dart';
+import '../../shared/widgets/produce_image.dart';
 import '../../shared/widgets/section_header.dart';
 import '../../shared/widgets/status_badge.dart';
 
@@ -20,10 +22,10 @@ import '../../shared/widgets/status_badge.dart';
 // Card decoration helper
 // ---------------------------------------------------------------------------
 BoxDecoration _card(bool isDark) => BoxDecoration(
-      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      color: isDark ? AppColors.cardDark : Colors.white,
       borderRadius: BorderRadius.circular(12),
       border: Border.all(
-        color: isDark ? const Color(0xFF2E3C2E) : const Color(0xFFE2EAE0),
+        color: isDark ? AppColors.darkBorder : AppColors.borderLight,
       ),
       boxShadow: [
         BoxShadow(
@@ -55,14 +57,14 @@ const List<_TrendingCategory> _trendingCategories = [
   _TrendingCategory(
     name: 'Maize',
     icon: Icons.grain,
-    gradientStart: Color(0xFFF9A825),
-    gradientEnd: Color(0xFFFF8F00),
+    gradientStart: AppColors.golden,
+    gradientEnd: AppColors.amber,
   ),
   _TrendingCategory(
     name: 'Tomatoes',
     icon: Icons.eco,
     gradientStart: Color(0xFFE53935),
-    gradientEnd: Color(0xFFC62828),
+    gradientEnd: AppColors.errorRed,
   ),
   _TrendingCategory(
     name: 'Cassava',
@@ -73,30 +75,49 @@ const List<_TrendingCategory> _trendingCategories = [
   _TrendingCategory(
     name: 'Rice',
     icon: Icons.rice_bowl,
-    gradientStart: Color(0xFF1B5E20),
-    gradientEnd: Color(0xFF2E7D32),
+    gradientStart: AppColors.deepGreen,
+    gradientEnd: AppColors.emerald,
   ),
   _TrendingCategory(
     name: 'Yam',
     icon: Icons.local_dining,
-    gradientStart: Color(0xFFFB8C00),
-    gradientEnd: Color(0xFFE65100),
+    gradientStart: AppColors.warmOrange,
+    gradientEnd: AppColors.warningOrange,
   ),
   _TrendingCategory(
     name: 'Palm Oil',
     icon: Icons.opacity,
-    gradientStart: Color(0xFF0277BD),
+    gradientStart: AppColors.infoBlue,
     gradientEnd: Color(0xFF01579B),
   ),
 ];
 
-const List<String> _mockRecentSearches = [
-  'Maize Plateau',
-  'Tomatoes Lagos',
-  'Rice Kebbi',
-  'Cassava Oyo',
-  'Palm Oil Rivers',
-];
+class _RecentSearchesNotifier extends StateNotifier<List<String>> {
+  _RecentSearchesNotifier() : super([]) {
+    _load();
+  }
+
+  static const _kKey = 'smartagro_recent_searches';
+  static const _kMax = 5;
+
+  Future<void> _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    state = prefs.getStringList(_kKey) ?? [];
+  }
+
+  Future<void> add(String query) async {
+    final q = query.trim();
+    if (q.isEmpty) return;
+    final next = [q, ...state.where((s) => s != q)].take(_kMax).toList();
+    state = next;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_kKey, next);
+  }
+}
+
+final _recentSearchesProvider =
+    StateNotifierProvider<_RecentSearchesNotifier, List<String>>(
+        (_) => _RecentSearchesNotifier());
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -131,7 +152,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 350), () {
       final q = _searchController.text.trim();
-      if (mounted && q != _query) setState(() => _query = q);
+      if (mounted && q != _query) {
+        setState(() => _query = q);
+        if (q.isNotEmpty) ref.read(_recentSearchesProvider.notifier).add(q);
+      }
     });
   }
 
@@ -147,6 +171,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
   // ── helpers ─────────────────────────────────────────────────────────────
 
   void _applyRecentSearch(String term) {
+    ref.read(_recentSearchesProvider.notifier).add(term);
     _searchController.text = term;
     _searchController.selection = TextSelection.fromPosition(
       TextPosition(offset: term.length),
@@ -206,7 +231,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
             color: isDark ? AppColors.darkTextPrimary : AppColors.charcoal,
           ),
           decoration: InputDecoration(
-            hintText: 'Search crops, products, buyers…',
+            hintText: tr('Search crops, products, buyers…'),
             hintStyle: GoogleFonts.poppins(
               fontSize: 14,
               color: isDark ? AppColors.darkTextSecondary : AppColors.gray,
@@ -221,7 +246,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
                     icon: Icon(
                       Icons.close_rounded,
                       size: 18,
-                      color: isDark ? AppColors.darkTextSecondary : AppColors.gray,
+                      color:
+                          isDark ? AppColors.darkTextSecondary : AppColors.gray,
                     ),
                     onPressed: () => _searchController.clear(),
                   )
@@ -253,16 +279,16 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
         children: [
           const SizedBox(height: 8),
           // ── Recent Searches ──
-          const SectionHeader(
-            title: 'Recent Searches',
+          SectionHeader(
+            title: tr('Recent Searches'),
             icon: Icons.history_rounded,
           ),
           const SizedBox(height: 8),
           _buildRecentSearches(isDark),
           const SizedBox(height: 16),
           // ── Trending Categories ──
-          const SectionHeader(
-            title: 'Trending Categories',
+          SectionHeader(
+            title: tr('Trending Categories'),
             icon: Icons.trending_up_rounded,
           ),
           const SizedBox(height: 8),
@@ -273,12 +299,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
   }
 
   Widget _buildRecentSearches(bool isDark) {
+    final searches = ref.watch(_recentSearchesProvider);
+    if (searches.isEmpty) return const SizedBox.shrink();
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
-        children: List.generate(_mockRecentSearches.length, (i) {
-          final term = _mockRecentSearches[i];
+        children: List.generate(searches.length, (i) {
+          final term = searches[i];
           return Padding(
             padding: const EdgeInsets.only(right: 8),
             child: ActionChip(
@@ -292,7 +320,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
                 style: GoogleFonts.poppins(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
-                  color: isDark ? AppColors.darkTextPrimary : AppColors.charcoal,
+                  color:
+                      isDark ? AppColors.darkTextPrimary : AppColors.charcoal,
                 ),
               ),
               backgroundColor:
@@ -352,29 +381,25 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
             .toList() ??
         [];
 
-    final products = productsAsync.valueOrNull
-            ?.where((p) {
-              final matchQ = p.title.toLowerCase().contains(q) ||
-                  p.state.toLowerCase().contains(q) ||
-                  p.city.toLowerCase().contains(q) ||
-                  p.sellerName.toLowerCase().contains(q);
-              final matchVerified = !_verifiedOnly || p.verified;
-              final matchNearby = !_nearbyOnly;
-              return matchQ && matchVerified && matchNearby;
-            })
-            .toList() ??
+    final products = productsAsync.valueOrNull?.where((p) {
+          final matchQ = p.title.toLowerCase().contains(q) ||
+              p.state.toLowerCase().contains(q) ||
+              p.city.toLowerCase().contains(q) ||
+              p.sellerName.toLowerCase().contains(q);
+          final matchVerified = !_verifiedOnly || p.verified;
+          final matchNearby = !_nearbyOnly;
+          return matchQ && matchVerified && matchNearby;
+        }).toList() ??
         [];
 
-    final buyers = buyersAsync.valueOrNull
-            ?.where((b) {
-              final matchQ = b.name.toLowerCase().contains(q) ||
-                  b.type.toLowerCase().contains(q) ||
-                  b.state.toLowerCase().contains(q);
-              final matchVerified = !_verifiedOnly || b.verified;
-              final matchNearby = !_nearbyOnly || b.distanceKm <= 50;
-              return matchQ && matchVerified && matchNearby;
-            })
-            .toList() ??
+    final buyers = buyersAsync.valueOrNull?.where((b) {
+          final matchQ = b.name.toLowerCase().contains(q) ||
+              b.type.toLowerCase().contains(q) ||
+              b.state.toLowerCase().contains(q);
+          final matchVerified = !_verifiedOnly || b.verified;
+          final matchNearby = !_nearbyOnly || b.distanceKm <= 50;
+          return matchQ && matchVerified && matchNearby;
+        }).toList() ??
         [];
 
     final isLoading = commoditiesAsync.isLoading ||
@@ -421,8 +446,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
               : TabBarView(
                   controller: _tabController,
                   children: [
-                    _buildAllTab(
-                        isDark, commodities, products, buyers),
+                    _buildAllTab(isDark, commodities, products, buyers),
                     _buildCommoditiesTab(isDark, commodities),
                     _buildProductsTab(isDark, products),
                     _buildBuyersTab(isDark, buyers),
@@ -442,7 +466,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
         child: Row(
           children: [
             _FilterChip(
-              label: 'Verified Only',
+              label: tr('Verified Only'),
               icon: Icons.verified_rounded,
               selected: _verifiedOnly,
               isDark: isDark,
@@ -450,7 +474,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
             ),
             const SizedBox(width: 8),
             _FilterChip(
-              label: 'Within 50 km',
+              label: tr('Within 50 km'),
               icon: Icons.location_on_rounded,
               selected: _nearbyOnly,
               isDark: isDark,
@@ -458,7 +482,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
             ),
             const SizedBox(width: 8),
             _FilterChip(
-              label: 'Price: Low-High',
+              label: tr('Price: Low-High'),
               icon: Icons.sort_rounded,
               selected: _priceFilterActive,
               isDark: isDark,
@@ -483,10 +507,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
         commodities.isNotEmpty || products.isNotEmpty || buyers.isNotEmpty;
 
     if (!hasAny) {
-      return const EmptyState(
+      return EmptyState(
         icon: Icons.search_off_rounded,
-        title: 'No results found',
-        subtitle: 'Try different keywords or adjust your filters.',
+        title: tr('No results found'),
+        subtitle: tr('Try different keywords or adjust your filters.'),
       );
     }
 
@@ -502,7 +526,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
           if (commodities.isNotEmpty) ...[
             SliverToBoxAdapter(
               child: SectionHeader(
-                title: 'Commodities',
+                title: tr('Commodities'),
                 actionLabel: commodities.length > 2 ? 'See all' : null,
                 onAction: () => _tabController.animateTo(1),
               ),
@@ -527,7 +551,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
           if (products.isNotEmpty) ...[
             SliverToBoxAdapter(
               child: SectionHeader(
-                title: 'Products',
+                title: tr('Products'),
                 actionLabel: products.length > 2 ? 'See all' : null,
                 onAction: () => _tabController.animateTo(2),
               ),
@@ -543,8 +567,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
                   ),
                   childCount: products.take(2).length,
                 ),
-                gridDelegate:
-                    const SliverGridDelegateWithFixedCrossAxisCount(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
                   mainAxisSpacing: 10,
                   crossAxisSpacing: 10,
@@ -556,7 +579,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
           if (buyers.isNotEmpty) ...[
             SliverToBoxAdapter(
               child: SectionHeader(
-                title: 'Buyers',
+                title: tr('Buyers'),
                 actionLabel: buyers.length > 2 ? 'See all' : null,
                 onAction: () => _tabController.animateTo(3),
               ),
@@ -588,10 +611,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
 
   Widget _buildCommoditiesTab(bool isDark, List<Commodity> commodities) {
     if (commodities.isEmpty) {
-      return const EmptyState(
+      return EmptyState(
         icon: Icons.grain,
-        title: 'No commodities found',
-        subtitle: 'Try searching with a different crop or category name.',
+        title: tr('No commodities found'),
+        subtitle: tr('Try searching with a different crop or category name.'),
       );
     }
 
@@ -615,10 +638,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
 
   Widget _buildProductsTab(bool isDark, List<ProductListing> products) {
     if (products.isEmpty) {
-      return const EmptyState(
+      return EmptyState(
         icon: Icons.storefront_rounded,
-        title: 'No products found',
-        subtitle: 'Try searching by crop name, location, or seller.',
+        title: tr('No products found'),
+        subtitle: tr('Try searching by crop name, location, or seller.'),
       );
     }
 
@@ -647,10 +670,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
 
   Widget _buildBuyersTab(bool isDark, List<NearbyBuyer> buyers) {
     if (buyers.isEmpty) {
-      return const EmptyState(
+      return EmptyState(
         icon: Icons.people_alt_rounded,
-        title: 'No buyers found',
-        subtitle: 'Try a different search term or remove filters.',
+        title: tr('No buyers found'),
+        subtitle: tr('Try a different search term or remove filters.'),
       );
     }
 
@@ -811,11 +834,9 @@ class _CommodityTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isUp = commodity.changePct >= 0;
-    final changeColor =
-        isUp ? AppColors.mintGreen : AppColors.errorRed;
-    final changeIcon = isUp
-        ? Icons.arrow_upward_rounded
-        : Icons.arrow_downward_rounded;
+    final changeColor = isUp ? AppColors.mintGreen : AppColors.errorRed;
+    final changeIcon =
+        isUp ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded;
     final changeLabel =
         '${isUp ? '+' : ''}${commodity.changePct.toStringAsFixed(1)}%';
 
@@ -851,9 +872,8 @@ class _CommodityTile extends StatelessWidget {
                   style: GoogleFonts.poppins(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: isDark
-                        ? AppColors.darkTextPrimary
-                        : AppColors.charcoal,
+                    color:
+                        isDark ? AppColors.darkTextPrimary : AppColors.charcoal,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -863,9 +883,8 @@ class _CommodityTile extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.poppins(
                     fontSize: 11,
-                    color: isDark
-                        ? AppColors.darkTextSecondary
-                        : AppColors.gray,
+                    color:
+                        isDark ? AppColors.darkTextSecondary : AppColors.gray,
                   ),
                 ),
               ],
@@ -882,9 +901,8 @@ class _CommodityTile extends StatelessWidget {
                 style: GoogleFonts.poppins(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: isDark
-                      ? AppColors.darkTextPrimary
-                      : AppColors.charcoal,
+                  color:
+                      isDark ? AppColors.darkTextPrimary : AppColors.charcoal,
                 ),
               ),
               const SizedBox(height: 4),
@@ -949,16 +967,9 @@ class _ProductCard extends StatelessWidget {
               ),
             ),
             child: product.imageUrl.isNotEmpty
-                ? CachedNetworkImage(
-                    imageUrl: product.imageUrl,
+                ? ProduceImage(
+                    url: product.imageUrl,
                     fit: BoxFit.cover,
-                    memCacheWidth: 300,
-                    memCacheHeight: 270,
-                    errorWidget: (_, __, ___) => const Icon(
-                      Icons.image_not_supported_rounded,
-                      color: Colors.white54,
-                      size: 28,
-                    ),
                   )
                 : const Icon(
                     Icons.storefront_rounded,
@@ -978,9 +989,8 @@ class _ProductCard extends StatelessWidget {
                   style: GoogleFonts.poppins(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: isDark
-                        ? AppColors.darkTextPrimary
-                        : AppColors.charcoal,
+                    color:
+                        isDark ? AppColors.darkTextPrimary : AppColors.charcoal,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -990,9 +1000,8 @@ class _ProductCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.poppins(
                     fontSize: 10,
-                    color: isDark
-                        ? AppColors.darkTextSecondary
-                        : AppColors.gray,
+                    color:
+                        isDark ? AppColors.darkTextSecondary : AppColors.gray,
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -1115,9 +1124,8 @@ class _BuyerTile extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.poppins(
                     fontSize: 11,
-                    color: isDark
-                        ? AppColors.darkTextSecondary
-                        : AppColors.gray,
+                    color:
+                        isDark ? AppColors.darkTextSecondary : AppColors.gray,
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -1126,9 +1134,8 @@ class _BuyerTile extends StatelessWidget {
                     Icon(
                       Icons.location_on_rounded,
                       size: 12,
-                      color: isDark
-                          ? AppColors.darkTextSecondary
-                          : AppColors.gray,
+                      color:
+                          isDark ? AppColors.darkTextSecondary : AppColors.gray,
                     ),
                     const SizedBox(width: 3),
                     Text(
@@ -1187,9 +1194,7 @@ class _BuyerTile extends StatelessWidget {
               const SizedBox(height: 6),
               StatusBadge(
                 label: buyer.verified ? 'Verified' : 'Unverified',
-                color: buyer.verified
-                    ? AppColors.mintGreen
-                    : AppColors.gray,
+                color: buyer.verified ? AppColors.mintGreen : AppColors.gray,
                 icon: buyer.verified
                     ? Icons.verified_rounded
                     : Icons.help_outline_rounded,

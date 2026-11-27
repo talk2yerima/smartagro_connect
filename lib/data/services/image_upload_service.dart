@@ -39,11 +39,37 @@ class ImageUploadService {
     String? userId,
     void Function(double progress)? onProgress,
   }) {
+    return uploadImage(
+      filePath: filePath,
+      storagePath: 'product_images/${userId ?? 'anon'}/$productId.jpg',
+      onProgress: onProgress,
+    );
+  }
+
+  /// A farm photo (cover or gallery) for the farmer's public profile:
+  /// farm_photos/{uid}/{name}.jpg.
+  Future<String> uploadFarmPhoto({
+    required String filePath,
+    required String userId,
+    required String name,
+    void Function(double progress)? onProgress,
+  }) =>
+      uploadImage(
+        filePath: filePath,
+        storagePath: 'farm_photos/$userId/$name.jpg',
+        onProgress: onProgress,
+      );
+
+  /// Uploads a (already resized) JPEG to [storagePath]; returns its URL.
+  Future<String> uploadImage({
+    required String filePath,
+    required String storagePath,
+    void Function(double progress)? onProgress,
+  }) {
     if (_storageReady) {
       return _uploadToFirebase(
         filePath: filePath,
-        productId: productId,
-        userId: userId,
+        storagePath: storagePath,
         onProgress: onProgress,
       );
     }
@@ -54,14 +80,21 @@ class ImageUploadService {
 
   Future<String> _uploadToFirebase({
     required String filePath,
-    required String productId,
-    String? userId,
+    required String storagePath,
     void Function(double)? onProgress,
   }) async {
-    final ref = FirebaseStorage.instance
-        .ref('product_images/${userId ?? 'anon'}/$productId.jpg');
+    final ref = FirebaseStorage.instance.ref(storagePath);
 
-    final task = ref.putFile(File(filePath));
+    // The photo picker already resized (max 1200 px) and compressed it
+    // (quality 80); compressing again only lost quality and cost time.
+    // Cache headers let phones keep the photo instead of re-downloading it.
+    final task = ref.putFile(
+      File(filePath),
+      SettableMetadata(
+        contentType: 'image/jpeg',
+        cacheControl: 'public, max-age=604800',
+      ),
+    );
 
     StreamSubscription<TaskSnapshot>? sub;
     sub = task.snapshotEvents.listen((snap) {

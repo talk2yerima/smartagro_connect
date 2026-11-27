@@ -2,9 +2,53 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/config/app_env.dart';
 import 'core/di/initialization_provider.dart';
+import 'core/errors/friendly_error.dart';
+import 'core/i18n/i18n.dart';
 import 'core/router/app_router.dart';
+import 'core/services/app_lock.dart';
 import 'core/theme/app_theme.dart';
+
+// ---------------------------------------------------------------------------
+// Jailbreak / root blocker
+// ---------------------------------------------------------------------------
+class _JailbreakBlocker extends StatelessWidget {
+  const _JailbreakBlocker();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Material(
+      color: Colors.white,
+      child: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.security_rounded, size: 72, color: Color(0xFFB00020)),
+              SizedBox(height: 24),
+              Text(
+                'Security Alert',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 16),
+              Text(
+                'SmartAgro Connect has detected that this device '
+                'may be compromised (rooted or jailbroken). '
+                'For the security of your data, the app cannot '
+                'run on this device.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14, height: 1.5),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 /// Root widget: theme mode, localization, and navigation shell.
 class SmartAgroConnectApp extends ConsumerWidget {
@@ -14,13 +58,17 @@ class SmartAgroConnectApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final init = ref.watch(initializationProvider);
     final themeMode = ref.watch(themeModeProvider);
+    // Sets the language before the first screen is drawn.
+    ref.watch(languageProvider);
+    final isJailbroken =
+        ref.watch(jailbreakDetectedProvider).valueOrNull ?? false;
 
     return init.when(
       data: (_) {
         final router = ref.watch(goRouterProvider);
 
         return MaterialApp.router(
-          title: 'SmartAgro Connect',
+          title: AppEnv.appName,
           debugShowCheckedModeBanner: false,
           theme: AppTheme.light(),
           darkTheme: AppTheme.dark(),
@@ -36,6 +84,30 @@ class SmartAgroConnectApp extends ConsumerWidget {
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
+          builder: (context, routed) {
+            if (isJailbroken) return const _JailbreakBlocker();
+            // Fingerprint / face lock sits over every signed-in screen.
+            final child = LanguageRefresher(
+                child: AppLockGate(child: routed ?? const SizedBox.shrink()));
+            if (!AppEnv.isProd) {
+              return Banner(
+                message: AppEnv.isStaging ? 'STAGING' : 'DEV',
+                location: BannerLocation.topEnd,
+                color: AppEnv.isStaging
+                    ? const Color(0xFFF57C00)
+                    : const Color(0xFF1565C0),
+                textStyle: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12.0,
+                  fontWeight: FontWeight.w700,
+                  height: 1.0,
+                  letterSpacing: 0.5,
+                ),
+                child: child,
+              );
+            }
+            return child;
+          },
         );
       },
       loading: () => const MaterialApp(
@@ -45,7 +117,9 @@ class SmartAgroConnectApp extends ConsumerWidget {
       ),
       error: (e, _) => MaterialApp(
         home: Scaffold(
-          body: Center(child: Text('Startup error: $e')),
+          body: Center(
+              child: Text('SmartAgro could not start. ${friendlyError(e)}',
+                  textAlign: TextAlign.center)),
         ),
       ),
     );
